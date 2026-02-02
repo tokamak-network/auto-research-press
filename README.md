@@ -104,7 +104,7 @@ Available at: https://github.com/tokamak-network/ai-backed-research
 This repository is maintained by the Tokamak Network Research Lab. For questions, suggestions, or collaboration inquiries:
 
 - **Issues:** Open a GitHub issue
-- **Contact:** research@tokamak.network
+- **Contact:** suhyeon@tokamak.network
 - **Website:** https://tokamak.network
 
 ## License
