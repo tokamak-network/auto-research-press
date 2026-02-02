@@ -18,6 +18,7 @@
     --bg-tertiary: #f1f5f9;
     --border: #e2e8f0;
     --border-light: #f1f5f9;
+    --bg-accent: #eff6ff;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
