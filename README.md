@@ -75,8 +75,14 @@ Navigate to [reports/research-report.md](./reports/research-report.md)
    xdg-open web/index.html  # Linux
    ```
 
-### Option 3: GitHub Pages (Coming Soon)
-The blog will be hosted at: `https://tokamak-network.github.io/ai-backed-research/`
+### Option 3: Live Website (Vercel)
+The blog is hosted at: `https://research.tokamak.network` (or Vercel auto-generated URL)
+
+**Deploy your own:**
+1. Fork this repository
+2. Import to Vercel: https://vercel.com/new
+3. Connect your GitHub repo
+4. Deploy automatically!
 
 ## Research Methodology
 
