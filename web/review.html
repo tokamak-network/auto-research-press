@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Peer Review System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --text: #0a0a0a;
+            --text-secondary: #525252;
+            --border: #e5e5e5;
+            --accent: #0a0a0a;
+            --highlight: #fef08a;
+            --highlight-border: #fde047;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0a0a0a;
+            --surface: #171717;
+            --text: #fafafa;
+            --text-secondary: #a3a3a3;
+            --border: #262626;
+            --accent: #fafafa;
+            --highlight: #713f12;
+            --highlight-border: #a16207;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 0.875rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        .theme-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.875rem;
+            border-radius: 0;
+            transition: all 0.15s ease;
+            font-weight: 500;
+            font-family: inherit;
+        }
+
+        .theme-btn:hover {
+            background: var(--bg);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .project-item {
+            padding: 0.875rem 1rem;
+            border: 1px solid var(--border);
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .project-item:hover {
+            border-color: var(--accent);
+            transform: translateX(2px);
+        }
+
+        .project-item.active {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+
+        .project-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 0.375rem;
+            letter-spacing: -0.01em;
+        }
+
+        .project-meta {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .section-title {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+        }
+
+        .version-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .blog-link-btn {
+            padding: 0.625rem 1.125rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8125rem;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .blog-link-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .blog-link-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .version-tab {
+            padding: 0.625rem 1.125rem;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.8125rem;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+            font-weight: 500;
+        }
+
+        .version-tab:hover {
+            border-color: var(--accent);
+            transform: translateY(-1px);
+        }
+
+        .version-tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        [data-theme="dark"] .version-tab.active {
+            color: var(--surface);
+        }
+
+        [data-theme="light"] .version-tab.active {
+            color: var(--surface);
+        }
+
+        .diff-toggle {
+            margin-bottom: 1.25rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .diff-toggle input[type="checkbox"] {
+            width: 2.5rem;
+            height: 1.375rem;
+            appearance: none;
+            background: var(--border);
+            border-radius: 1rem;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .diff-toggle input[type="checkbox"]:checked {
+            background: var(--accent);
+        }
+
+        .diff-toggle input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 50%;
+            background: white;
+            top: 0.125rem;
+            left: 0.125rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .diff-toggle input[type="checkbox"]:checked::before {
+            left: 1.25rem;
+        }
+
+        .diff-toggle label {
+            cursor: pointer;
+            user-select: none;
+            font-weight: 500;
+        }
+
+        .manuscript-viewer {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.75rem;
+            font-size: 0.9375rem;
+            line-height: 1.7;
+            max-height: 600px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .manuscript-viewer h1 {
+            font-size: 1.625rem;
+            margin: 1.75rem 0 0.875rem 0;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.3;
+        }
+
+        .manuscript-viewer h1:first-child {
+            margin-top: 0;
+        }
+
+        .manuscript-viewer h2 {
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.625rem 0;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+
+        .manuscript-viewer h3 {
+            font-size: 1.0625rem;
+            margin: 1.25rem 0 0.5rem 0;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .manuscript-viewer p {
+            margin: 0.875rem 0;
+        }
+
+        .manuscript-viewer ul, .manuscript-viewer ol {
+            margin: 0.875rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .manuscript-viewer li {
+            margin: 0.375rem 0;
+        }
+
+        .manuscript-viewer code {
+            background: var(--surface);
+            padding: 0.1875rem 0.375rem;
+            font-family: 'SF Mono', 'Monaco', monospace;
+            font-size: 0.875rem;
+            border-radius: 3px;
+            border: 1px solid var(--border);
+        }
+
+        .manuscript-viewer pre {
+            background: var(--surface);
+            padding: 1.125rem;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin: 1.125rem 0;
+        }
+
+        .manuscript-viewer pre code {
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .diff-highlight {
+            background: var(--highlight);
+            border-bottom: 2px solid var(--highlight-border);
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .chart-container {
+            height: 280px;
+            margin: 1.25rem 0;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="dark"] .chart-container {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .project-title {
+            font-size: 1.375rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .status-badge {
+            padding: 0.375rem 0.875rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .round-section {
+            margin-bottom: 1.75rem;
+        }
+
+        .round-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.875rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.25rem;
+        }
+
+        .round-title {
+            font-size: 1.0625rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .round-score {
+            font-weight: 700;
+            font-size: 1.125rem;
+        }
+
+        .moderator-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .moderator-decision {
+            font-weight: 600;
+            margin-bottom: 0.625rem;
+            font-size: 0.9375rem;
+        }
+
+        .moderator-meta {
+            font-size: 0.9375rem;
+            margin: 0.625rem 0;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .changes-list {
+            margin-top: 0.875rem;
+            font-size: 0.875rem;
+        }
+
+        .changes-list ul {
+            margin-left: 1.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .changes-list li {
+            margin: 0.375rem 0;
+        }
+
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .review-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.25rem;
+        }
+
+        .reviewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.875rem;
+        }
+
+        .reviewer-name {
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+
+        .reviewer-score {
+            font-weight: 700;
+            font-size: 1.0625rem;
+        }
+
+        .score-breakdown {
+            display: flex;
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+            flex-wrap: wrap;
+            font-size: 0.75rem;
+        }
+
+        .score-item {
+            padding: 0.375rem 0.625rem;
+            border: 1px solid var(--border-subtle);
+            background: var(--layer-01);
+            border-radius: 0;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .review-section {
+            margin: 0.875rem 0;
+        }
+
+        .review-section-title {
+            font-weight: 600;
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.625rem;
+        }
+
+        .review-list {
+            list-style: disc;
+            margin-left: 1.25rem;
+            font-size: 0.875rem;
+        }
+
+        .review-list li {
+            margin: 0.375rem 0;
+            color: var(--text-secondary);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.25rem 0;
+        }
+
+        .metric-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .metric-label {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .metric-subvalue {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .performance-breakdown {
+            margin: 1.25rem 0;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .breakdown-label {
+            font-weight: 500;
+        }
+
+        .breakdown-value {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .detailed-feedback {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.875rem;
+            margin-top: 0.625rem;
+            font-size: 0.875rem;
+            max-height: 220px;
+            overflow-y: auto;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .loading, .error {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .version-tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">AI Peer Review System</div>
+            <div class="header-nav">
+                <a href="index.html" class="nav-link">← Home</a>
+                <a href="research-queue.html" class="nav-link">Queue</a>
+                <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">Dark Mode</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-title">Research Projects</div>
+            <div id="projects-list" class="loading">Loading...</div>
+        </div>
+
+        <div class="content">
+            <div id="content" class="loading">
+                <p>Select a project to view details</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allProjects = [];
+        let currentData = null;
+        let manuscripts = {};
+        let scoreChart = null;
+        let timeDistributionChart = null;
+        let reviewerTimingChart = null;
+        let currentVersion = 1;
+        let showDiff = false;
+        let currentProject = null;
+
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const theme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', theme);
+            document.getElementById('theme-btn').textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            localStorage.setItem('theme', theme);
+            if (scoreChart) updateChartTheme();
+            if (timeDistributionChart) updatePerformanceChartTheme();
+        }
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('theme-btn').textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+
+        window.addEventListener('DOMContentLoaded', loadProjects);
+
+        async function loadProjects() {
+            try {
+                const indexRes = await fetch('data/index.json');
+                if (!indexRes.ok) throw new Error('No data found');
+
+                const index = await indexRes.json();
+                allProjects = index.projects;
+
+                if (allProjects.length === 0) {
+                    document.getElementById('projects-list').innerHTML = '<p>No projects yet</p>';
+                    return;
+                }
+
+                renderProjectsList();
+
+                // Check if project ID is in URL
+                const params = new URLSearchParams(window.location.search);
+                const urlProjectId = params.get('id');
+
+                if (urlProjectId && allProjects.find(p => p.id === urlProjectId)) {
+                    loadProject(urlProjectId);
+                } else {
+                    loadProject(allProjects[0].id);
+                }
+            } catch (error) {
+                document.getElementById('projects-list').innerHTML = `<div class="error">${error.message}</div>`;
+            }
+        }
+
+        function renderProjectsList() {
+            const projectsList = document.getElementById('projects-list');
+            projectsList.innerHTML = '';
+
+            allProjects.forEach(p => {
+                console.log('Adding project to list:', p.id);
+                const div = document.createElement('div');
+                div.className = 'project-item';
+                div.setAttribute('data-project-id', p.id);
+                div.id = `proj-${p.id}`;
+                div.innerHTML = `
+                    <div class="project-name">${p.topic}</div>
+                    <div class="project-meta">
+                        ${p.final_score}/10 • ${p.total_rounds} rounds
+                    </div>
+                `;
+                div.addEventListener('click', () => {
+                    console.log('Project clicked:', p.id);
+                    loadProject(p.id);
+                });
+                projectsList.appendChild(div);
+            });
+        }
+
+        async function loadProject(projectId) {
+            try {
+                console.log('loadProject called with ID:', projectId);
+                currentProject = projectId; // Set current project ID
+                console.log('currentProject set to:', currentProject);
+
+                document.querySelectorAll('.project-item').forEach(el => el.classList.remove('active'));
+                const projElement = document.querySelector(`[data-project-id="${projectId}"]`);
+                if (projElement) {
+                    projElement.classList.add('active');
+                } else {
+                    console.warn('Project element not found for ID:', projectId);
+                }
+
+                const project = allProjects.find(p => p.id === projectId);
+                const [dataRes, manuscriptsRes] = await Promise.all([
+                    fetch(project.data_file),
+                    fetch(`data/${projectId}_manuscripts.json`)
+                ]);
+
+                currentData = await dataRes.json();
+                manuscripts = manuscriptsRes.ok ? await manuscriptsRes.json() : {};
+
+                currentVersion = 1;
+                showDiff = false;
+
+                // Update URL with project ID
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('id', projectId);
+                window.history.pushState({}, '', newUrl);
+                console.log('URL updated to:', newUrl.toString());
+
+                renderView(currentData);
+            } catch (error) {
+                document.getElementById('content').innerHTML = `<div class="error">${error.message}</div>`;
+            }
+        }
+
+        function getBlogUrl(topic) {
+            // All projects can be viewed as static articles
+            // Get current project ID from URL or global state
+            const params = new URLSearchParams(window.location.search);
+            const projectId = params.get('id') || currentProject;
+
+            console.log('getBlogUrl called:', {
+                topic: topic,
+                urlParams: window.location.search,
+                urlProjectId: params.get('id'),
+                currentProject: currentProject,
+                finalProjectId: projectId
+            });
+
+            if (projectId) {
+                const url = `articles/${projectId}.html`;
+                console.log('Generated article URL:', url);
+                return url;
+            }
+
+            console.log('No project ID available, returning null');
+            return null;
+        }
+
+        function renderView(data) {
+            const finalDecision = data.rounds[data.rounds.length - 1].moderator_decision?.decision || 'PENDING';
+
+            // Get blog URL if available (can be configured in data or based on ID mapping)
+            console.log('renderView: currentProject =', currentProject);
+            const blogUrl = getBlogUrl(data.topic);
+            console.log('renderView: blogUrl =', blogUrl);
+
+            document.getElementById('content').innerHTML = `
+                <div class="section">
+                    <div class="section-title">Manuscript Versions</div>
+                    <div class="version-tabs" id="version-tabs">
+                        ${data.rounds.map(r => `
+                            <button class="version-tab ${r.round === 1 ? 'active' : ''}" onclick="selectVersion(${r.round})">
+                                V${r.round} (${r.overall_average}/10)
+                            </button>
+                        `).join('')}
+                        ${blogUrl ? `
+                            <a href="${blogUrl}" class="blog-link-btn" target="_blank">
+                                <svg viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                                </svg>
+                                Read Article
+                            </a>
+                        ` : ''}
+                    </div>
+                    <div class="diff-toggle">
+                        <input type="checkbox" id="diff-mode" onchange="toggleDiffMode()">
+                        <label for="diff-mode">Highlight changes from previous version</label>
+                    </div>
+                    <div class="manuscript-viewer" id="manuscript-viewer"></div>
+                </div>
+
+                <div class="section">
+                    <div class="project-header">
+                        <h1 class="project-title">${data.topic}</h1>
+                        <span class="status-badge">${finalDecision}</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+
+                ${data.rounds.map((round, idx) => renderRound(round, idx)).join('')}
+
+                ${data.performance ? renderPerformanceMetrics(data.performance) : ''}
+            `;
+
+            renderChart(data);
+            if (data.performance) {
+                renderPerformanceCharts(data.performance);
+            }
+            renderManuscriptViewer();
+        }
+
+        function selectVersion(version) {
+            currentVersion = version;
+
+            document.querySelectorAll('.version-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            renderManuscriptViewer();
+        }
+
+        function toggleDiffMode() {
+            showDiff = document.getElementById('diff-mode').checked;
+            renderManuscriptViewer();
+        }
+
+        function renderManuscriptViewer() {
+            const viewer = document.getElementById('manuscript-viewer');
+            if (!viewer) return;
+
+            const manuscriptKey = `manuscript_v${currentVersion}`;
+            const manuscriptText = manuscripts[manuscriptKey] || '';
+
+            if (!manuscriptText) {
+                viewer.innerHTML = '<p style="color: var(--text-secondary);">Manuscript not available</p>';
+                return;
+            }
+
+            if (showDiff && currentVersion > 1) {
+                const prevKey = `manuscript_v${currentVersion - 1}`;
+                const prevText = manuscripts[prevKey] || '';
+                viewer.innerHTML = renderDiff(prevText, manuscriptText);
+            } else {
+                viewer.innerHTML = marked.parse(manuscriptText);
+            }
+        }
+
+        function renderDiff(oldText, newText) {
+            // Parse both texts as HTML first
+            const oldHtml = marked.parse(oldText);
+            const newHtml = marked.parse(newText);
+
+            // Create temporary elements to extract text content
+            const oldDiv = document.createElement('div');
+            const newDiv = document.createElement('div');
+            oldDiv.innerHTML = oldHtml;
+            newDiv.innerHTML = newHtml;
+
+            // For now, use a simple paragraph-based diff
+            const oldParas = Array.from(oldDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote'));
+            const newParas = Array.from(newDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote'));
+
+            // Simple approach: highlight paragraphs that are new or changed
+            const oldTexts = new Set(oldParas.map(p => p.textContent.trim()));
+
+            newParas.forEach(para => {
+                const text = para.textContent.trim();
+                if (!oldTexts.has(text) && text.length > 0) {
+                    // This paragraph is new or modified
+                    para.style.backgroundColor = 'var(--highlight)';
+                    para.style.borderLeft = '3px solid var(--highlight-border)';
+                    para.style.paddingLeft = '0.75rem';
+                    para.style.marginLeft = '-0.75rem';
+                }
+            });
+
+            return newDiv.innerHTML;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderRound(round, idx) {
+            const moderator = round.moderator_decision;
+
+            return `
+                <div class="section">
+                    <div class="round-section">
+                        <div class="round-header">
+                            <div>
+                                <div class="round-title">Round ${round.round}</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    ${round.word_count.toLocaleString()} words
+                                </div>
+                            </div>
+                            <div class="round-score">${round.overall_average}/10</div>
+                        </div>
+
+                        ${moderator ? `
+                            <div class="moderator-panel">
+                                <div class="moderator-decision">
+                                    ${moderator.decision} (Confidence: ${moderator.confidence}/5)
+                                </div>
+                                <div class="moderator-meta">${moderator.meta_review}</div>
+                                ${moderator.required_changes.length > 0 ? `
+                                    <div class="changes-list">
+                                        <strong>Required Changes:</strong>
+                                        <ul>
+                                            ${moderator.required_changes.map(c => `<li>${c}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+
+                        <div class="reviews-grid">
+                            ${round.reviews.map(r => renderReview(r)).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderReview(review) {
+            return `
+                <div class="review-card">
+                    <div class="reviewer-header">
+                        <div class="reviewer-name">${review.specialist_name}</div>
+                        <div class="reviewer-score">${review.average}/10</div>
+                    </div>
+
+                    <div class="score-breakdown">
+                        <div class="score-item">${review.scores.accuracy} Accuracy</div>
+                        <div class="score-item">${review.scores.completeness} Complete</div>
+                        <div class="score-item">${review.scores.clarity} Clarity</div>
+                        <div class="score-item">${review.scores.novelty} Novelty</div>
+                        <div class="score-item">${review.scores.rigor} Rigor</div>
+                    </div>
+
+                    <div class="review-section">
+                        <div class="review-section-title">Summary</div>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary);">${review.summary}</p>
+                    </div>
+
+                    <div class="review-section">
+                        <div class="review-section-title">Strengths</div>
+                        <ul class="review-list">
+                            ${review.strengths.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="review-section">
+                        <div class="review-section-title">Weaknesses</div>
+                        <ul class="review-list">
+                            ${review.weaknesses.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="review-section">
+                        <div class="review-section-title">Detailed Feedback</div>
+                        <div class="detailed-feedback">${review.detailed_feedback}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('progressChart');
+            if (!ctx) return;
+
+            const theme = document.documentElement.getAttribute('data-theme');
+            const textColor = theme === 'dark' ? '#fafafa' : '#0a0a0a';
+            const gridColor = theme === 'dark' ? '#262626' : '#e5e5e5';
+
+            const rounds = data.rounds.map(r => `Round ${r.round}`);
+
+            // Extract unique reviewers from actual data (only those who participated)
+            const reviewerSet = new Set();
+            data.rounds.forEach(round => {
+                round.reviews.forEach(review => {
+                    if (review.specialist_name) {
+                        reviewerSet.add(review.specialist_name);
+                    }
+                });
+            });
+            const specialists = Array.from(reviewerSet);
+
+            const datasets = specialists.map((name, idx) => {
+                const colors = ['#0f62fe', '#8a3ffc', '#ff7eb6', '#42be65', '#f1c21b']; // IBM Carbon colors
+                return {
+                    label: name,
+                    data: data.rounds.map(r => {
+                        const review = r.reviews.find(rev => rev.specialist_name === name);
+                        return review ? review.average : null;
+                    }),
+                    borderColor: colors[idx % colors.length],
+                    backgroundColor: colors[idx % colors.length] + '20',
+                    tension: 0.3,
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: colors[idx % colors.length],
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverBorderWidth: 2,
+                    spanGaps: false  // Don't connect points if reviewer didn't participate
+                };
+            });
+
+            datasets.unshift({
+                label: 'Overall Average',
+                data: data.rounds.map(r => r.overall_average),
+                borderColor: '#10b981',
+                backgroundColor: '#10b98120',
+                borderWidth: 4,
+                tension: 0.4,
+                fill: false,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: '#10b981',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointHoverBorderWidth: 3
+            });
+
+            scoreChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: rounds, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: textColor,
+                                font: { size: 11, weight: '500' },
+                                padding: 12
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10,
+                            ticks: {
+                                color: textColor,
+                                font: { size: 12, weight: '500' }
+                            },
+                            grid: {
+                                color: gridColor,
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: textColor,
+                                font: { size: 12, weight: '500' }
+                            },
+                            grid: {
+                                color: gridColor,
+                                drawBorder: false
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        function updateChartTheme() {
+            if (!scoreChart) return;
+
+            const theme = document.documentElement.getAttribute('data-theme');
+            const textColor = theme === 'dark' ? '#fafafa' : '#0a0a0a';
+            const gridColor = theme === 'dark' ? '#262626' : '#e5e5e5';
+
+            scoreChart.options.plugins.legend.labels.color = textColor;
+            scoreChart.options.scales.y.ticks.color = textColor;
+            scoreChart.options.scales.y.grid.color = gridColor;
+            scoreChart.options.scales.x.ticks.color = textColor;
+            scoreChart.options.scales.x.grid.color = gridColor;
+
+            scoreChart.update();
+        }
+
+        function renderPerformanceMetrics(perf) {
+            const totalMinutes = Math.floor(perf.total_duration / 60);
+            const totalSeconds = Math.floor(perf.total_duration % 60);
+
+            const workflowStart = new Date(perf.workflow_start);
+            const workflowEnd = new Date(perf.workflow_end);
+
+            return `
+                <div class="section">
+                    <div class="section-title">Performance Metrics</div>
+
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Total Duration</div>
+                            <div class="metric-value">${totalMinutes}m ${totalSeconds}s</div>
+                            <div class="metric-subvalue">${perf.total_duration.toFixed(1)}s</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-label">Total Tokens</div>
+                            <div class="metric-value">${perf.total_tokens.toLocaleString()}</div>
+                            ${perf.estimated_cost ? `<div class="metric-subvalue">$${perf.estimated_cost.toFixed(3)}</div>` : ''}
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-label">Initial Draft</div>
+                            <div class="metric-value">${perf.initial_draft_time.toFixed(1)}s</div>
+                            <div class="metric-subvalue">${perf.initial_draft_tokens.toLocaleString()} tokens</div>
+                        </div>
+
+                        ${perf.team_composition_time ? `
+                        <div class="metric-card">
+                            <div class="metric-label">Team Composition</div>
+                            <div class="metric-value">${perf.team_composition_time.toFixed(1)}s</div>
+                            <div class="metric-subvalue">${perf.team_composition_tokens.toLocaleString()} tokens</div>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="performance-breakdown">
+                        <h3 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.75rem;">Time Breakdown</h3>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Initial Draft</span>
+                            <span class="breakdown-value">${perf.initial_draft_time.toFixed(1)}s</span>
+                        </div>
+                        ${perf.team_composition_time ? `
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Team Composition</span>
+                            <span class="breakdown-value">${perf.team_composition_time.toFixed(1)}s</span>
+                        </div>
+                        ` : ''}
+                        ${perf.rounds.map((round, idx) => `
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Round ${round.round_number}</span>
+                            <span class="breakdown-value">${round.review_duration.toFixed(1)}s (${round.round_tokens.toLocaleString()} tokens)</span>
+                        </div>
+                        <div class="breakdown-item" style="padding-left: 1.5rem; font-size: 0.8125rem;">
+                            <span class="breakdown-label">Review Phase</span>
+                            <span class="breakdown-value">${Object.values(round.reviewer_times).reduce((a, b) => a + b, 0).toFixed(1)}s</span>
+                        </div>
+                        <div class="breakdown-item" style="padding-left: 1.5rem; font-size: 0.8125rem;">
+                            <span class="breakdown-label">Moderator Phase</span>
+                            <span class="breakdown-value">${round.moderator_time.toFixed(1)}s</span>
+                        </div>
+                        <div class="breakdown-item" style="padding-left: 1.5rem; font-size: 0.8125rem;">
+                            <span class="breakdown-label">Revision Phase</span>
+                            <span class="breakdown-value">${round.revision_time ? round.revision_time.toFixed(1) + 's' : 'N/A'}</span>
+                        </div>
+                        `).join('')}
+                    </div>
+
+                    <div style="margin-top: 2rem;">
+                        <h3 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.75rem;">Time Distribution Across Rounds</h3>
+                        <div class="chart-container">
+                            <canvas id="timeDistributionChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 2rem;">
+                        <h3 style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.75rem;">Reviewer Timing Per Round</h3>
+                        <div class="chart-container">
+                            <canvas id="reviewerTimingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPerformanceCharts(perf) {
+            const theme = document.documentElement.getAttribute('data-theme');
+            const textColor = theme === 'dark' ? '#fafafa' : '#0a0a0a';
+            const gridColor = theme === 'dark' ? '#262626' : '#e5e5e5';
+
+            // Time Distribution Chart
+            const timeDistCtx = document.getElementById('timeDistributionChart');
+            if (timeDistCtx) {
+                const labels = perf.rounds.map(r => `Round ${r.round_number}`);
+                const reviewTimes = perf.rounds.map(r => Object.values(r.reviewer_times).reduce((a, b) => a + b, 0));
+                const moderatorTimes = perf.rounds.map(r => r.moderator_time || 0);
+                const revisionTimes = perf.rounds.map(r => r.revision_time || 0);
+
+                timeDistributionChart = new Chart(timeDistCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Review Phase',
+                                data: reviewTimes,
+                                backgroundColor: '#0f62fe',
+                                borderWidth: 0,
+                                borderRadius: 0,
+                                barThickness: 32,
+                                maxBarThickness: 40
+                            },
+                            {
+                                label: 'Moderator Phase',
+                                data: moderatorTimes,
+                                backgroundColor: '#8a3ffc',
+                                borderWidth: 0,
+                                borderRadius: 0,
+                                barThickness: 32,
+                                maxBarThickness: 40
+                            },
+                            {
+                                label: 'Revision Phase',
+                                data: revisionTimes,
+                                backgroundColor: '#ff7eb6',
+                                borderWidth: 0,
+                                borderRadius: 0,
+                                barThickness: 32,
+                                maxBarThickness: 40
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: textColor,
+                                    font: { size: 11, weight: '500' },
+                                    padding: 12
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                ticks: {
+                                    color: textColor,
+                                    font: { size: 12, weight: '500' }
+                                },
+                                grid: {
+                                    display: false,
+                                    drawBorder: false
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                beginAtZero: true,
+                                ticks: {
+                                    color: textColor,
+                                    font: { size: 12, weight: '500' },
+                                    callback: function(value) {
+                                        return value + 's';
+                                    }
+                                },
+                                grid: {
+                                    color: gridColor,
+                                    drawBorder: false
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Reviewer Timing Chart
+            const reviewerTimingCtx = document.getElementById('reviewerTimingChart');
+            if (reviewerTimingCtx) {
+                const labels = perf.rounds.map(r => `Round ${r.round_number}`);
+                const reviewers = Object.keys(perf.rounds[0].reviewer_times);
+                const colors = ['#0f62fe', '#8a3ffc', '#ff7eb6', '#42be65', '#f1c21b', '#da1e28'];
+
+                const datasets = reviewers.map((reviewer, idx) => ({
+                    label: reviewer,
+                    data: perf.rounds.map(r => r.reviewer_times[reviewer] || 0),
+                    backgroundColor: colors[idx % colors.length],
+                    borderWidth: 0,
+                    borderRadius: 0,
+                    barThickness: 24,
+                    maxBarThickness: 32
+                }));
+
+                reviewerTimingChart = new Chart(reviewerTimingCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: textColor,
+                                    font: { size: 11, weight: '500' },
+                                    padding: 12
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: textColor,
+                                    font: { size: 12, weight: '500' }
+                                },
+                                grid: {
+                                    display: false,
+                                    drawBorder: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: textColor,
+                                    font: { size: 12, weight: '500' },
+                                    callback: function(value) {
+                                        return value + 's';
+                                    }
+                                },
+                                grid: {
+                                    color: gridColor,
+                                    drawBorder: false
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updatePerformanceChartTheme() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            const textColor = theme === 'dark' ? '#fafafa' : '#0a0a0a';
+            const gridColor = theme === 'dark' ? '#262626' : '#e5e5e5';
+
+            if (timeDistributionChart) {
+                timeDistributionChart.options.plugins.legend.labels.color = textColor;
+                timeDistributionChart.options.scales.x.ticks.color = textColor;
+                timeDistributionChart.options.scales.x.grid.color = gridColor;
+                timeDistributionChart.options.scales.y.ticks.color = textColor;
+                timeDistributionChart.options.scales.y.grid.color = gridColor;
+                timeDistributionChart.update();
+            }
+
+            if (reviewerTimingChart) {
+                reviewerTimingChart.options.plugins.legend.labels.color = textColor;
+                reviewerTimingChart.options.scales.x.ticks.color = textColor;
+                reviewerTimingChart.options.scales.x.grid.color = gridColor;
+                reviewerTimingChart.options.scales.y.ticks.color = textColor;
+                reviewerTimingChart.options.scales.y.grid.color = gridColor;
+                reviewerTimingChart.update();
+            }
+        }
+    </script>
+</body>
+</html>

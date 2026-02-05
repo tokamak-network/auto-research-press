@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Queue | AI-Backed Research</title>
+    <meta name="description" content="Monitor ongoing research report generation">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
+    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/article.css">
+    <style>
+        .queue-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .queue-header {
+            margin-bottom: 2rem;
+        }
+
+        .queue-header h1 {
+            font-size: 2rem;
+            margin: 0 0 0.5rem 0;
+            color: var(--text);
+        }
+
+        .queue-header p {
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .queue-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .stat-value.active {
+            color: #3b82f6;
+        }
+
+        .stat-value.completed {
+            color: #10b981;
+        }
+
+        .stat-value.failed {
+            color: #ef4444;
+        }
+
+        .workflow-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .workflow-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+
+        .workflow-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .workflow-card.highlighted {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            animation: highlight-pulse 2s ease-in-out;
+        }
+
+        @keyframes highlight-pulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+            50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2); }
+        }
+
+        .workflow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .workflow-title {
+            flex: 1;
+            margin-right: 1rem;
+        }
+
+        .workflow-title h3 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.25rem;
+            color: var(--text);
+        }
+
+        .workflow-title .project-id {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .workflow-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.375rem 0.875rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-badge.queued {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        .status-badge.writing {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .status-badge.reviewing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.revising {
+            background: #fce7f3;
+            color: #9f1239;
+        }
+
+        .status-badge.completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .progress-section {
+            margin: 1rem 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-600);
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.completed {
+            background: var(--success);
+        }
+
+        .progress-fill.failed {
+            background: var(--error);
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .workflow-message {
+            color: var(--text);
+            margin: 0.5rem 0;
+        }
+
+        .workflow-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary-600);
+            color: white;
+            border-color: var(--primary-600);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--background);
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            opacity: 0.3;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            margin: 0 0 0.5rem 0;
+            color: var(--text);
+        }
+
+        .empty-state p {
+            margin: 0 0 1.5rem 0;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .auto-refresh input {
+            margin: 0;
+        }
+
+        .spinner-inline {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Workflow Dashboard */
+        .workflow-dashboard {
+            background: var(--layer-01);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0;
+            padding: 20px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .workflow-dashboard.active {
+            display: block;
+        }
+
+        .workflow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .workflow-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            right: 40px;
+            height: 2px;
+            background: var(--border-subtle);
+            z-index: 0;
+        }
+
+        .workflow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .workflow-step-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--background);
+            border: 2px solid var(--border-subtle);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .workflow-step.completed .workflow-step-icon {
+            background: var(--link-primary);
+            border-color: var(--link-primary);
+            color: white;
+        }
+
+        .workflow-step.active .workflow-step-icon {
+            border-color: var(--link-primary);
+            color: var(--link-primary);
+            animation: pulse 2s infinite;
+        }
+
+        .workflow-step-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .workflow-step.active .workflow-step-label {
+            color: var(--text-primary);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(15, 98, 254, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(15, 98, 254, 0); }
+        }
+
+        .expert-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .expert-status-card {
+            background: var(--background);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0;
+            padding: 12px;
+        }
+
+        .expert-status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .expert-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .expert-status-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 0;
+            border: 1px solid;
+        }
+
+        .expert-status-badge.waiting {
+            background: var(--layer-01);
+            border-color: var(--border-subtle);
+            color: var(--text-tertiary);
+        }
+
+        .expert-status-badge.active {
+            background: rgba(15, 98, 254, 0.1);
+            border-color: var(--link-primary);
+            color: var(--link-primary);
+        }
+
+        .expert-status-badge.completed {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: #10b981;
+            color: #065f46;
+        }
+
+        .expert-progress-bar {
+            height: 4px;
+            background: var(--layer-01);
+            border-radius: 0;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .expert-progress-fill {
+            height: 100%;
+            background: var(--link-primary);
+            transition: width 0.3s ease;
+        }
+
+        .expert-score {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .expert-score strong {
+            color: var(--text-primary);
+        }
+
+        /* Live Activity Feed */
+        .activity-feed {
+            background: var(--layer-01);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+
+        .activity-feed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .activity-feed-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+        }
+
+        .activity-feed-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .activity-filter {
+            font-size: 11px;
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: 0;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .activity-filter.active {
+            background: var(--link-primary);
+            border-color: var(--link-primary);
+            color: white;
+        }
+
+        .activity-entry {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .activity-entry:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .activity-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0;
+        }
+
+        .activity-icon.info {
+            background: rgba(15, 98, 254, 0.1);
+            color: var(--link-primary);
+        }
+
+        .activity-icon.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .activity-icon.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+        }
+
+        .activity-icon.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-message {
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .activity-timestamp {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .timeline-indicator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-subtle);
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="header-nav">
+                <a href="index.html" class="back-link">
+                    <svg viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    Back to Research
+                </a>
+                <div class="header-content">
+                    <h1 class="site-title">AI-Backed Research</h1>
+                    <p class="site-subtitle">Research Queue</p>
+                </div>
+                <button class="theme-toggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="queue-container">
+        <div class="queue-header">
+            <h1>Research Queue</h1>
+            <p>Monitor the status of all research report generation workflows</p>
+        </div>
+
+        <div class="auto-refresh">
+            <input type="checkbox" id="auto-refresh" checked>
+            <label for="auto-refresh">Auto-refresh every 3 seconds</label>
+            <span id="refresh-status"></span>
+        </div>
+
+        <div class="queue-stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Workflows</div>
+                <div class="stat-value" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">In Progress</div>
+                <div class="stat-value active" id="stat-active">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Completed</div>
+                <div class="stat-value completed" id="stat-completed">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Failed</div>
+                <div class="stat-value failed" id="stat-failed">0</div>
+            </div>
+        </div>
+
+        <div id="workflow-list" class="workflow-list">
+            <!-- Workflows will be inserted here -->
+        </div>
+
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <h3>No Research Workflows</h3>
+            <p>Get started by creating your first research report</p>
+            <a href="create-report.html" class="btn btn-primary">+ Create Report</a>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p><strong>Platform:</strong> AI-Backed Research | Tokamak Network Research Lab</p>
+            <p class="copyright">© 2026 Tokamak Network Research Lab. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let autoRefreshInterval = null;
+
+        async function loadWorkflows() {
+            try {
+                const response = await fetch(`${API_BASE}/api/workflows`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayWorkflows(data.workflows);
+                updateStats(data.workflows);
+
+            } catch (error) {
+                console.error('Error loading workflows:', error);
+                document.getElementById('refresh-status').innerHTML =
+                    '<span style="color: var(--error);">Connection error</span>';
+            }
+        }
+
+        function displayWorkflows(workflows) {
+            const listDiv = document.getElementById('workflow-list');
+            const emptyDiv = document.getElementById('empty-state');
+
+            if (workflows.length === 0) {
+                listDiv.innerHTML = '';
+                emptyDiv.style.display = 'block';
+                return;
+            }
+
+            emptyDiv.style.display = 'none';
+
+            // Sort: active first, then by project_id desc
+            workflows.sort((a, b) => {
+                const activeStatuses = ['queued', 'writing', 'reviewing', 'revising'];
+                const aActive = activeStatuses.includes(a.status);
+                const bActive = activeStatuses.includes(b.status);
+
+                if (aActive && !bActive) return -1;
+                if (!aActive && bActive) return 1;
+                return b.project_id.localeCompare(a.project_id);
+            });
+
+            listDiv.innerHTML = workflows.map(wf => createWorkflowCard(wf)).join('');
+
+            // Scroll to highlighted workflow
+            const urlParams = new URLSearchParams(window.location.search);
+            const highlightId = urlParams.get('highlight');
+            if (highlightId) {
+                setTimeout(() => {
+                    const element = document.getElementById(`wf-${highlightId}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+        }
+
+        function createWorkflowCard(wf) {
+            const topic = extractTopicFromId(wf.project_id);
+            const isActive = ['queued', 'writing', 'reviewing', 'revising', 'composing_team'].includes(wf.status);
+            const progressClass = wf.status === 'completed' ? 'completed' :
+                                 wf.status === 'failed' ? 'failed' : '';
+
+            // Check if this workflow should be highlighted
+            const urlParams = new URLSearchParams(window.location.search);
+            const highlightId = urlParams.get('highlight');
+            const isHighlighted = highlightId === wf.project_id;
+
+            // Workflow steps
+            const steps = [
+                { id: 'team', label: 'Team', statuses: ['composing_team'] },
+                { id: 'draft', label: 'Draft', statuses: ['writing'] },
+                { id: 'review', label: 'Review', statuses: ['reviewing'] },
+                { id: 'revise', label: 'Revise', statuses: ['revising'] }
+            ];
+
+            const currentStepIndex = steps.findIndex(s => s.statuses.includes(wf.status));
+            const stepsHtml = steps.map((step, idx) => {
+                let stepClass = '';
+                if (idx < currentStepIndex || wf.status === 'completed') {
+                    stepClass = 'completed';
+                } else if (idx === currentStepIndex) {
+                    stepClass = 'active';
+                }
+                return `
+                    <div class="workflow-step ${stepClass}">
+                        <div class="workflow-step-icon">${stepClass === 'completed' ? '✓' : idx + 1}</div>
+                        <div class="workflow-step-label">${step.label}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Expert status (if available)
+            let expertStatusHtml = '';
+            if (wf.expert_status && isActive) {
+                expertStatusHtml = `
+                    <div class="expert-status-grid">
+                        ${wf.expert_status.map(expert => `
+                            <div class="expert-status-card">
+                                <div class="expert-status-header">
+                                    <span class="expert-name">${expert.expert_name}</span>
+                                    <span class="expert-status-badge ${expert.status}">${expert.status}</span>
+                                </div>
+                                <div class="expert-progress-bar">
+                                    <div class="expert-progress-fill" style="width: ${expert.progress}%"></div>
+                                </div>
+                                <div class="expert-score">
+                                    ${expert.score ? `<strong>Score:</strong> ${expert.score}/10` : expert.message}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Timeline
+            let timelineHtml = '';
+            if (wf.elapsed_time_seconds !== undefined) {
+                const elapsed = formatTime(wf.elapsed_time_seconds);
+                const remaining = wf.estimated_time_remaining_seconds ? formatTime(wf.estimated_time_remaining_seconds) : 'calculating...';
+                timelineHtml = `
+                    <div class="timeline-indicator">
+                        <span>⏱️ Elapsed: ${elapsed}</span>
+                        <span>⏳ Remaining: ~${remaining}</span>
+                    </div>
+                `;
+            }
+
+            let actions = '';
+            if (wf.status === 'completed') {
+                actions = `
+                    <a href="articles/${wf.project_id}.html" class="btn btn-primary">Read Article</a>
+                    <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
+                `;
+            } else if (wf.status === 'failed') {
+                actions = `<button class="btn btn-secondary" onclick="retryWorkflow('${wf.project_id}')">Retry</button>`;
+            } else if (isActive) {
+                actions = `<button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>`;
+            }
+
+            const errorHtml = wf.error ? `<div class="error-message">Error: ${escapeHtml(wf.error)}</div>` : '';
+
+            // Dashboard (only for active workflows)
+            let dashboardHtml = '';
+            if (isActive) {
+                dashboardHtml = `
+                    <div class="workflow-dashboard ${isActive ? 'active' : ''}">
+                        <div class="workflow-steps">
+                            ${stepsHtml}
+                        </div>
+                        ${expertStatusHtml}
+                        ${timelineHtml}
+                    </div>
+                `;
+            }
+
+            // Activity feed placeholder
+            const activityFeedHtml = `
+                <div id="activity-feed-${wf.project_id}" class="activity-feed" style="display: none;">
+                    <div class="activity-feed-header">
+                        <span class="activity-feed-title">Activity Log</span>
+                        <div class="activity-feed-controls">
+                            <button class="activity-filter active" data-level="all">All</button>
+                            <button class="activity-filter" data-level="info">Info</button>
+                            <button class="activity-filter" data-level="success">Success</button>
+                            <button class="activity-filter" data-level="error">Error</button>
+                        </div>
+                    </div>
+                    <div id="activity-entries-${wf.project_id}">
+                        <div style="text-align: center; padding: 20px; color: var(--text-tertiary);">
+                            Loading activity log...
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return `
+                <div class="workflow-card ${isHighlighted ? 'highlighted' : ''}" id="wf-${wf.project_id}">
+                    <div class="workflow-header">
+                        <div class="workflow-title">
+                            <h3>${escapeHtml(topic)}</h3>
+                            <div class="project-id">${wf.project_id}</div>
+                        </div>
+                        <div class="workflow-status">
+                            <span class="status-badge ${wf.status}">${wf.status.replace('_', ' ').toUpperCase()}</span>
+                            ${isActive ? '<div class="spinner-inline"></div>' : ''}
+                        </div>
+                    </div>
+                    ${dashboardHtml}
+                    <div class="progress-section">
+                        <div class="progress-bar">
+                            <div class="progress-fill ${progressClass}" style="width: ${wf.progress_percentage}%"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>${wf.message}</span>
+                            <span>Round ${wf.current_round}/${wf.total_rounds}</span>
+                        </div>
+                    </div>
+                    ${errorHtml}
+                    ${isActive ? activityFeedHtml : ''}
+                    ${actions ? `<div class="workflow-actions">${actions}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function formatTime(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s`;
+            } else if (seconds < 3600) {
+                return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `${hours}h ${mins}m`;
+            }
+        }
+
+        async function toggleActivityFeed(projectId) {
+            const feedElement = document.getElementById(`activity-feed-${projectId}`);
+            if (feedElement.style.display === 'none') {
+                feedElement.style.display = 'block';
+                await loadActivityLog(projectId);
+            } else {
+                feedElement.style.display = 'none';
+            }
+        }
+
+        async function loadActivityLog(projectId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/workflow-activity/${projectId}`);
+                if (!response.ok) throw new Error('Failed to load activity log');
+
+                const data = await response.json();
+                displayActivityLog(projectId, data.activity);
+            } catch (error) {
+                console.error('Error loading activity log:', error);
+                document.getElementById(`activity-entries-${projectId}`).innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--error);">
+                        Failed to load activity log
+                    </div>
+                `;
+            }
+        }
+
+        function displayActivityLog(projectId, activities) {
+            const container = document.getElementById(`activity-entries-${projectId}`);
+            if (!activities || activities.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-tertiary);">No activity yet</div>';
+                return;
+            }
+
+            const getIcon = (level) => {
+                const icons = {
+                    info: 'ℹ',
+                    success: '✓',
+                    warning: '⚠',
+                    error: '✕'
+                };
+                return icons[level] || 'ℹ';
+            };
+
+            container.innerHTML = activities.map(activity => `
+                <div class="activity-entry" data-level="${activity.level}">
+                    <div class="activity-icon ${activity.level}">
+                        ${getIcon(activity.level)}
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-message">${escapeHtml(activity.message)}</div>
+                        <div class="activity-timestamp">${new Date(activity.timestamp).toLocaleTimeString()}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add filter listeners
+            const filters = document.querySelectorAll(`#activity-feed-${projectId} .activity-filter`);
+            filters.forEach(filter => {
+                filter.addEventListener('click', () => {
+                    filters.forEach(f => f.classList.remove('active'));
+                    filter.classList.add('active');
+
+                    const level = filter.dataset.level;
+                    const entries = container.querySelectorAll('.activity-entry');
+                    entries.forEach(entry => {
+                        if (level === 'all' || entry.dataset.level === level) {
+                            entry.style.display = 'flex';
+                        } else {
+                            entry.style.display = 'none';
+                        }
+                    });
+                });
+            });
+        }
+
+        function updateStats(workflows) {
+            const total = workflows.length;
+            const active = workflows.filter(w => ['queued', 'writing', 'reviewing', 'revising'].includes(w.status)).length;
+            const completed = workflows.filter(w => w.status === 'completed').length;
+            const failed = workflows.filter(w => w.status === 'failed').length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-completed').textContent = completed;
+            document.getElementById('stat-failed').textContent = failed;
+        }
+
+        function extractTopicFromId(projectId) {
+            // Remove timestamp suffix and convert dashes to spaces
+            const parts = projectId.split('-');
+            // Remove last 2 parts (date and time)
+            if (parts.length > 2) {
+                parts.splice(-2);
+            }
+            return parts.join(' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function retryWorkflow(projectId) {
+            alert('Retry functionality coming soon');
+        }
+
+        // Auto-refresh handling
+        document.getElementById('auto-refresh').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            autoRefreshInterval = setInterval(() => {
+                loadWorkflows();
+                document.getElementById('refresh-status').innerHTML =
+                    '<span style="color: var(--success); font-size: 0.875rem;">Live</span>';
+            }, 3000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                document.getElementById('refresh-status').textContent = '';
+            }
+        }
+
+        // Initial load
+        loadWorkflows();
+        startAutoRefresh();
+    </script>
+</body>
+</html>
