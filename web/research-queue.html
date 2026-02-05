@@ -687,12 +687,33 @@
 
         async function loadWorkflows() {
             try {
+                // Try API first (for live/in-progress workflows)
+                const apiResponse = await fetch(`${API_BASE}/api/workflows`).catch(() => null);
+
+                if (apiResponse && apiResponse.ok) {
+                    const apiData = await apiResponse.json();
+                    if (apiData && apiData.workflows && apiData.workflows.length > 0) {
+                        displayWorkflows(apiData.workflows);
+                        updateStats(apiData.workflows);
+                        return;
+                    }
+                }
+
+                // Fallback to static index.json (for completed workflows)
                 const response = await fetch(`data/index.json`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
                 const data = await response.json();
+
+                // Check if workflows exist
+                if (!data || !data.workflows || !Array.isArray(data.workflows)) {
+                    console.warn('No workflows found');
+                    displayWorkflows([]);
+                    updateStats([]);
+                    return;
+                }
 
                 // Transform to match expected format
                 const workflows = data.workflows.map(wf => ({
@@ -712,6 +733,8 @@
                 console.error('Error loading workflows:', error);
                 document.getElementById('refresh-status').innerHTML =
                     '<span style="color: var(--error);">Connection error</span>';
+                displayWorkflows([]);
+                updateStats([]);
             }
         }
 

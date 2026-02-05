@@ -26,7 +26,9 @@ async def generate_review(
     specialist: dict,
     manuscript: str,
     round_number: int,
-    tracker: PerformanceTracker
+    tracker: PerformanceTracker,
+    previous_reviews: Optional[List[dict]] = None,
+    previous_manuscript: Optional[str] = None
 ) -> dict:
     """Generate review from a specialist.
 
@@ -52,8 +54,32 @@ async def generate_review(
         base_url=llm_config.base_url
     )
 
+    # Build context from previous reviews
+    previous_context = ""
+    if round_number > 1 and previous_reviews:
+        # Find this specialist's previous review
+        my_previous_review = next((r for r in previous_reviews if r.get("specialist") == specialist_id), None)
+
+        if my_previous_review:
+            previous_context = f"""
+YOUR PREVIOUS REVIEW (Round {round_number-1}):
+Summary: {my_previous_review.get('summary', 'N/A')}
+
+Your Previous Weaknesses Identified:
+{chr(10).join(f"- {w}" for w in my_previous_review.get('weaknesses', []))}
+
+Your Previous Suggestions:
+{chr(10).join(f"- {s}" for s in my_previous_review.get('suggestions', []))}
+
+IMPORTANT: Check if the issues you identified in Round {round_number-1} have been adequately addressed in this revision.
+Focus especially on whether your specific suggestions were implemented.
+
+---
+"""
+
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
 
+{previous_context}
 MANUSCRIPT:
 {manuscript}
 
@@ -138,7 +164,9 @@ async def run_review_round(
     manuscript: str,
     round_number: int,
     specialists: Dict[str, dict],
-    tracker: PerformanceTracker
+    tracker: PerformanceTracker,
+    previous_reviews: Optional[List[dict]] = None,
+    previous_manuscript: Optional[str] = None
 ) -> tuple[List[Dict], float]:
     """Run one round of peer review.
 
@@ -169,7 +197,7 @@ async def run_review_round(
 
         # Generate reviews concurrently
         review_tasks = [
-            generate_review(specialist_id, specialist, manuscript, round_number, tracker)
+            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript)
             for specialist_id, specialist in specialists.items()
         ]
 
@@ -306,11 +334,17 @@ class WorkflowOrchestrator:
             # Run review
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}: Expert reviews in progress...")
+
+            # Get previous reviews for context
+            prev_reviews = all_rounds[-1]['reviews'] if all_rounds else None
+
             reviews, overall_average = await run_review_round(
                 current_manuscript,
                 round_num,
                 self.specialists,
-                self.tracker
+                self.tracker,
+                prev_reviews,
+                previous_manuscript
             )
 
             # Moderator decision
