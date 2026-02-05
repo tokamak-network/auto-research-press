@@ -687,14 +687,26 @@
 
         async function loadWorkflows() {
             try {
-                const response = await fetch(`${API_BASE}/api/workflows`);
+                const response = await fetch(`data/index.json`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
                 const data = await response.json();
-                displayWorkflows(data.workflows);
-                updateStats(data.workflows);
+
+                // Transform to match expected format
+                const workflows = data.workflows.map(wf => ({
+                    project_id: wf.id,
+                    status: wf.status,
+                    current_round: wf.rounds || 0,
+                    total_rounds: wf.rounds || 0,
+                    progress_percentage: 100,
+                    message: 'Workflow completed successfully',
+                    error: null
+                }));
+
+                displayWorkflows(workflows);
+                updateStats(workflows);
 
             } catch (error) {
                 console.error('Error loading workflows:', error);
