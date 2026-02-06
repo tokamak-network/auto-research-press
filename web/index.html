@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-Backed Research | Tokamak Network</title>
-    <meta name="description" content="Comprehensive blockchain research reports powered by AI for Tokamak Network Research Lab">
+    <meta name="description" content="Automated research lab powered by AI agents - from literature review to peer review">
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="AI-Backed Research | Tokamak Network">
-    <meta property="og:description" content="Quantitative blockchain research with real-world data and actionable insights">
+    <meta property="og:description" content="Automated research lab with AI agents conducting comprehensive technical research">
     <meta property="og:image" content="https://research.tokamak.network/images/thumbnails/l2-fee-structures.svg">
     <meta property="og:url" content="https://research.tokamak.network">
     <meta name="twitter:card" content="summary_large_image">
@@ -60,8 +60,8 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h2 class="hero-title">Quantitative Blockchain Research</h2>
-            <p class="hero-subtitle">Data-driven analysis of Layer 2 scaling, security, and protocol economics</p>
+            <h2 class="hero-title">Automated Research Lab</h2>
+            <p class="hero-subtitle">AI agents conducting research from data collection to peer review</p>
         </div>
     </section>
 
@@ -93,7 +93,7 @@
                 </div>
                 <div class="about-item">
                     <h3>Data-Driven Approach</h3>
-                    <p>Quantitative metrics, empirical data, and verifiable citations form the foundation of all research findings</p>
+                    <p>Empirical data collection, statistical analysis, and verifiable citations form the foundation of all research findings</p>
                 </div>
                 <div class="about-item">
                     <h3>Technical Rigor</h3>
@@ -109,15 +109,15 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>AI-Backed Research</h3>
-                    <p>Comprehensive blockchain research for Tokamak Network</p>
+                    <p>Automated research lab for any technical topic</p>
                 </div>
                 <div class="footer-section">
-                    <h4>Research Focus</h4>
+                    <h4>Research Capabilities</h4>
                     <ul>
-                        <li>Layer 2 Scaling</li>
-                        <li>Protocol Economics</li>
-                        <li>Security Analysis</li>
-                        <li>Mechanism Design</li>
+                        <li>Any Technical Topic</li>
+                        <li>Data Collection & Analysis</li>
+                        <li>Multi-Agent Peer Review</li>
+                        <li>Automated Report Generation</li>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -147,10 +147,22 @@
                 const data = await response.json();
                 const projects = data.projects || [];
 
+                // Filter: Only show accepted papers (status === "completed" and passed === true)
+                const acceptedProjects = projects.filter(p => p.status === 'completed' && p.passed === true);
+
                 // Sort by timestamp (newest first) and take top 6
-                const topProjects = projects
+                const topProjects = acceptedProjects
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                     .slice(0, 6);
+
+                // If no accepted papers, show empty state
+                if (topProjects.length === 0) {
+                    const grid = document.querySelector('.articles-grid');
+                    if (grid) {
+                        grid.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);"><p style="font-size: 1.1rem; margin-bottom: 1rem;">No published research yet</p><p>New research reports will appear here once they pass peer review.</p></div>';
+                    }
+                    return;
+                }
 
                 const grid = document.querySelector('.articles-grid');
                 if (!grid) return;

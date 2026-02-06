@@ -1,6 +1,18 @@
 {
   "projects": [
     {
+      "id": "efficient-and-realistic-secure-voting-mechanism-for-blockchain-based-dao-20260206-155500",
+      "topic": "efficient and realistic secure voting mechanism for blockchain based DAO",
+      "final_score": 6.9,
+      "passed": false,
+      "status": "rejected",
+      "total_rounds": 3,
+      "timestamp": "2026-02-06T16:06:51.090500",
+      "data_file": "data/efficient-and-realistic-secure-voting-mechanism-for-blockchain-based-dao-20260206-155500.json",
+      "elapsed_time_seconds": 710,
+      "final_decision": "MAJOR_REVISION"
+    },
+    {
       "id": "ethereum-layer-2-technologies-20260206-153937",
       "topic": "Ethereum Layer 2 technologies",
       "final_score": 6.9,
@@ -229,5 +241,5 @@
       "final_decision": "PENDING"
     }
   ],
-  "updated_at": "2026-02-06T15:50:20.152598"
+  "updated_at": "2026-02-06T16:06:51.291229"
 }
