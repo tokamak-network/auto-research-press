@@ -138,11 +138,17 @@ class TeamProposalResponse(BaseModel):
     cost_estimate: Optional[CostEstimate] = None
 
 
+class CategoryInfo(BaseModel):
+    major: Optional[str] = None
+    subfield: Optional[str] = None
+
 class StartWorkflowRequest(BaseModel):
     topic: str
     experts: List[dict]
     max_rounds: int = 3
     threshold: float = 8.0
+    research_cycles: int = 1  # Number of research note iterations
+    category: Optional[CategoryInfo] = None  # Academic category
 
 
 class ExpertStatus(BaseModel):
@@ -184,6 +190,30 @@ async def root():
     return {"status": "ok", "service": "AI-Backed Research API"}
 
 
+def suggest_category_from_topic(topic: str) -> dict:
+    """Suggest academic category based on topic keywords."""
+    topic_lower = topic.lower()
+
+    # Blockchain/Crypto related
+    if any(kw in topic_lower for kw in ['blockchain', 'crypto', 'ethereum', 'bitcoin', 'rollup', 'zk', 'zero-knowledge', 'smart contract', 'defi', 'consensus', 'proof of stake', 'proof of work']):
+        return {"major": "computer_science", "subfield": "security"}
+
+    # AI/ML related
+    if any(kw in topic_lower for kw in ['machine learning', 'deep learning', 'neural network', 'nlp', 'natural language', 'computer vision', 'reinforcement learning', 'transformer', 'gpt', 'llm']):
+        return {"major": "computer_science", "subfield": "ai_ml"}
+
+    # Systems/Distributed
+    if any(kw in topic_lower for kw in ['distributed', 'database', 'scalability', 'performance', 'latency', 'throughput', 'networking', 'cloud']):
+        return {"major": "computer_science", "subfield": "systems"}
+
+    # Finance/Economics
+    if any(kw in topic_lower for kw in ['finance', 'trading', 'market', 'economics', 'investment', 'portfolio', 'risk management']):
+        return {"major": "business_economics", "subfield": "finance"}
+
+    # Default to CS/theory for general tech topics
+    return {"major": "computer_science", "subfield": "theory"}
+
+
 @app.post("/api/propose-team", response_model=TeamProposalResponse)
 async def propose_team(request: ProposeTeamRequest):
     """Propose expert team based on research topic."""
@@ -214,6 +244,9 @@ async def propose_team(request: ProposeTeamRequest):
 
         proposals = await composer.propose_team(request.topic, num_experts, additional_context)
 
+        # Suggest category based on topic
+        suggested_category = suggest_category_from_topic(request.topic)
+
         # Estimate time based on number of experts and rounds
         # Rough estimate: 5 min draft + (num_experts * 2 min per round * 2 rounds) + 3 min revision
         estimated_time = 5 + (len(proposals) * 2 * 2) + 3
@@ -226,9 +259,10 @@ async def propose_team(request: ProposeTeamRequest):
         output_tokens = num_experts_final * estimated_rounds * 2000
         cost_info = calculate_cost_estimate(input_tokens, output_tokens, model)
 
-        return TeamProposalResponse(
-            topic=request.topic,
-            proposed_experts=[
+        # Build response with suggested category
+        response_data = {
+            "topic": request.topic,
+            "proposed_experts": [
                 ExpertProposalResponse(
                     expert_domain=p.expert_domain,
                     rationale=p.rationale,
@@ -236,11 +270,26 @@ async def propose_team(request: ProposeTeamRequest):
                     suggested_model=p.suggested_model
                 ) for p in proposals
             ],
-            recommended_num_experts=len(proposals),
-            estimated_time_minutes=estimated_time,
-            estimated_rounds=estimated_rounds,
-            cost_estimate=CostEstimate(**cost_info)
-        )
+            "recommended_num_experts": len(proposals),
+            "estimated_time_minutes": estimated_time,
+            "estimated_rounds": estimated_rounds,
+            "cost_estimate": CostEstimate(**cost_info)
+        }
+
+        # Return as dict to include suggested_category (not in model)
+        return JSONResponse(content={
+            **response_data,
+            "proposed_experts": [
+                {
+                    "expert_domain": p.expert_domain,
+                    "rationale": p.rationale,
+                    "focus_areas": p.focus_areas,
+                    "suggested_model": p.suggested_model
+                } for p in proposals
+            ],
+            "cost_estimate": cost_info,
+            "suggested_category": suggested_category
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to propose team: {str(e)}")
 
@@ -290,7 +339,9 @@ async def start_workflow(request: StartWorkflowRequest, background_tasks: Backgr
             topic=request.topic,
             experts=request.experts,
             max_rounds=request.max_rounds,
-            threshold=request.threshold
+            threshold=request.threshold,
+            research_cycles=request.research_cycles,
+            category=request.category.dict() if request.category else None
         )
 
         return {
@@ -501,7 +552,9 @@ async def run_workflow_background(
     topic: str,
     experts: List[dict],
     max_rounds: int,
-    threshold: float
+    threshold: float,
+    research_cycles: int = 1,
+    category: Optional[dict] = None
 ):
     """Run workflow in background and update status."""
     try:

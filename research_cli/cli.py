@@ -441,5 +441,193 @@ async def _run_workflow(
         return 1
 
 
+@cli.command()
+@click.argument("topic")
+@click.option("--major-field", default="computer_science", help="Major academic field")
+@click.option("--subfield", default="security", help="Subfield")
+@click.option("--num-coauthors", default=2, help="Number of co-authors (0-3)")
+@click.option("--max-rounds", default=3, help="Maximum review rounds")
+@click.option("--threshold", default=8.0, help="Acceptance threshold")
+@click.option("--target-length", default=4000, help="Target manuscript length in words")
+def collaborate(
+    topic: str,
+    major_field: str,
+    subfield: str,
+    num_coauthors: int,
+    max_rounds: int,
+    threshold: float,
+    target_length: int
+):
+    """Run collaborative research workflow with writer team.
+
+    Example:
+        ai-research collaborate "ZK Rollup Security" --major-field computer_science --subfield security
+    """
+    return asyncio.run(_run_collaborative_workflow(
+        topic, major_field, subfield, num_coauthors, max_rounds, threshold, target_length
+    ))
+
+
+async def _run_collaborative_workflow(
+    topic: str,
+    major_field: str,
+    subfield: str,
+    num_coauthors: int,
+    max_rounds: int,
+    threshold: float,
+    target_length: int
+):
+    """Run collaborative workflow async."""
+    from datetime import datetime
+    from .models.author import AuthorRole, WriterTeam
+    from .models.expert import ExpertConfig
+    from .workflow.collaborative_workflow import CollaborativeWorkflowOrchestrator
+    from .categories import get_expert_pool, get_category_name
+
+    console.print("\n[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]")
+    console.print("[bold cyan] Collaborative Research Setup[/bold cyan]")
+    console.print("[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]\n")
+
+    console.print(f"[bold]Topic:[/bold] {topic}")
+    console.print(f"[bold]Category:[/bold] {get_category_name(major_field, subfield)}\n")
+
+    # Step 1: AI-composed writer team
+    console.print("[bold cyan]Step 1: Composing Writer Team (AI)[/bold cyan]\n")
+
+    from .agents.writer_team_composer import WriterTeamComposerAgent
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("AI analyzing topic and proposing writer team...", total=None)
+
+        composer = WriterTeamComposerAgent()
+        team_config = await composer.propose_and_format_team(
+            topic=topic,
+            major_field=major_field,
+            subfield=subfield,
+            num_coauthors=num_coauthors
+        )
+
+        progress.update(task, completed=True)
+
+    # Display proposed team
+    lead_config = team_config["lead_author"]
+    console.print(f"  [bold]Lead Author:[/bold] {lead_config['name']}")
+    console.print(f"    Expertise: {lead_config['expertise']}")
+    console.print(f"    Focus: {', '.join(lead_config['focus_areas'][:2])}")
+
+    if team_config["coauthors"]:
+        console.print()
+        for i, ca_config in enumerate(team_config["coauthors"], 1):
+            console.print(f"  [bold]Co-Author {i}:[/bold] {ca_config['name']}")
+            console.print(f"    Expertise: {ca_config['expertise']}")
+            console.print(f"    Focus: {', '.join(ca_config['focus_areas'][:2])}")
+
+    console.print()
+
+    # Convert to AuthorRole objects
+    lead_author = AuthorRole(
+        id=lead_config["id"],
+        name=lead_config["name"],
+        role=lead_config["role"],
+        expertise=lead_config["expertise"],
+        focus_areas=lead_config["focus_areas"],
+        model=lead_config["model"]
+    )
+
+    coauthors = []
+    for ca_config in team_config["coauthors"]:
+        coauthor = AuthorRole(
+            id=ca_config["id"],
+            name=ca_config["name"],
+            role=ca_config["role"],
+            expertise=ca_config["expertise"],
+            focus_areas=ca_config["focus_areas"],
+            model=ca_config["model"]
+        )
+        coauthors.append(coauthor)
+
+    writer_team = WriterTeam(lead_author=lead_author, coauthors=coauthors)
+
+    # Step 2: Compose reviewer pool (external, not writers)
+    console.print("[bold cyan]Step 2: Composing Reviewer Pool[/bold cyan]\n")
+
+    # Get expert pool from category
+    expert_pool = get_expert_pool(major_field, subfield)
+
+    # Create reviewer configs (different from writers)
+    reviewer_configs = [
+        ExpertConfig(
+            id="reviewer_1",
+            name="Network Security Expert",
+            domain="Network Security",
+            focus_areas=["network protocols", "security analysis", "attack vectors"],
+            system_prompt="You are a network security expert reviewing blockchain protocols.",
+            provider="anthropic",
+            model="claude-opus-4.5"
+        ),
+        ExpertConfig(
+            id="reviewer_2",
+            name="Formal Methods Expert",
+            domain="Formal Methods",
+            focus_areas=["security proofs", "formal verification", "correctness proofs"],
+            system_prompt="You are a formal methods expert reviewing security proofs.",
+            provider="anthropic",
+            model="claude-opus-4.5"
+        ),
+        ExpertConfig(
+            id="reviewer_3",
+            name="Applied Cryptography Expert",
+            domain="Applied Cryptography",
+            focus_areas=["cryptographic implementations", "protocol security", "cryptographic primitives"],
+            system_prompt="You are an applied cryptography expert reviewing cryptographic implementations.",
+            provider="anthropic",
+            model="claude-opus-4.5"
+        )
+    ]
+
+    console.print(f"  ✓ {len(reviewer_configs)} external reviewers assigned from {get_category_name(major_field, subfield)}")
+    console.print("  (Reviewer names hidden to ensure objectivity)\n")
+
+    # Step 3: Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe_topic = topic.lower().replace(" ", "-").replace("/", "-")
+    project_id = f"{safe_topic}-{timestamp}"
+    output_dir = Path("results") / project_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(f"[dim]Output directory: {output_dir}[/dim]\n")
+
+    # Step 4: Run workflow
+    orchestrator = CollaborativeWorkflowOrchestrator(
+        topic=topic,
+        major_field=major_field,
+        subfield=subfield,
+        writer_team=writer_team,
+        reviewer_configs=reviewer_configs,
+        output_dir=output_dir,
+        max_rounds=max_rounds,
+        threshold=threshold,
+        target_manuscript_length=target_length
+    )
+
+    try:
+        result = await orchestrator.run()
+
+        console.print("\n[bold green]✓ Complete collaborative workflow finished![/bold green]")
+        console.print(f"\n[dim]Results saved to: {output_dir}[/dim]\n")
+
+        return 0
+
+    except Exception as e:
+        console.print(f"\n[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
 if __name__ == "__main__":
     cli()

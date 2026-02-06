@@ -760,11 +760,15 @@
                         current_round: wf.total_rounds || 0,
                         total_rounds: wf.total_rounds || 0,
                         rounds: wf.rounds || [],  // Add rounds data
-                        progress_percentage: 100,
+                        progress_percentage: 100,  // Completed items are always 100%
                         message: message,
                         error: null,
                         elapsed_time_seconds: wf.elapsed_time_seconds || 0,
-                        estimated_time_remaining_seconds: 0
+                        estimated_time_remaining_seconds: 0,
+                        final_score: wf.final_score,  // Add final_score
+                        final_decision: wf.final_decision,  // Add final_decision
+                        topic: wf.topic,  // Add topic for display
+                        data_file: wf.data_file  // Add data_file path
                     };
                 });
 
@@ -857,12 +861,17 @@
         }
 
         function createWorkflowCard(wf) {
-            const topic = extractTopicFromId(wf.project_id);
+            // Use topic from data if available, otherwise extract from project_id
+            const topic = wf.topic || extractTopicFromId(wf.project_id);
             const isActive = ['queued', 'writing', 'reviewing', 'revising', 'composing_team'].includes(wf.status);
             const isInterrupted = wf.status === 'interrupted';
-            const isCompleted = wf.status === 'completed' || wf.status === 'rejected';
+            const isCompleted = wf.status === 'completed';
+            const isRejected = wf.status === 'rejected' || wf.status === 'failed';
+            const isDone = isCompleted || isRejected;
             const progressClass = isCompleted ? 'completed' :
-                                 wf.status === 'failed' ? 'failed' : '';
+                                 isRejected ? 'failed' : '';
+            // Ensure progress is 100% for completed/rejected workflows
+            const progressPercentage = isDone ? 100 : (wf.progress_percentage || 0);
 
             // Check if this workflow should be highlighted
             const urlParams = new URLSearchParams(window.location.search);
@@ -930,9 +939,14 @@
             }
 
             let actions = '';
-            if (wf.status === 'completed') {
+            if (isCompleted) {
                 actions = `
                     <a href="articles/${wf.project_id}.html" class="btn btn-primary">Read Article</a>
+                    <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
+                `;
+            } else if (isRejected) {
+                actions = `
+                    <a href="articles/${wf.project_id}.html" class="btn btn-secondary">Read Draft</a>
                     <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
                 `;
             } else if (wf.status === 'interrupted') {
@@ -940,19 +954,17 @@
                     <button class="btn btn-primary" onclick="resumeWorkflow('${wf.project_id}')">▶ Resume Workflow</button>
                     <button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>
                 `;
-            } else if (wf.status === 'failed') {
-                actions = `<button class="btn btn-secondary" onclick="retryWorkflow('${wf.project_id}')">Retry</button>`;
             } else if (isActive) {
                 actions = `<button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>`;
             }
 
             const errorHtml = wf.error ? `<div class="error-message">Error: ${escapeHtml(wf.error)}</div>` : '';
 
-            // Dashboard (only for active workflows)
+            // Dashboard (only for active or interrupted workflows)
             let dashboardHtml = '';
-            if (isActive) {
+            if (isActive || isInterrupted) {
                 dashboardHtml = `
-                    <div class="workflow-dashboard ${isActive ? 'active' : ''}">
+                    <div class="workflow-dashboard active">
                         <div class="workflow-steps">
                             ${stepsHtml}
                         </div>
@@ -997,11 +1009,11 @@
                     ${dashboardHtml}
                     <div class="progress-section">
                         <div class="progress-bar">
-                            <div class="progress-fill ${progressClass}" style="width: ${isCompleted ? '100' : wf.progress_percentage}%"></div>
+                            <div class="progress-fill ${progressClass}" style="width: ${progressPercentage}%"></div>
                         </div>
                         <div class="progress-text">
-                            <span>${isCompleted ? `Completed - Final Score: ${wf.final_score ? wf.final_score.toFixed(1) : 'N/A'}/10` : wf.message}</span>
-                            <span>${isCompleted ? `${wf.total_rounds} rounds completed` : `Round ${wf.current_round}/${wf.total_rounds}`}</span>
+                            <span>${isDone ? `${isCompleted ? 'Accepted' : 'Rejected'} - Final Score: ${wf.final_score ? wf.final_score.toFixed(1) : 'N/A'}/10` : wf.message}</span>
+                            <span>${isDone ? `${wf.total_rounds} rounds completed` : `Round ${wf.current_round}/${wf.total_rounds}`}</span>
                         </div>
                     </div>
                     ${wf.rounds && wf.rounds.length > 0 ? `
@@ -1018,7 +1030,7 @@
                             `).join('')}
                         </div>
                     ` : ''}
-                    ${isCompleted ? `
+                    ${isDone ? `
                         <div style="margin-top: 1rem;">
                             <button class="btn btn-secondary" style="width: 100%; font-size: 0.875rem;" onclick="toggleDetailedLog('${wf.project_id}')">
                                 📋 View Detailed Log
@@ -1030,7 +1042,7 @@
                         </div>
                     ` : ''}
                     ${errorHtml}
-                    ${isActive ? activityFeedHtml : ''}
+                    ${(isActive || isInterrupted) ? activityFeedHtml : ''}
                     ${actions ? `<div class="workflow-actions">${actions}</div>` : ''}
                 </div>
             `;
@@ -1167,7 +1179,12 @@
         async function loadDetailedLog(projectId) {
             const timelineElement = document.getElementById(`timeline-${projectId}`);
             try {
-                const response = await fetch(`data/${projectId}.json`);
+                // Try multiple paths for the data file
+                let response = await fetch(`data/${projectId}.json`);
+                if (!response.ok) {
+                    // Try with data/ prefix already in place
+                    response = await fetch(`${projectId}.json`);
+                }
                 if (!response.ok) throw new Error('Failed to load workflow data');
 
                 const data = await response.json();

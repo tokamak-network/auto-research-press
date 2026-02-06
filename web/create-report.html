@@ -32,6 +32,22 @@
             margin: 0 0 1.5rem 0;
             font-size: 1.5rem;
             color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .step-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--primary-600);
+            color: white;
+            border-radius: 50%;
+            font-size: 0.875rem;
+            font-weight: 700;
         }
 
         .form-group {
@@ -46,7 +62,8 @@
         }
 
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid var(--border);
@@ -58,15 +75,22 @@
         }
 
         .form-group textarea {
-            min-height: 120px;
+            min-height: 100px;
             resize: vertical;
         }
 
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .help-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
         }
 
         .button-group {
@@ -88,7 +112,6 @@
         .btn-primary {
             background: var(--primary-600);
             color: white;
-            border-color: var(--primary-600);
         }
 
         .btn-primary:hover:not(:disabled) {
@@ -97,8 +120,18 @@
         }
 
         .btn-primary:disabled {
-            opacity: 0.8;
+            opacity: 0.7;
             cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--background);
         }
 
         .loading-spinner {
@@ -117,76 +150,285 @@
             to { transform: rotate(360deg); }
         }
 
-        .btn-secondary {
-            background: var(--surface);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--background);
-        }
-
-        .expert-proposals {
+        /* Category Selection */
+        .category-section {
             display: none;
-        }
-
-        .expert-proposals.active {
-            display: block;
-        }
-
-        .expert-card {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
             background: var(--background);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.25rem;
+        }
+
+        .category-section.active {
+            display: block;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 1rem;
         }
 
-        .expert-card h3 {
-            margin: 0 0 0.75rem 0;
+        .category-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        .category-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .category-select-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Team Display */
+        .team-section {
+            display: none;
+        }
+
+        .team-section.active {
+            display: block;
+        }
+
+        .team-group {
+            margin-bottom: 2rem;
+        }
+
+        .team-group-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .team-group-header h3 {
+            margin: 0;
             font-size: 1.125rem;
             color: var(--text);
         }
 
-        .expert-card p {
-            margin: 0 0 0.5rem 0;
+        .team-group-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 4px;
             color: var(--text-secondary);
-            font-size: 0.95rem;
         }
 
-        .expert-card .focus-areas {
+        .author-card {
+            background: var(--background);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .author-card.lead {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .author-card.lead::before {
+            content: "LEAD";
+            position: absolute;
+            top: -10px;
+            left: 12px;
+            background: #f59e0b;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .author-card.reviewer {
+            border-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .author-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .author-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .author-model {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+
+        .author-rationale {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .author-focus-areas {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
-            margin-top: 0.75rem;
         }
 
         .focus-tag {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
             background: rgba(59, 130, 246, 0.1);
             color: #3b82f6;
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
+            border-radius: 4px;
         }
 
-        .estimate-box {
+        .author-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .author-action-btn {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .author-action-btn:hover {
+            background: var(--surface);
+            border-color: var(--primary-600);
+            color: var(--primary-600);
+        }
+
+        /* Customization Modal */
+        .customization-panel {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-5);
-            margin-top: var(--space-6);
+            border-radius: 8px;
+        }
+
+        .customization-panel.active {
+            display: block;
+        }
+
+        .custom-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .custom-tab {
+            flex: 1;
+            padding: 0.5rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .custom-tab.active {
+            background: var(--primary-600);
+            border-color: var(--primary-600);
+            color: white;
+        }
+
+        .custom-content textarea,
+        .custom-content input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        /* Settings */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .setting-item {
+            text-align: center;
+        }
+
+        .setting-item label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .setting-item input {
+            width: 80px;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        /* Estimate Box */
+        .estimate-box {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
         }
 
         .estimate-box h3 {
             margin: 0 0 1rem 0;
-            font-size: 1.125rem;
+            font-size: 1rem;
             color: var(--text);
         }
 
         .estimate-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
         }
 
@@ -195,304 +437,18 @@
         }
 
         .estimate-item .label {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
             margin-bottom: 0.25rem;
         }
 
         .estimate-item .value {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 700;
             color: #3b82f6;
         }
 
-        /* Cost Analytics */
-        .cost-breakdown {
-            background: var(--layer-01);
-            border: 1px solid var(--border-subtle);
-            border-radius: 0;
-            padding: 16px;
-            margin-top: 16px;
-        }
-
-        .cost-breakdown h4 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .cost-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-
-        .cost-row:last-child {
-            border-bottom: none;
-            margin-top: 8px;
-            padding-top: 12px;
-            border-top: 2px solid var(--border-subtle);
-        }
-
-        .cost-row .cost-label {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .cost-row .cost-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .cost-row:last-child .cost-value {
-            font-size: 18px;
-            color: var(--link-primary);
-        }
-
-        .time-breakdown {
-            display: grid;
-            grid-template-columns: 1fr 80px 100px;
-            gap: 12px;
-            margin-top: 12px;
-        }
-
-        .time-phase {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .time-phase-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        .time-bar {
-            height: 6px;
-            background: var(--layer-01);
-            border-radius: 0;
-            overflow: hidden;
-            margin-top: 4px;
-        }
-
-        .time-bar-fill {
-            height: 100%;
-            background: var(--link-primary);
-        }
-
-        /* Interactive Expert Cards */
-        .expert-card-interactive {
-            background: var(--background);
-            border: 2px solid var(--border-subtle);
-            border-radius: 0;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: all 70ms;
-            cursor: move;
-        }
-
-        .expert-card-interactive:hover {
-            border-color: var(--link-primary);
-            box-shadow: 0 0 0 3px rgba(15, 98, 254, 0.1);
-        }
-
-        .expert-card-interactive.dragging {
-            opacity: 0.5;
-        }
-
-        .expert-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-
-        .expert-card-title {
-            flex: 1;
-        }
-
-        .expert-card-title h3 {
-            margin: 0 0 4px 0;
-            font-size: 16px;
-            color: var(--text-primary);
-        }
-
-        .expert-card-title .model-badge {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-tertiary);
-            background: var(--layer-01);
-            border: 1px solid var(--border-subtle);
-            padding: 2px 8px;
-            border-radius: 0;
-        }
-
-        .expert-card-actions {
-            display: flex;
-            gap: 4px;
-        }
-
-        .icon-btn {
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            padding: 6px;
-            cursor: pointer;
-            transition: all 70ms;
-            border-radius: 0;
-        }
-
-        .icon-btn:hover {
-            background: var(--layer-01);
-            border-color: var(--link-primary);
-        }
-
-        .icon-btn svg {
-            width: 16px;
-            height: 16px;
-            color: var(--text-secondary);
-        }
-
-        .expert-card-body {
-            margin-top: 12px;
-        }
-
-        .expert-rationale {
-            font-size: 13px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 12px;
-        }
-
-        .focus-areas-editable {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-
-        .focus-tag-editable {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(15, 98, 254, 0.1);
-            color: var(--link-primary);
-            padding: 4px 10px;
-            border-radius: 0;
-            font-size: 12px;
-            border: 1px solid transparent;
-        }
-
-        .focus-tag-editable:hover {
-            border-color: var(--link-primary);
-        }
-
-        .focus-tag-remove {
-            cursor: pointer;
-            font-weight: bold;
-            opacity: 0.6;
-        }
-
-        .focus-tag-remove:hover {
-            opacity: 1;
-        }
-
-        .add-focus-area {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: transparent;
-            border: 1px dashed var(--border-subtle);
-            color: var(--text-tertiary);
-            padding: 4px 10px;
-            border-radius: 0;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .add-focus-area:hover {
-            border-color: var(--link-primary);
-            color: var(--link-primary);
-        }
-
-        .add-expert-btn {
-            width: 100%;
-            padding: 16px;
-            background: transparent;
-            border: 2px dashed var(--border-subtle);
-            border-radius: 0;
-            color: var(--text-tertiary);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 70ms;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .add-expert-btn:hover {
-            border-color: var(--link-primary);
-            color: var(--link-primary);
-            background: rgba(15, 98, 254, 0.05);
-        }
-
-        .progress-section {
-            display: none;
-        }
-
-        .progress-section.active {
-            display: block;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: var(--border);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--primary-600);
-            transition: width 0.5s ease;
-        }
-
-        .status-message {
-            text-align: center;
-            font-size: 1.125rem;
-            color: var(--text);
-            margin-bottom: 1rem;
-        }
-
-        .round-info {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid var(--border);
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 2rem auto;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        /* Error/Success boxes */
         .error-box {
             background: #fee2e2;
             border: 1px solid #fca5a5;
@@ -500,6 +456,7 @@
             padding: 1rem;
             border-radius: 8px;
             margin-top: 1rem;
+            display: none;
         }
 
         .success-box {
@@ -509,275 +466,59 @@
             padding: 1.5rem;
             border-radius: 8px;
             text-align: center;
-            margin-top: 1rem;
-        }
-
-        .success-box h3 {
-            margin: 0 0 1rem 0;
-            font-size: 1.5rem;
-        }
-
-        .success-box .btn {
-            margin-top: 1rem;
         }
 
         /* Research Type Selector */
         .research-type-selector {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin-top: 12px;
+            gap: 1rem;
         }
 
         .research-type-option {
-            border: 2px solid var(--border-subtle);
-            border-radius: 0;
-            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
             cursor: pointer;
-            transition: all 70ms;
+            transition: all 0.2s;
             position: relative;
         }
 
         .research-type-option:hover {
-            border-color: var(--link-primary);
-            background: var(--layer-01);
+            border-color: var(--primary-600);
+        }
+
+        .research-type-option.selected {
+            border-color: var(--primary-600);
+            background: rgba(59, 130, 246, 0.05);
         }
 
         .research-type-option input[type="radio"] {
             position: absolute;
-            top: 16px;
-            right: 16px;
-            width: 20px;
-            height: 20px;
+            top: 12px;
+            right: 12px;
         }
 
-        .type-content {
-            padding-right: 32px;
-        }
-
-        .type-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .type-header strong {
-            font-size: 18px;
-            color: var(--text-primary);
-        }
-
-        .type-badge {
-            font-size: 12px;
+        .type-title {
             font-weight: 600;
-            color: var(--text-tertiary);
-            background: var(--layer-01);
-            border: 1px solid var(--border-subtle);
-            padding: 2px 8px;
-            border-radius: 0;
+            color: var(--text);
+            margin-bottom: 0.5rem;
         }
 
         .type-description {
-            font-size: 14px;
-            line-height: 1.6;
+            font-size: 0.875rem;
             color: var(--text-secondary);
-            margin-bottom: 12px;
-        }
-
-        .type-features {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .type-features li {
-            font-size: 13px;
-            color: var(--text-tertiary);
-            padding-left: 20px;
-            position: relative;
-            margin-bottom: 4px;
-        }
-
-        .type-features li:before {
-            content: "→";
-            position: absolute;
-            left: 0;
-            color: var(--link-primary);
-        }
-
-        .help-text {
-            font-size: 13px;
-            color: var(--text-tertiary);
-            display: block;
-            margin-top: 8px;
-        }
-
-        /* Expert Customization */
-        .expert-customization {
-            border: 1px solid var(--border-subtle);
-            border-radius: 0;
-            margin-top: 12px;
-        }
-
-        .custom-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-
-        .custom-tab {
-            flex: 1;
-            padding: 12px 16px;
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid transparent;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 70ms;
-        }
-
-        .custom-tab:hover {
-            background: var(--layer-01);
-            color: var(--text-primary);
-        }
-
-        .custom-tab.active {
-            color: var(--link-primary);
-            border-bottom-color: var(--link-primary);
-        }
-
-        .custom-content {
-            padding: 20px;
-        }
-
-        .custom-panel {
-            display: none;
-        }
-
-        .custom-panel.active {
-            display: block;
-        }
-
-        .info-text {
-            font-size: 14px;
-            color: var(--text-secondary);
-            padding: 16px;
-            background: var(--layer-01);
-            border: 1px solid var(--border-subtle);
-            border-radius: 0;
-        }
-
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 14px;
-            margin-top: 12px;
-        }
-
-        .analysis-result {
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--layer-01);
-            border: 1px solid var(--border-subtle);
-            border-left: 4px solid var(--link-primary);
-            border-radius: 0;
-            display: none;
-        }
-
-        .analysis-result.active {
-            display: block;
-        }
-
-        .analysis-result h4 {
-            margin: 0 0 12px 0;
-            font-size: 16px;
-            color: var(--text-primary);
-        }
-
-        .analysis-result p {
-            font-size: 14px;
-            line-height: 1.6;
-            color: var(--text-secondary);
-            margin: 8px 0;
-        }
-
-        .analysis-result ul {
-            list-style: none;
-            padding: 0;
-            margin: 12px 0;
-        }
-
-        .analysis-result li {
-            font-size: 14px;
-            color: var(--text-secondary);
-            padding-left: 20px;
-            position: relative;
-            margin-bottom: 8px;
-        }
-
-        .analysis-result li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: var(--link-primary);
-            font-weight: bold;
-        }
-
-        .file-upload {
-            position: relative;
-            border: 2px dashed var(--border-subtle);
-            border-radius: 0;
-            padding: 32px;
-            text-align: center;
-            transition: all 70ms;
-        }
-
-        .file-upload:hover {
-            border-color: var(--link-primary);
-            background: var(--layer-01);
-        }
-
-        .file-upload input[type="file"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            cursor: pointer;
-        }
-
-        .file-upload label {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            color: var(--text-secondary);
-        }
-
-        .file-upload svg {
-            width: 48px;
-            height: 48px;
-            color: var(--text-tertiary);
-        }
-
-        .file-upload span {
-            font-size: 14px;
-            font-weight: 500;
         }
 
         @media (max-width: 768px) {
-            .research-type-selector {
+            .category-grid,
+            .settings-grid,
+            .estimate-grid {
                 grid-template-columns: 1fr;
             }
 
-            .custom-tabs {
-                flex-wrap: wrap;
-            }
-
-            .custom-tab {
-                flex: 1 1 50%;
+            .research-type-selector {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -817,43 +558,23 @@
     </header>
 
     <main class="create-report-container">
-        <!-- Step 1: Research Configuration -->
+        <!-- Step 1: Topic & Category -->
         <div id="step-topic" class="form-section">
-            <h2>1. Research Configuration</h2>
+            <h2><span class="step-badge">1</span> Research Topic</h2>
 
-            <!-- Research Type Selection -->
+            <!-- Research Type -->
             <div class="form-group">
                 <label>Research Type</label>
                 <div class="research-type-selector">
-                    <div class="research-type-option" onclick="selectResearchType('survey')">
+                    <div class="research-type-option selected" onclick="selectResearchType('survey')">
                         <input type="radio" name="research-type" value="survey" checked>
-                        <div class="type-content">
-                            <div class="type-header">
-                                <strong>Survey</strong>
-                                <span class="type-badge">Literature Review</span>
-                            </div>
-                            <p class="type-description">Comprehensive review of existing research, methodologies, and state-of-the-art. Best for understanding "what is known" about a topic.</p>
-                            <ul class="type-features">
-                                <li>Synthesizes existing literature</li>
-                                <li>Identifies research gaps</li>
-                                <li>Provides broad overview</li>
-                            </ul>
-                        </div>
+                        <div class="type-title">Survey / Literature Review</div>
+                        <div class="type-description">Comprehensive review of existing research and state-of-the-art</div>
                     </div>
                     <div class="research-type-option" onclick="selectResearchType('research')">
                         <input type="radio" name="research-type" value="research">
-                        <div class="type-content">
-                            <div class="type-header">
-                                <strong>Research</strong>
-                                <span class="type-badge">Original Analysis</span>
-                            </div>
-                            <p class="type-description">In-depth analysis with novel insights, comparisons, and conclusions. Best for investigating specific questions or hypotheses.</p>
-                            <ul class="type-features">
-                                <li>Original analysis & insights</li>
-                                <li>Comparative evaluations</li>
-                                <li>Novel conclusions</li>
-                            </ul>
-                        </div>
+                        <div class="type-title">Original Research</div>
+                        <div class="type-description">In-depth analysis with novel insights and conclusions</div>
                     </div>
                 </div>
             </div>
@@ -863,305 +584,285 @@
                 <label for="topic">Research Topic</label>
                 <textarea
                     id="topic"
-                    placeholder="e.g., Ethereum's Proof of Stake consensus mechanism, Bitcoin Lightning Network payment channels, or Solana's fee market dynamics"
+                    placeholder="e.g., Zero-Knowledge Rollup Security Analysis, Ethereum's Proof of Stake Mechanism"
                     rows="3"
-                    required
                 ></textarea>
-                <small class="help-text">Describe the topic you want researched. Be specific about the aspects you're interested in.</small>
+                <p class="help-text">Describe the topic you want researched. The AI will suggest an appropriate academic category.</p>
             </div>
 
-            <!-- Co-Author Customization -->
-            <div class="form-group">
-                <label>Co-Author Team Customization (Optional)</label>
-                <div class="expert-customization">
-                    <div class="custom-tabs">
-                        <button class="custom-tab active" onclick="switchCustomTab('none')">Auto-Select</button>
-                        <button class="custom-tab" onclick="switchCustomTab('text')">Describe Co-Author</button>
-                        <button class="custom-tab" onclick="switchCustomTab('url')">From URL</button>
-                        <button class="custom-tab" onclick="switchCustomTab('pdf')">From PDF</button>
+            <!-- Category Section (shown after AI analysis) -->
+            <div id="category-section" class="category-section">
+                <div class="category-header">
+                    <h3>Suggested Category</h3>
+                    <span id="category-badge" class="category-badge"></span>
+                </div>
+                <p class="help-text">The AI has analyzed your topic and suggested this category. You can modify it if needed.</p>
+                <div class="category-grid">
+                    <div class="category-select-group">
+                        <label for="major-field">Major Field</label>
+                        <select id="major-field" onchange="onMajorFieldChange()">
+                            <!-- Populated by JS -->
+                        </select>
                     </div>
-
-                    <div class="custom-content">
-                        <div id="custom-none" class="custom-panel active">
-                            <p class="info-text">AI will automatically propose co-authors based on your topic.</p>
-                        </div>
-
-                        <div id="custom-text" class="custom-panel">
-                            <textarea id="expert-description" placeholder="Describe the type of co-author you want (e.g., 'Cryptography specialist in zero-knowledge proofs' or 'Economist focused on token economics')" rows="3"></textarea>
-                            <button class="btn btn-secondary btn-sm" onclick="analyzeExpertDescription()">Analyze Co-Author Profile</button>
-                            <div id="expert-analysis" class="analysis-result"></div>
-                        </div>
-
-                        <div id="custom-url" class="custom-panel">
-                            <input type="text" id="expert-url" placeholder="Enter URL (research paper, blog post, or Google Scholar profile)">
-                            <button class="btn btn-secondary btn-sm" onclick="analyzeExpertURL()">Extract Expertise</button>
-                            <div id="url-analysis" class="analysis-result"></div>
-                        </div>
-
-                        <div id="custom-pdf" class="custom-panel">
-                            <div class="file-upload">
-                                <input type="file" id="expert-pdf" accept=".pdf" onchange="analyzeExpertPDF()">
-                                <label for="expert-pdf">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                                    </svg>
-                                    <span>Upload PDF (paper or profile)</span>
-                                </label>
-                            </div>
-                            <div id="pdf-analysis" class="analysis-result"></div>
-                        </div>
+                    <div class="category-select-group">
+                        <label for="subfield">Subfield</label>
+                        <select id="subfield" onchange="onSubfieldChange()">
+                            <!-- Populated by JS -->
+                        </select>
                     </div>
                 </div>
             </div>
 
             <div class="button-group">
-                <button class="btn btn-primary" onclick="proposeTeam()">
-                    Propose Co-Author Team →
+                <button id="analyze-btn" class="btn btn-primary" onclick="analyzeTopicAndProposeTeam()">
+                    Analyze Topic & Propose Team
                 </button>
             </div>
-            <div id="topic-error" class="error-box" style="display: none;"></div>
+            <div id="topic-error" class="error-box"></div>
         </div>
 
-        <!-- Step 2: Co-Author Team Proposal -->
-        <div id="step-experts" class="form-section expert-proposals">
-            <h2>2. Proposed Co-Author Team</h2>
+        <!-- Step 2: Team Composition -->
+        <div id="step-team" class="form-section team-section">
+            <h2><span class="step-badge">2</span> Research Team</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Our AI has analyzed your topic and proposed the following co-authors:
+                Based on your topic and category, the AI has composed the following research team:
             </p>
-            <div id="expert-list"></div>
+
+            <!-- Lead Author -->
+            <div class="team-group">
+                <div class="team-group-header">
+                    <h3>Lead Author</h3>
+                    <span class="team-group-badge">Plans, coordinates, writes</span>
+                </div>
+                <div id="lead-author-container"></div>
+            </div>
+
+            <!-- Co-Authors -->
+            <div class="team-group">
+                <div class="team-group-header">
+                    <h3>Co-Authors</h3>
+                    <span class="team-group-badge">Research, feedback, review sections</span>
+                </div>
+                <div id="coauthors-container"></div>
+                <button class="author-action-btn" onclick="addCoAuthor()" style="margin-top: 0.5rem;">
+                    + Add Co-Author
+                </button>
+            </div>
+
+            <!-- Reviewers -->
+            <div class="team-group">
+                <div class="team-group-header">
+                    <h3>Peer Reviewers</h3>
+                    <span class="team-group-badge">From category expert pool</span>
+                </div>
+                <div id="reviewers-container"></div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="backToTopic()">Back</button>
+                <button class="btn btn-primary" onclick="goToSettings()">Configure Settings</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Workflow Settings -->
+        <div id="step-settings" class="form-section" style="display: none;">
+            <h2><span class="step-badge">3</span> Workflow Settings</h2>
+
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="research-cycles">Research Note Cycles</label>
+                    <input type="number" id="research-cycles" value="1" min="1" max="5">
+                    <p class="help-text">Iterations of research notes + feedback</p>
+                </div>
+                <div class="setting-item">
+                    <label for="max-rounds">Max Review Rounds</label>
+                    <input type="number" id="max-rounds" value="3" min="1" max="10">
+                    <p class="help-text">Peer review iterations</p>
+                </div>
+                <div class="setting-item">
+                    <label for="threshold">Quality Threshold</label>
+                    <input type="number" id="threshold" value="8.0" min="5.0" max="10.0" step="0.1">
+                    <p class="help-text">Score to pass peer review</p>
+                </div>
+            </div>
 
             <div class="estimate-box">
                 <h3>Workflow Estimate</h3>
                 <div class="estimate-grid">
                     <div class="estimate-item">
-                        <div class="label">Co-Authors</div>
-                        <div class="value" id="est-experts">-</div>
-                    </div>
-                    <div class="estimate-item">
-                        <div class="label">Review Rounds</div>
-                        <div class="value" id="est-rounds">-</div>
+                        <div class="label">Team Size</div>
+                        <div class="value" id="est-team-size">-</div>
                     </div>
                     <div class="estimate-item">
                         <div class="label">Est. Time</div>
                         <div class="value" id="est-time">-</div>
                     </div>
                     <div class="estimate-item">
-                        <div class="label">Quality Threshold</div>
-                        <div class="value" id="est-threshold">8.0/10</div>
+                        <div class="label">Est. Tokens</div>
+                        <div class="value" id="est-tokens">-</div>
                     </div>
-                </div>
-
-                <!-- Time Breakdown -->
-                <div class="cost-breakdown">
-                    <h4>Time Breakdown</h4>
-                    <div id="time-breakdown-content"></div>
-                </div>
-
-                <!-- Cost Estimate -->
-                <div class="cost-breakdown">
-                    <h4>Cost Estimate</h4>
-                    <div class="cost-row">
-                        <span class="cost-label">Input Tokens</span>
-                        <span class="cost-value" id="cost-input-tokens">~50,000</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Output Tokens</span>
-                        <span class="cost-value" id="cost-output-tokens">~15,000</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Model</span>
-                        <span class="cost-value" id="cost-model">Claude Opus 4.5</span>
-                    </div>
-                    <div class="cost-row">
-                        <span class="cost-label">Estimated Cost</span>
-                        <span class="cost-value" id="cost-total">$0.75</span>
+                    <div class="estimate-item">
+                        <div class="label">Est. Cost</div>
+                        <div class="value" id="est-cost">-</div>
                     </div>
                 </div>
             </div>
 
             <div class="button-group">
-                <button class="btn btn-secondary" onclick="backToTopic()">← Back</button>
-                <button class="btn btn-primary" onclick="configureWorkflow()">Configure Workflow →</button>
+                <button class="btn btn-secondary" onclick="backToTeam()">Back</button>
+                <button class="btn btn-primary" onclick="startWorkflow()">Start Research Workflow</button>
             </div>
-        </div>
-
-        <!-- Step 3: Workflow Configuration -->
-        <div id="step-config" class="form-section" style="display: none;">
-            <h2>3. Workflow Configuration</h2>
-            <div class="form-group">
-                <label for="max-rounds">Maximum Review Rounds</label>
-                <input type="number" id="max-rounds" value="3" min="1" max="10">
-            </div>
-            <div class="form-group">
-                <label for="threshold">Quality Threshold (0-10)</label>
-                <input type="number" id="threshold" value="8.0" min="5.0" max="10.0" step="0.1">
-            </div>
-            <div class="button-group">
-                <button class="btn btn-secondary" onclick="backToExperts()">← Back</button>
-                <button class="btn btn-primary" onclick="startWorkflow()">Generate Report</button>
-            </div>
-            <div id="config-error" class="error-box" style="display: none;"></div>
-        </div>
-
-        <!-- Step 4: Progress -->
-        <div id="step-progress" class="form-section progress-section">
-            <h2>Generating Research Report</h2>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="status-message" id="status-message">Initializing workflow...</div>
-            <div class="round-info" id="round-info">Round 0 of 3</div>
-            <div class="spinner"></div>
-        </div>
-
-        <!-- Step 5: Success -->
-        <div id="step-success" class="form-section" style="display: none;">
-            <div class="success-box">
-                <h3>Report Generated Successfully</h3>
-                <p>Your research report has been completed and is ready to view.</p>
-                <div class="button-group" style="justify-content: center;">
-                    <button class="btn btn-primary" onclick="viewReport()">View Report</button>
-                    <button class="btn btn-secondary" onclick="window.location.reload()">Create Another</button>
-                </div>
-            </div>
+            <div id="settings-error" class="error-box"></div>
         </div>
     </main>
 
     <footer class="site-footer">
         <div class="container">
             <p><strong>Platform:</strong> Autonomous Research Press</p>
-            <p class="copyright">© 2026 Autonomous Research Press. All rights reserved.</p>
+            <p class="copyright">2026 Autonomous Research Press. All rights reserved.</p>
         </div>
     </footer>
 
     <script src="js/main.js"></script>
     <script>
         const API_BASE = 'http://localhost:8000';
+
+        // Academic categories (loaded from backend or defined here)
+        const ACADEMIC_CATEGORIES = {
+            "computer_science": {
+                "name": "Computer Science",
+                "icon": "computer",
+                "subfields": {
+                    "ai_ml": { "name": "AI & Machine Learning", "expert_pool": ["deep_learning_expert", "nlp_expert", "computer_vision_expert"] },
+                    "systems": { "name": "Systems & Distributed Computing", "expert_pool": ["distributed_systems_expert", "database_expert", "networking_expert"] },
+                    "security": { "name": "Security & Cryptography", "expert_pool": ["cryptography_expert", "blockchain_expert", "network_security_expert", "privacy_expert"] },
+                    "theory": { "name": "Theory & Algorithms", "expert_pool": ["algorithms_expert", "complexity_theory_expert", "formal_methods_expert"] }
+                }
+            },
+            "engineering": {
+                "name": "Engineering",
+                "icon": "build",
+                "subfields": {
+                    "electrical": { "name": "Electrical Engineering", "expert_pool": ["circuits_expert", "signal_processing_expert", "embedded_systems_expert"] },
+                    "mechanical": { "name": "Mechanical Engineering", "expert_pool": ["thermodynamics_expert", "robotics_expert", "materials_expert"] }
+                }
+            },
+            "business_economics": {
+                "name": "Business & Economics",
+                "icon": "trending_up",
+                "subfields": {
+                    "finance": { "name": "Finance", "expert_pool": ["financial_markets_expert", "corporate_finance_expert", "risk_management_expert"] },
+                    "economics": { "name": "Economics", "expert_pool": ["microeconomics_expert", "macroeconomics_expert", "game_theory_expert"] }
+                }
+            },
+            "natural_sciences": {
+                "name": "Natural Sciences",
+                "icon": "science",
+                "subfields": {
+                    "physics": { "name": "Physics", "expert_pool": ["quantum_physics_expert", "particle_physics_expert"] },
+                    "mathematics": { "name": "Mathematics", "expert_pool": ["number_theory_expert", "topology_expert", "analysis_expert"] }
+                }
+            }
+        };
+
         let currentProposal = null;
-        let currentProjectId = null;
-        let customExpertContext = null;
+        let selectedCategory = { major: null, subfield: null };
+
+        // Initialize category dropdowns
+        function initCategoryDropdowns() {
+            const majorSelect = document.getElementById('major-field');
+            majorSelect.innerHTML = '<option value="">Select major field...</option>';
+
+            for (const [key, data] of Object.entries(ACADEMIC_CATEGORIES)) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = data.name;
+                majorSelect.appendChild(option);
+            }
+        }
+
+        function onMajorFieldChange() {
+            const majorField = document.getElementById('major-field').value;
+            const subfieldSelect = document.getElementById('subfield');
+
+            subfieldSelect.innerHTML = '<option value="">Select subfield...</option>';
+
+            if (majorField && ACADEMIC_CATEGORIES[majorField]) {
+                const subfields = ACADEMIC_CATEGORIES[majorField].subfields;
+                for (const [key, data] of Object.entries(subfields)) {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = data.name;
+                    subfieldSelect.appendChild(option);
+                }
+            }
+
+            selectedCategory.major = majorField;
+            selectedCategory.subfield = null;
+            updateCategoryBadge();
+        }
+
+        function onSubfieldChange() {
+            selectedCategory.subfield = document.getElementById('subfield').value;
+            updateCategoryBadge();
+            updateReviewerPool();
+        }
+
+        function updateCategoryBadge() {
+            const badge = document.getElementById('category-badge');
+            if (selectedCategory.major && selectedCategory.subfield) {
+                const majorName = ACADEMIC_CATEGORIES[selectedCategory.major].name;
+                const subfieldName = ACADEMIC_CATEGORIES[selectedCategory.major].subfields[selectedCategory.subfield].name;
+                badge.textContent = `${majorName} > ${subfieldName}`;
+            } else if (selectedCategory.major) {
+                badge.textContent = ACADEMIC_CATEGORIES[selectedCategory.major].name;
+            } else {
+                badge.textContent = 'Not selected';
+            }
+        }
+
+        function updateReviewerPool() {
+            if (!selectedCategory.major || !selectedCategory.subfield) return;
+
+            const pool = ACADEMIC_CATEGORIES[selectedCategory.major].subfields[selectedCategory.subfield].expert_pool;
+            const container = document.getElementById('reviewers-container');
+
+            container.innerHTML = pool.map((expert, idx) => `
+                <div class="author-card reviewer">
+                    <div class="author-header">
+                        <h4 class="author-name">${formatExpertName(expert)}</h4>
+                        <span class="author-model">Reviewer ${idx + 1}</span>
+                    </div>
+                    <div class="author-rationale">From category expert pool: ${selectedCategory.subfield}</div>
+                </div>
+            `).join('');
+        }
+
+        function formatExpertName(expertKey) {
+            return expertKey
+                .replace(/_expert$/, '')
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ') + ' Expert';
+        }
 
         // Research type selection
         function selectResearchType(type) {
-            document.querySelectorAll('.research-type-option input').forEach(input => {
-                input.checked = (input.value === type);
+            document.querySelectorAll('.research-type-option').forEach(opt => {
+                opt.classList.remove('selected');
+                opt.querySelector('input').checked = false;
             });
+            const selected = document.querySelector(`.research-type-option input[value="${type}"]`);
+            selected.checked = true;
+            selected.closest('.research-type-option').classList.add('selected');
         }
 
-        // Tab switching for expert customization
-        function switchCustomTab(tab) {
-            // Update tab buttons
-            document.querySelectorAll('.custom-tab').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            // Update panels
-            document.querySelectorAll('.custom-panel').forEach(panel => {
-                panel.classList.remove('active');
-            });
-            document.getElementById(`custom-${tab}`).classList.add('active');
-        }
-
-        // Analyze expert description
-        async function analyzeExpertDescription() {
-            const description = document.getElementById('expert-description').value.trim();
-            const resultDiv = document.getElementById('expert-analysis');
-
-            if (!description) {
-                alert('Please enter an expert description');
-                return;
-            }
-
-            resultDiv.innerHTML = '<p style="color: var(--text-tertiary);">Analyzing...</p>';
-            resultDiv.classList.add('active');
-
-            // Simulate API call (you'll need to implement this on backend)
-            setTimeout(() => {
-                customExpertContext = {
-                    type: 'description',
-                    content: description
-                };
-
-                resultDiv.innerHTML = `
-                    <h4>Co-Author Profile Extracted</h4>
-                    <p><strong>Expertise:</strong> ${description}</p>
-                    <ul>
-                        <li>Will be considered when proposing co-author team</li>
-                        <li>AI will find co-authors matching this profile</li>
-                    </ul>
-                `;
-            }, 1000);
-        }
-
-        // Analyze expert URL
-        async function analyzeExpertURL() {
-            const url = document.getElementById('expert-url').value.trim();
-            const resultDiv = document.getElementById('url-analysis');
-
-            if (!url) {
-                alert('Please enter a URL');
-                return;
-            }
-
-            resultDiv.innerHTML = '<p style="color: var(--text-tertiary);">Extracting expertise from URL...</p>';
-            resultDiv.classList.add('active');
-
-            // Simulate API call
-            setTimeout(() => {
-                customExpertContext = {
-                    type: 'url',
-                    content: url
-                };
-
-                resultDiv.innerHTML = `
-                    <h4>Expertise Extracted from URL</h4>
-                    <p><strong>Source:</strong> ${url}</p>
-                    <ul>
-                        <li>Analyzing author expertise and topics</li>
-                        <li>Will match co-authors with similar background</li>
-                    </ul>
-                `;
-            }, 1500);
-        }
-
-        // Analyze expert PDF
-        async function analyzeExpertPDF() {
-            const fileInput = document.getElementById('expert-pdf');
-            const file = fileInput.files[0];
-            const resultDiv = document.getElementById('pdf-analysis');
-
-            if (!file) {
-                return;
-            }
-
-            resultDiv.innerHTML = '<p style="color: var(--text-tertiary);">Analyzing PDF...</p>';
-            resultDiv.classList.add('active');
-
-            // Simulate API call
-            setTimeout(() => {
-                customExpertContext = {
-                    type: 'pdf',
-                    content: file.name
-                };
-
-                resultDiv.innerHTML = `
-                    <h4>PDF Analysis Complete</h4>
-                    <p><strong>File:</strong> ${file.name}</p>
-                    <ul>
-                        <li>Extracted author expertise and research focus</li>
-                        <li>Will find co-authors with matching specialization</li>
-                    </ul>
-                `;
-            }, 2000);
-        }
-
-        async function proposeTeam() {
+        // Analyze topic and propose team
+        async function analyzeTopicAndProposeTeam() {
             const topic = document.getElementById('topic').value.trim();
             const researchType = document.querySelector('input[name="research-type"]:checked').value;
             const errorDiv = document.getElementById('topic-error');
-            const submitBtn = event.target;
-            const originalBtnText = submitBtn.innerHTML;
+            const btn = document.getElementById('analyze-btn');
 
             if (!topic) {
                 errorDiv.textContent = 'Please enter a research topic.';
@@ -1170,29 +871,17 @@
             }
 
             errorDiv.style.display = 'none';
-
-            // Show loading state
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = `
-                <span class="loading-spinner"></span>
-                Analyzing topic & composing team...
-            `;
-
-            // Build request with research type and custom context
-            const requestBody = {
-                topic: topic,
-                research_type: researchType
-            };
-
-            if (customExpertContext) {
-                requestBody.expert_context = customExpertContext;
-            }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Analyzing topic...';
 
             try {
                 const response = await fetch(`${API_BASE}/api/propose-team`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify({
+                        topic: topic,
+                        research_type: researchType
+                    })
                 });
 
                 if (!response.ok) {
@@ -1201,245 +890,221 @@
 
                 const proposal = await response.json();
                 currentProposal = proposal;
-                displayProposal(proposal);
 
-                // Show expert section
-                document.getElementById('step-experts').classList.add('active');
-                document.getElementById('step-experts').scrollIntoView({ behavior: 'smooth' });
+                // Show category section
+                document.getElementById('category-section').classList.add('active');
+
+                // Set suggested category (if returned from API)
+                if (proposal.suggested_category) {
+                    document.getElementById('major-field').value = proposal.suggested_category.major;
+                    onMajorFieldChange();
+                    document.getElementById('subfield').value = proposal.suggested_category.subfield;
+                    onSubfieldChange();
+                } else {
+                    // Default to computer_science/security for blockchain topics
+                    if (topic.toLowerCase().includes('blockchain') ||
+                        topic.toLowerCase().includes('crypto') ||
+                        topic.toLowerCase().includes('rollup') ||
+                        topic.toLowerCase().includes('ethereum')) {
+                        document.getElementById('major-field').value = 'computer_science';
+                        onMajorFieldChange();
+                        document.getElementById('subfield').value = 'security';
+                        onSubfieldChange();
+                    }
+                }
+
+                // Display team
+                displayTeam(proposal);
+
+                // Show team section
+                document.getElementById('step-team').classList.add('active');
+                document.getElementById('step-team').scrollIntoView({ behavior: 'smooth' });
 
             } catch (error) {
                 errorDiv.textContent = `Error: ${error.message}`;
                 errorDiv.style.display = 'block';
             } finally {
-                // Restore button state
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
+                btn.disabled = false;
+                btn.innerHTML = 'Analyze Topic & Propose Team';
             }
         }
 
-        function displayProposal(proposal) {
-            const expertList = document.getElementById('expert-list');
-            expertList.innerHTML = '';
+        function displayTeam(proposal) {
+            const experts = proposal.proposed_experts || [];
 
-            proposal.proposed_experts.forEach((expert, idx) => {
-                const card = document.createElement('div');
-                card.className = 'expert-card-interactive';
-                card.draggable = true;
-                card.dataset.expertId = idx;
-                card.innerHTML = `
-                    <div class="expert-card-header">
-                        <div class="expert-card-title">
-                            <h3>${idx + 1}. ${expert.expert_domain}</h3>
-                            <span class="model-badge">${expert.suggested_model}</span>
-                        </div>
-                        <div class="expert-card-actions">
-                            <button class="icon-btn" onclick="editExpert(${idx})" title="Edit">
-                                <svg viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                                </svg>
-                            </button>
-                            <button class="icon-btn" onclick="removeExpert(${idx})" title="Remove">
-                                <svg viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="expert-card-body">
-                        <p class="expert-rationale">${expert.rationale}</p>
-                        <div class="focus-areas-editable" id="focus-areas-${idx}">
-                            ${expert.focus_areas.map(area => `
-                                <span class="focus-tag-editable">
-                                    ${area}
-                                    <span class="focus-tag-remove" onclick="removeFocusArea(${idx}, '${area}')">×</span>
-                                </span>
-                            `).join('')}
-                            <button class="add-focus-area" onclick="addFocusArea(${idx})">+ Add Focus</button>
-                        </div>
-                    </div>
-                `;
-                expertList.appendChild(card);
+            // First expert is Lead Author
+            const leadContainer = document.getElementById('lead-author-container');
+            if (experts.length > 0) {
+                const lead = experts[0];
+                leadContainer.innerHTML = createAuthorCard(lead, 0, true);
+            }
 
-                // Add drag-and-drop listeners
-                card.addEventListener('dragstart', handleDragStart);
-                card.addEventListener('dragover', handleDragOver);
-                card.addEventListener('drop', handleDrop);
-                card.addEventListener('dragend', handleDragEnd);
-            });
+            // Rest are Co-Authors
+            const coauthorsContainer = document.getElementById('coauthors-container');
+            if (experts.length > 1) {
+                coauthorsContainer.innerHTML = experts.slice(1).map((expert, idx) =>
+                    createAuthorCard(expert, idx + 1, false)
+                ).join('');
+            } else {
+                coauthorsContainer.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">No co-authors assigned yet.</p>';
+            }
 
-            // Add "Add Co-Author" button
-            const addBtn = document.createElement('button');
-            addBtn.className = 'add-expert-btn';
-            addBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px;"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg> Add Another Co-Author';
-            addBtn.onclick = addNewExpert;
-            expertList.appendChild(addBtn);
-
-            // Update estimates
-            document.getElementById('est-experts').textContent = proposal.recommended_num_experts;
-            document.getElementById('est-rounds').textContent = proposal.estimated_rounds;
-            document.getElementById('est-time').textContent = `~${proposal.estimated_time_minutes}min`;
-
-            // Calculate and display cost breakdown
-            updateCostEstimate(proposal);
-            updateTimeBreakdown(proposal);
+            // Update reviewers based on category
+            updateReviewerPool();
         }
 
-        function updateCostEstimate(proposal) {
-            const numExperts = proposal.recommended_num_experts;
-            const numRounds = proposal.estimated_rounds;
-            const model = proposal.proposed_experts[0]?.suggested_model || 'claude-opus-4.5';
-
-            // Rough estimates
-            const inputTokensPerExpert = 5000 * numRounds;
-            const outputTokensPerExpert = 2000 * numRounds;
-            const totalInput = inputTokensPerExpert * numExperts;
-            const totalOutput = outputTokensPerExpert * numExperts;
-
-            // Cost calculation (per 1M tokens)
-            const pricing = {
-                'claude-opus-4.5': { input: 15, output: 75 },
-                'claude-sonnet-4': { input: 3, output: 15 }
-            };
-            const modelPrice = pricing[model] || pricing['claude-opus-4.5'];
-            const inputCost = (totalInput / 1_000_000) * modelPrice.input;
-            const outputCost = (totalOutput / 1_000_000) * modelPrice.output;
-            const totalCost = inputCost + outputCost;
-
-            document.getElementById('cost-input-tokens').textContent = `~${totalInput.toLocaleString()}`;
-            document.getElementById('cost-output-tokens').textContent = `~${totalOutput.toLocaleString()}`;
-            document.getElementById('cost-model').textContent = model;
-            document.getElementById('cost-total').textContent = `$${totalCost.toFixed(2)}`;
-        }
-
-        function updateTimeBreakdown(proposal) {
-            const container = document.getElementById('time-breakdown-content');
-            const phases = [
-                { label: 'Initial Draft', time: 5, percent: 28 },
-                { label: `Round 1 Review`, time: proposal.recommended_num_experts * 2, percent: 33 },
-                { label: `Round 2 Review`, time: proposal.recommended_num_experts * 1.5, percent: 22 },
-                { label: 'Final Revision', time: 3, percent: 17 }
-            ];
-
-            container.innerHTML = phases.map(phase => `
-                <div style="margin-bottom: 12px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span class="time-phase-label">${phase.label}</span>
-                        <span class="time-phase-label">${phase.time} min (${phase.percent}%)</span>
+        function createAuthorCard(expert, idx, isLead) {
+            const cardClass = isLead ? 'author-card lead' : 'author-card';
+            return `
+                <div class="${cardClass}" data-idx="${idx}">
+                    <div class="author-header">
+                        <h4 class="author-name">${expert.expert_domain}</h4>
+                        <span class="author-model">${expert.suggested_model || 'claude-sonnet-4.5'}</span>
                     </div>
-                    <div class="time-bar">
-                        <div class="time-bar-fill" style="width: ${phase.percent}%"></div>
+                    <div class="author-rationale">${expert.rationale || 'AI-proposed based on topic analysis'}</div>
+                    <div class="author-focus-areas">
+                        ${(expert.focus_areas || []).map(area => `<span class="focus-tag">${area}</span>`).join('')}
+                    </div>
+                    <div class="author-actions">
+                        <button class="author-action-btn" onclick="editAuthor(${idx})">Edit</button>
+                        <button class="author-action-btn" onclick="customizeAuthor(${idx})">Customize</button>
+                        ${!isLead ? `<button class="author-action-btn" onclick="removeAuthor(${idx})">Remove</button>` : ''}
+                    </div>
+                    <div id="customize-panel-${idx}" class="customization-panel">
+                        <div class="custom-tabs">
+                            <button class="custom-tab active" onclick="switchCustomTab(${idx}, 'desc')">Description</button>
+                            <button class="custom-tab" onclick="switchCustomTab(${idx}, 'url')">URL</button>
+                            <button class="custom-tab" onclick="switchCustomTab(${idx}, 'pdf')">PDF</button>
+                        </div>
+                        <div id="custom-content-${idx}" class="custom-content">
+                            <textarea id="custom-desc-${idx}" placeholder="Describe the expertise you want for this author..."></textarea>
+                            <button class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem;" onclick="applyCustomization(${idx})">Apply</button>
+                        </div>
                     </div>
                 </div>
-            `).join('');
+            `;
         }
 
-        // Drag and drop functions
-        let draggedElement = null;
-
-        function handleDragStart(e) {
-            draggedElement = this;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        }
-
-        function handleDragOver(e) {
-            if (e.preventDefault) {
-                e.preventDefault();
-            }
-            e.dataTransfer.dropEffect = 'move';
-            return false;
-        }
-
-        function handleDrop(e) {
-            if (e.stopPropagation) {
-                e.stopPropagation();
-            }
-            if (draggedElement !== this) {
-                const allCards = Array.from(document.querySelectorAll('.expert-card-interactive'));
-                const draggedIndex = allCards.indexOf(draggedElement);
-                const targetIndex = allCards.indexOf(this);
-
-                if (draggedIndex < targetIndex) {
-                    this.parentNode.insertBefore(draggedElement, this.nextSibling);
-                } else {
-                    this.parentNode.insertBefore(draggedElement, this);
-                }
-
-                // Update proposal order
-                const draggedId = parseInt(draggedElement.dataset.expertId);
-                const targetId = parseInt(this.dataset.expertId);
-                const expert = currentProposal.proposed_experts.splice(draggedId, 1)[0];
-                currentProposal.proposed_experts.splice(targetId, 0, expert);
-            }
-            return false;
-        }
-
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-        }
-
-        function editExpert(idx) {
+        function editAuthor(idx) {
             const expert = currentProposal.proposed_experts[idx];
-            const newDomain = prompt('Edit co-author domain:', expert.expert_domain);
+            const newDomain = prompt('Edit author domain:', expert.expert_domain);
             if (newDomain && newDomain.trim()) {
                 expert.expert_domain = newDomain.trim();
-                displayProposal(currentProposal);
+                displayTeam(currentProposal);
             }
         }
 
-        function removeExpert(idx) {
-            if (confirm('Remove this co-author from the team?')) {
-                currentProposal.proposed_experts.splice(idx, 1);
-                currentProposal.recommended_num_experts--;
-                displayProposal(currentProposal);
+        function customizeAuthor(idx) {
+            const panel = document.getElementById(`customize-panel-${idx}`);
+            panel.classList.toggle('active');
+        }
+
+        function switchCustomTab(idx, tab) {
+            const panel = document.getElementById(`customize-panel-${idx}`);
+            panel.querySelectorAll('.custom-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const content = document.getElementById(`custom-content-${idx}`);
+            if (tab === 'desc') {
+                content.innerHTML = `
+                    <textarea id="custom-desc-${idx}" placeholder="Describe the expertise you want..."></textarea>
+                    <button class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem;" onclick="applyCustomization(${idx}, 'desc')">Apply</button>
+                `;
+            } else if (tab === 'url') {
+                content.innerHTML = `
+                    <input type="text" id="custom-url-${idx}" placeholder="Enter URL (paper, blog, profile)...">
+                    <button class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem;" onclick="applyCustomization(${idx}, 'url')">Analyze & Apply</button>
+                `;
+            } else if (tab === 'pdf') {
+                content.innerHTML = `
+                    <input type="file" id="custom-pdf-${idx}" accept=".pdf">
+                    <button class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.5rem;" onclick="applyCustomization(${idx}, 'pdf')">Analyze & Apply</button>
+                `;
             }
         }
 
-        function addFocusArea(idx) {
-            const area = prompt('Enter new focus area:');
-            if (area && area.trim()) {
-                currentProposal.proposed_experts[idx].focus_areas.push(area.trim());
-                displayProposal(currentProposal);
-            }
-        }
-
-        function removeFocusArea(idx, area) {
+        function applyCustomization(idx, type = 'desc') {
             const expert = currentProposal.proposed_experts[idx];
-            expert.focus_areas = expert.focus_areas.filter(a => a !== area);
-            displayProposal(currentProposal);
+
+            if (type === 'desc') {
+                const desc = document.getElementById(`custom-desc-${idx}`).value.trim();
+                if (desc) {
+                    expert.custom_description = desc;
+                    expert.rationale = `Custom: ${desc.substring(0, 100)}...`;
+                }
+            } else if (type === 'url') {
+                const url = document.getElementById(`custom-url-${idx}`).value.trim();
+                if (url) {
+                    expert.custom_url = url;
+                    expert.rationale = `Expertise extracted from: ${url}`;
+                    // TODO: Call API to analyze URL and get description
+                }
+            } else if (type === 'pdf') {
+                const file = document.getElementById(`custom-pdf-${idx}`).files[0];
+                if (file) {
+                    expert.custom_pdf = file.name;
+                    expert.rationale = `Expertise extracted from PDF: ${file.name}`;
+                    // TODO: Call API to analyze PDF and get description
+                }
+            }
+
+            displayTeam(currentProposal);
         }
 
-        function addNewExpert() {
-            const domain = prompt('Enter co-author specialty (e.g., "Zero-Knowledge Cryptography"):');
-            if (!domain || !domain.trim()) return;
-
-            const focusInput = prompt('Enter focus areas (comma-separated):');
-            const focusAreas = focusInput ? focusInput.split(',').map(s => s.trim()) : [];
-
-            const newExpert = {
-                expert_domain: domain.trim(),
-                rationale: 'Custom expert added by user',
-                focus_areas: focusAreas,
-                suggested_model: 'claude-opus-4.5'
-            };
-
-            currentProposal.proposed_experts.push(newExpert);
-            currentProposal.recommended_num_experts++;
-            displayProposal(currentProposal);
+        function removeAuthor(idx) {
+            if (confirm('Remove this co-author?')) {
+                currentProposal.proposed_experts.splice(idx, 1);
+                displayTeam(currentProposal);
+            }
         }
 
-        function configureWorkflow() {
-            document.getElementById('step-config').style.display = 'block';
-            document.getElementById('step-config').scrollIntoView({ behavior: 'smooth' });
+        function addCoAuthor() {
+            const domain = prompt('Enter co-author specialty:');
+            if (domain && domain.trim()) {
+                currentProposal.proposed_experts.push({
+                    expert_domain: domain.trim(),
+                    rationale: 'Manually added co-author',
+                    focus_areas: [],
+                    suggested_model: 'claude-sonnet-4.5'
+                });
+                displayTeam(currentProposal);
+            }
         }
 
+        // Navigation
+        function backToTopic() {
+            document.getElementById('step-team').classList.remove('active');
+        }
+
+        function goToSettings() {
+            // Update estimates
+            const teamSize = currentProposal.proposed_experts.length +
+                (selectedCategory.subfield ? ACADEMIC_CATEGORIES[selectedCategory.major].subfields[selectedCategory.subfield].expert_pool.length : 3);
+            const cycles = parseInt(document.getElementById('research-cycles')?.value || 1);
+            const rounds = parseInt(document.getElementById('max-rounds')?.value || 3);
+
+            document.getElementById('est-team-size').textContent = teamSize;
+            document.getElementById('est-time').textContent = `~${5 + cycles * 10 + rounds * 5}min`;
+            document.getElementById('est-tokens').textContent = `~${(teamSize * rounds * 7000).toLocaleString()}`;
+            document.getElementById('est-cost').textContent = `$${((teamSize * rounds * 7000) / 1000000 * 18).toFixed(2)}`;
+
+            document.getElementById('step-settings').style.display = 'block';
+            document.getElementById('step-settings').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function backToTeam() {
+            document.getElementById('step-settings').style.display = 'none';
+        }
+
+        // Start workflow
         async function startWorkflow() {
+            const errorDiv = document.getElementById('settings-error');
+            const researchCycles = parseInt(document.getElementById('research-cycles').value);
             const maxRounds = parseInt(document.getElementById('max-rounds').value);
             const threshold = parseFloat(document.getElementById('threshold').value);
-            const errorDiv = document.getElementById('config-error');
 
             if (!currentProposal) {
-                errorDiv.textContent = 'No team proposal found. Please go back and propose a team.';
+                errorDiv.textContent = 'No team proposal found.';
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -1454,7 +1119,9 @@
                         topic: currentProposal.topic,
                         experts: currentProposal.proposed_experts,
                         max_rounds: maxRounds,
-                        threshold: threshold
+                        threshold: threshold,
+                        research_cycles: researchCycles,
+                        category: selectedCategory
                     })
                 });
 
@@ -1463,10 +1130,9 @@
                 }
 
                 const result = await response.json();
-                currentProjectId = result.project_id;
 
-                // Redirect to queue page
-                window.location.href = `research-queue.html?highlight=${result.project_id}`;
+                // Redirect to queue
+                window.location.href = `research-queue.html?highlight=${encodeURIComponent(result.project_id)}`;
 
             } catch (error) {
                 errorDiv.textContent = `Error: ${error.message}`;
@@ -1474,56 +1140,8 @@
             }
         }
 
-        async function pollWorkflowStatus() {
-            if (!currentProjectId) return;
-
-            try {
-                const response = await fetch(`${API_BASE}/api/workflow-status/${currentProjectId}`);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const status = await response.json();
-
-                // Update UI
-                document.getElementById('progress-fill').style.width = `${status.progress_percentage}%`;
-                document.getElementById('status-message').textContent = status.message;
-                document.getElementById('round-info').textContent =
-                    `Round ${status.current_round} of ${status.total_rounds}`;
-
-                if (status.status === 'completed') {
-                    // Show success
-                    document.getElementById('step-progress').style.display = 'none';
-                    document.getElementById('step-success').style.display = 'block';
-                    document.getElementById('step-success').scrollIntoView({ behavior: 'smooth' });
-                } else if (status.status === 'failed') {
-                    // Show error
-                    alert(`Workflow failed: ${status.error}`);
-                } else {
-                    // Continue polling
-                    setTimeout(pollWorkflowStatus, 2000);
-                }
-
-            } catch (error) {
-                console.error('Error polling status:', error);
-                setTimeout(pollWorkflowStatus, 2000);
-            }
-        }
-
-        function viewReport() {
-            if (currentProjectId) {
-                window.location.href = `review-viewer.html?id=${currentProjectId}`;
-            }
-        }
-
-        function backToTopic() {
-            document.getElementById('step-experts').classList.remove('active');
-        }
-
-        function backToExperts() {
-            document.getElementById('step-config').style.display = 'none';
-        }
+        // Initialize
+        initCategoryDropdowns();
     </script>
 </body>
 </html>
