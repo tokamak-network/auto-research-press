@@ -74,7 +74,7 @@ Editorial discretion factors:
 5. **Round context**: After 3 rounds with consistent improvement, be pragmatic
 6. **Field standards**: Industry research reports have different standards than pure theory
 
-Think like a real editor who cares about publishing valuable work, not a score calculator.
+Think like a real editor who cares about publishing valuable work, not a score calculator."""
 
         # Format reviews for moderator
         reviews_summary = self._format_reviews(reviews)
