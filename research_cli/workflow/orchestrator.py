@@ -28,7 +28,8 @@ async def generate_review(
     round_number: int,
     tracker: PerformanceTracker,
     previous_reviews: Optional[List[dict]] = None,
-    previous_manuscript: Optional[str] = None
+    previous_manuscript: Optional[str] = None,
+    author_rebuttal: Optional[str] = None
 ) -> dict:
     """Generate review from a specialist.
 
@@ -38,6 +39,9 @@ async def generate_review(
         manuscript: Manuscript to review
         round_number: Current round number
         tracker: Performance tracker
+        previous_reviews: Reviews from previous round
+        previous_manuscript: Manuscript from previous round
+        author_rebuttal: Author's rebuttal to previous reviews
 
     Returns:
         Review data dictionary
@@ -77,9 +81,34 @@ Focus especially on whether your specific suggestions were implemented.
 ---
 """
 
+    # Add author rebuttal context if available
+    rebuttal_context = ""
+    if author_rebuttal:
+        rebuttal_context = f"""
+AUTHOR REBUTTAL TO PREVIOUS REVIEWS:
+
+The authors have responded to reviewer feedback. Read their rebuttal carefully to understand:
+- What changes they made
+- Their rationale for decisions
+- Clarifications of misunderstandings
+
+{author_rebuttal}
+
+---
+
+IMPORTANT: Consider the author's rebuttal when evaluating this revision:
+- Did they address your concerns adequately?
+- Are their explanations/disagreements reasonable?
+- Does the revised manuscript reflect their stated changes?
+- Give credit for genuine engagement with feedback
+
+---
+"""
+
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
 
 {previous_context}
+{rebuttal_context}
 MANUSCRIPT:
 {manuscript}
 
@@ -166,7 +195,8 @@ async def run_review_round(
     specialists: Dict[str, dict],
     tracker: PerformanceTracker,
     previous_reviews: Optional[List[dict]] = None,
-    previous_manuscript: Optional[str] = None
+    previous_manuscript: Optional[str] = None,
+    author_rebuttal: Optional[str] = None
 ) -> tuple[List[Dict], float]:
     """Run one round of peer review.
 
@@ -175,6 +205,9 @@ async def run_review_round(
         round_number: Round number
         specialists: Dictionary of specialist definitions
         tracker: Performance tracker
+        previous_reviews: Reviews from previous round
+        previous_manuscript: Manuscript from previous round
+        author_rebuttal: Author's rebuttal to previous reviews
 
     Returns:
         (reviews, overall_average)
@@ -197,7 +230,7 @@ async def run_review_round(
 
         # Generate reviews concurrently
         review_tasks = [
-            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript)
+            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript, author_rebuttal)
             for specialist_id, specialist in specialists.items()
         ]
 
@@ -335,8 +368,9 @@ class WorkflowOrchestrator:
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}: Expert reviews in progress...")
 
-            # Get previous reviews for context
+            # Get previous reviews and rebuttal for context
             prev_reviews = all_rounds[-1]['reviews'] if all_rounds else None
+            prev_rebuttal = all_rounds[-1].get('author_rebuttal') if all_rounds else None
 
             reviews, overall_average = await run_review_round(
                 current_manuscript,
@@ -344,7 +378,8 @@ class WorkflowOrchestrator:
                 self.specialists,
                 self.tracker,
                 prev_reviews,
-                previous_manuscript
+                previous_manuscript,
+                prev_rebuttal  # Pass author rebuttal to reviewers
             )
 
             # Moderator decision
@@ -385,6 +420,40 @@ class WorkflowOrchestrator:
                 border_style=decision_color
             ))
 
+            # Author rebuttal (if revision needed)
+            author_rebuttal = None
+            if moderator_decision["decision"] != "ACCEPT":
+                console.print("\n[cyan]Author writing rebuttal...[/cyan]")
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console
+                ) as progress:
+                    task = progress.add_task("[cyan]Author responding to reviews...", total=None)
+                    self.tracker.start_operation("rebuttal")
+                    author_rebuttal = await self.writer.write_rebuttal(
+                        current_manuscript,
+                        reviews,
+                        round_num
+                    )
+                    rebuttal_time = self.tracker.end_operation("rebuttal")
+                    progress.update(task, completed=True)
+
+                console.print(f"[green]✓ Author rebuttal complete[/green]")
+
+                # Display rebuttal summary
+                rebuttal_preview = author_rebuttal[:300] + "..." if len(author_rebuttal) > 300 else author_rebuttal
+                console.print(Panel.fit(
+                    rebuttal_preview,
+                    title="Author Rebuttal (preview)",
+                    border_style="cyan"
+                ))
+
+                # Save full rebuttal
+                rebuttal_file = self.output_dir / f"rebuttal_round_{round_num}.md"
+                rebuttal_file.write_text(author_rebuttal)
+                console.print(f"[dim]Saved: {rebuttal_file}[/dim]")
+
             # Calculate manuscript diff
             manuscript_diff = None
             if previous_manuscript:
@@ -406,6 +475,7 @@ class WorkflowOrchestrator:
                 "reviews": reviews,
                 "overall_average": round(overall_average, 1),
                 "moderator_decision": moderator_decision,
+                "author_rebuttal": author_rebuttal,  # Include rebuttal
                 "manuscript_diff": manuscript_diff,
                 "threshold": self.threshold,
                 "passed": moderator_decision["decision"] == "ACCEPT",

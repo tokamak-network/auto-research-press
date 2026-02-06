@@ -983,6 +983,18 @@
                             </div>
                         ` : ''}
 
+                        ${round.author_rebuttal ? `
+                            <div class="moderator-panel" style="background: var(--bg-tertiary); border-left: 4px solid #0f62fe;">
+                                <div style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 3zm0 8a1 1 0 100 2 1 1 0 000-2z"/>
+                                    </svg>
+                                    Author Rebuttal
+                                </div>
+                                <div style="white-space: pre-wrap; font-size: 0.875rem; line-height: 1.5; color: var(--text-secondary);">${round.author_rebuttal}</div>
+                            </div>
+                        ` : ''}
+
                         <div class="reviews-grid">
                             ${round.reviews.map(r => renderReview(r)).join('')}
                         </div>

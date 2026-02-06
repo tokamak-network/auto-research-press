@@ -1,6 +1,24 @@
 {
   "projects": [
     {
+      "id": "rollup's-stages-and-current-situation-and-bottleneck-20260206-011653",
+      "topic": "Rollup's stages and current situation and bottleneck",
+      "final_score": 6.9,
+      "passed": false,
+      "total_rounds": 3,
+      "timestamp": "2026-02-06T01:27:25.284973",
+      "data_file": "data/rollup's-stages-and-current-situation-and-bottleneck-20260206-011653.json"
+    },
+    {
+      "id": "test-20260205-235637",
+      "topic": "Test",
+      "final_score": 7.2,
+      "passed": false,
+      "total_rounds": 3,
+      "timestamp": "2026-02-06T00:05:12.340943",
+      "data_file": "data/test-20260205-235637.json"
+    },
+    {
       "id": "based-rollup-20260205-234749",
       "topic": "Based rollup",
       "final_score": 7.2,
@@ -136,5 +154,5 @@
       "data_file": "data/research-report.json"
     }
   ],
-  "updated_at": "2026-02-05T23:57:34.837814"
+  "updated_at": "2026-02-06T01:27:25.360836"
 }

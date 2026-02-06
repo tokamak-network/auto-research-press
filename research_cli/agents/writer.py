@@ -80,6 +80,103 @@ Write the complete manuscript now."""
 
         return response.content
 
+    async def write_rebuttal(
+        self,
+        manuscript: str,
+        reviews: List[Dict],
+        round_number: int
+    ) -> str:
+        """Write author rebuttal responding to reviewer feedback.
+
+        Args:
+            manuscript: Current manuscript text
+            reviews: List of review dictionaries from specialists
+            round_number: Current review round
+
+        Returns:
+            Rebuttal text explaining responses to each reviewer
+        """
+        feedback_summary = self._consolidate_feedback(reviews)
+
+        system_prompt = """You are the author of a research manuscript responding to peer review feedback.
+
+Your role:
+- Address each reviewer's concerns directly and professionally
+- Explain what changes you will make (or have made)
+- Clarify misunderstandings or provide additional context
+- Respectfully disagree when reviewer criticism is not applicable
+- Show engagement with feedback and willingness to improve
+
+Write a professional rebuttal that demonstrates:
+- Careful reading of all reviews
+- Clear plan for addressing substantive concerns
+- Rationale for decisions (what to change, what to keep)
+- Respect for reviewers' time and expertise"""
+
+        prompt = f"""You have received peer reviews for your manuscript. Write a detailed rebuttal responding to each reviewer.
+
+ROUND: {round_number}
+
+MANUSCRIPT SUMMARY:
+[Word count: {len(manuscript.split())} words]
+
+REVIEWER FEEDBACK:
+{feedback_summary}
+
+---
+
+Write a professional author rebuttal with the following structure:
+
+## Author Rebuttal - Round {round_number}
+
+### Overview
+[1-2 paragraphs: thank reviewers, summarize key themes in feedback, outline revision strategy]
+
+### Response to Reviewer 1 ([Reviewer Name])
+**Overall Assessment**: [Acknowledge their score and main concerns]
+
+**Major Points**:
+1. [Reviewer concern 1]
+   - **Our response**: [What you will change/clarify/explain]
+   - **Action taken**: [Specific changes made or planned]
+
+2. [Reviewer concern 2]
+   - **Our response**: ...
+   - **Action taken**: ...
+
+**Minor Points**: [Address smaller suggestions collectively]
+
+### Response to Reviewer 2 ([Reviewer Name])
+[Same structure]
+
+### Response to Reviewer 3 ([Reviewer Name])
+[Same structure]
+
+### Summary of Changes
+- [List major revisions planned/made]
+- [Clarifications added]
+- [New analysis/data included]
+
+---
+
+Guidelines:
+- Be specific about what you will change
+- Provide rationale for disagreements (respectfully)
+- Show you understand the criticism even if you disagree
+- Keep tone professional and collaborative
+- Focus on substantive issues, not minor wording
+
+Write the complete rebuttal now."""
+
+        response = await self.llm.generate(
+            prompt=prompt,
+            system=system_prompt,
+            temperature=0.7,
+            max_tokens=4096
+        )
+
+        return response.content
+
     async def revise_manuscript(
         self,
         manuscript: str,
