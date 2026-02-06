@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Research Report | AI-Backed Research</title>
+    <title>Create Research Report | Autonomous Research Press</title>
     <meta name="description" content="Generate comprehensive AI-powered research reports">
 
     <!-- Favicon -->
@@ -97,8 +97,24 @@
         }
 
         .btn-primary:disabled {
-            opacity: 0.6;
+            opacity: 0.8;
             cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .btn-secondary {
@@ -777,7 +793,7 @@
                     Back to Research
                 </a>
                 <div class="header-content">
-                    <h1 class="site-title">AI-Backed Research</h1>
+                    <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Create New Research Report</p>
                 </div>
                 <button class="theme-toggle" aria-label="Toggle dark mode">
@@ -854,25 +870,25 @@
                 <small class="help-text">Describe the topic you want researched. Be specific about the aspects you're interested in.</small>
             </div>
 
-            <!-- Expert Customization -->
+            <!-- Co-Author Customization -->
             <div class="form-group">
-                <label>Expert Team Customization (Optional)</label>
+                <label>Co-Author Team Customization (Optional)</label>
                 <div class="expert-customization">
                     <div class="custom-tabs">
                         <button class="custom-tab active" onclick="switchCustomTab('none')">Auto-Select</button>
-                        <button class="custom-tab" onclick="switchCustomTab('text')">Describe Expert</button>
+                        <button class="custom-tab" onclick="switchCustomTab('text')">Describe Co-Author</button>
                         <button class="custom-tab" onclick="switchCustomTab('url')">From URL</button>
                         <button class="custom-tab" onclick="switchCustomTab('pdf')">From PDF</button>
                     </div>
 
                     <div class="custom-content">
                         <div id="custom-none" class="custom-panel active">
-                            <p class="info-text">AI will automatically propose expert reviewers based on your topic.</p>
+                            <p class="info-text">AI will automatically propose co-authors based on your topic.</p>
                         </div>
 
                         <div id="custom-text" class="custom-panel">
-                            <textarea id="expert-description" placeholder="Describe the type of expert you want (e.g., 'Cryptography expert specializing in zero-knowledge proofs' or 'Economist focused on token economics')" rows="3"></textarea>
-                            <button class="btn btn-secondary btn-sm" onclick="analyzeExpertDescription()">Analyze Expert Profile</button>
+                            <textarea id="expert-description" placeholder="Describe the type of co-author you want (e.g., 'Cryptography specialist in zero-knowledge proofs' or 'Economist focused on token economics')" rows="3"></textarea>
+                            <button class="btn btn-secondary btn-sm" onclick="analyzeExpertDescription()">Analyze Co-Author Profile</button>
                             <div id="expert-analysis" class="analysis-result"></div>
                         </div>
 
@@ -900,17 +916,17 @@
 
             <div class="button-group">
                 <button class="btn btn-primary" onclick="proposeTeam()">
-                    Propose Expert Team →
+                    Propose Co-Author Team →
                 </button>
             </div>
             <div id="topic-error" class="error-box" style="display: none;"></div>
         </div>
 
-        <!-- Step 2: Expert Team Proposal -->
+        <!-- Step 2: Co-Author Team Proposal -->
         <div id="step-experts" class="form-section expert-proposals">
-            <h2>2. Proposed Expert Team</h2>
+            <h2>2. Proposed Co-Author Team</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Our AI has analyzed your topic and proposed the following expert reviewers:
+                Our AI has analyzed your topic and proposed the following co-authors:
             </p>
             <div id="expert-list"></div>
 
@@ -918,7 +934,7 @@
                 <h3>Workflow Estimate</h3>
                 <div class="estimate-grid">
                     <div class="estimate-item">
-                        <div class="label">Experts</div>
+                        <div class="label">Co-Authors</div>
                         <div class="value" id="est-experts">-</div>
                     </div>
                     <div class="estimate-item">
@@ -1013,8 +1029,8 @@
 
     <footer class="site-footer">
         <div class="container">
-            <p><strong>Platform:</strong> AI-Backed Research | Tokamak Network Research Lab</p>
-            <p class="copyright">© 2026 Tokamak Network Research Lab. All rights reserved.</p>
+            <p><strong>Platform:</strong> Autonomous Research Press</p>
+            <p class="copyright">© 2026 Autonomous Research Press. All rights reserved.</p>
         </div>
     </footer>
 
@@ -1068,11 +1084,11 @@
                 };
 
                 resultDiv.innerHTML = `
-                    <h4>Expert Profile Extracted</h4>
+                    <h4>Co-Author Profile Extracted</h4>
                     <p><strong>Expertise:</strong> ${description}</p>
                     <ul>
-                        <li>Will be considered when proposing expert team</li>
-                        <li>AI will find reviewers matching this profile</li>
+                        <li>Will be considered when proposing co-author team</li>
+                        <li>AI will find co-authors matching this profile</li>
                     </ul>
                 `;
             }, 1000);
@@ -1103,7 +1119,7 @@
                     <p><strong>Source:</strong> ${url}</p>
                     <ul>
                         <li>Analyzing author expertise and topics</li>
-                        <li>Will match reviewers with similar background</li>
+                        <li>Will match co-authors with similar background</li>
                     </ul>
                 `;
             }, 1500);
@@ -1134,7 +1150,7 @@
                     <p><strong>File:</strong> ${file.name}</p>
                     <ul>
                         <li>Extracted author expertise and research focus</li>
-                        <li>Will find reviewers with matching specialization</li>
+                        <li>Will find co-authors with matching specialization</li>
                     </ul>
                 `;
             }, 2000);
@@ -1144,6 +1160,8 @@
             const topic = document.getElementById('topic').value.trim();
             const researchType = document.querySelector('input[name="research-type"]:checked').value;
             const errorDiv = document.getElementById('topic-error');
+            const submitBtn = event.target;
+            const originalBtnText = submitBtn.innerHTML;
 
             if (!topic) {
                 errorDiv.textContent = 'Please enter a research topic.';
@@ -1152,6 +1170,13 @@
             }
 
             errorDiv.style.display = 'none';
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <span class="loading-spinner"></span>
+                Analyzing topic & composing team...
+            `;
 
             // Build request with research type and custom context
             const requestBody = {
@@ -1185,6 +1210,10 @@
             } catch (error) {
                 errorDiv.textContent = `Error: ${error.message}`;
                 errorDiv.style.display = 'block';
+            } finally {
+                // Restore button state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
             }
         }
 
@@ -1238,10 +1267,10 @@
                 card.addEventListener('dragend', handleDragEnd);
             });
 
-            // Add "Add Expert" button
+            // Add "Add Co-Author" button
             const addBtn = document.createElement('button');
             addBtn.className = 'add-expert-btn';
-            addBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px;"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg> Add Another Expert';
+            addBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px;"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg> Add Another Co-Author';
             addBtn.onclick = addNewExpert;
             expertList.appendChild(addBtn);
 
@@ -1351,7 +1380,7 @@
 
         function editExpert(idx) {
             const expert = currentProposal.proposed_experts[idx];
-            const newDomain = prompt('Edit expert domain:', expert.expert_domain);
+            const newDomain = prompt('Edit co-author domain:', expert.expert_domain);
             if (newDomain && newDomain.trim()) {
                 expert.expert_domain = newDomain.trim();
                 displayProposal(currentProposal);
@@ -1359,7 +1388,7 @@
         }
 
         function removeExpert(idx) {
-            if (confirm('Remove this expert from the team?')) {
+            if (confirm('Remove this co-author from the team?')) {
                 currentProposal.proposed_experts.splice(idx, 1);
                 currentProposal.recommended_num_experts--;
                 displayProposal(currentProposal);
@@ -1381,7 +1410,7 @@
         }
 
         function addNewExpert() {
-            const domain = prompt('Enter expert domain (e.g., "Zero-Knowledge Cryptography Expert"):');
+            const domain = prompt('Enter co-author specialty (e.g., "Zero-Knowledge Cryptography"):');
             if (!domain || !domain.trim()) return;
 
             const focusInput = prompt('Enter focus areas (comma-separated):');

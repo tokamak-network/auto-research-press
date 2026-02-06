@@ -30,6 +30,78 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Scan for interrupted workflows on startup."""
+    await scan_interrupted_workflows()
+
+
+async def scan_interrupted_workflows():
+    """Scan results directory for interrupted workflows (checkpoint exists but no complete)."""
+    results_dir = Path("results")
+    if not results_dir.exists():
+        return
+
+    interrupted_count = 0
+    for project_dir in results_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+
+        checkpoint_file = project_dir / "workflow_checkpoint.json"
+        complete_file = project_dir / "workflow_complete.json"
+
+        # Has checkpoint but no complete = interrupted
+        if checkpoint_file.exists() and not complete_file.exists():
+            project_id = project_dir.name
+
+            try:
+                with open(checkpoint_file) as f:
+                    checkpoint = json.load(f)
+
+                # Add to workflow_status as "interrupted"
+                workflow_status[project_id] = {
+                    "status": "interrupted",
+                    "current_round": checkpoint.get("current_round", 0),
+                    "total_rounds": checkpoint.get("max_rounds", 3),
+                    "progress_percentage": int((checkpoint.get("current_round", 0) / checkpoint.get("max_rounds", 3)) * 100),
+                    "message": f"Interrupted at Round {checkpoint.get('current_round', 0)} - Resume available",
+                    "error": None,
+                    "expert_status": [
+                        {
+                            "expert_id": f"expert-{i+1}",
+                            "expert_name": exp.get("name", exp.get("domain", f"Expert {i+1}")),
+                            "status": "waiting",
+                            "progress": 0,
+                            "message": "Waiting to resume",
+                            "score": None
+                        }
+                        for i, exp in enumerate(checkpoint.get("expert_configs", []))
+                    ],
+                    "cost_estimate": None,
+                    "start_time": checkpoint.get("checkpoint_time", datetime.now().isoformat()),
+                    "elapsed_time_seconds": 0,
+                    "estimated_time_remaining_seconds": (checkpoint.get("max_rounds", 3) - checkpoint.get("current_round", 0)) * 180,
+                    "can_resume": True
+                }
+
+                # Initialize activity log
+                activity_logs[project_id] = [{
+                    "timestamp": datetime.now().isoformat(),
+                    "level": "warning",
+                    "message": f"Workflow interrupted at Round {checkpoint.get('current_round', 0)}. Click Resume to continue.",
+                    "details": {"checkpoint_time": checkpoint.get("checkpoint_time")}
+                }]
+
+                interrupted_count += 1
+                print(f"  Found interrupted workflow: {project_id} (Round {checkpoint.get('current_round', 0)}/{checkpoint.get('max_rounds', 3)})")
+
+            except Exception as e:
+                print(f"  Error loading checkpoint for {project_id}: {e}")
+
+    if interrupted_count > 0:
+        print(f"✓ Found {interrupted_count} interrupted workflow(s) - available for resume")
+
+
 # Request/Response Models
 class ExpertContext(BaseModel):
     type: str  # "description", "url", "pdf"

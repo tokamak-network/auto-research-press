@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Research Queue | AI-Backed Research</title>
+    <title>Research Queue | Autonomous Research Press</title>
     <meta name="description" content="Monitor ongoing research report generation">
 
     <!-- Favicon -->
@@ -170,6 +170,17 @@
         .status-badge.failed {
             background: #fee2e2;
             color: #991b1b;
+        }
+
+        .status-badge.interrupted {
+            background: #fef3c7;
+            color: #92400e;
+            animation: pulse-warning 2s infinite;
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
         }
 
         .progress-section {
@@ -602,7 +613,7 @@
                     Back to Research
                 </a>
                 <div class="header-content">
-                    <h1 class="site-title">AI-Backed Research</h1>
+                    <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Research Queue</p>
                 </div>
                 <button class="theme-toggle" aria-label="Toggle dark mode">
@@ -688,8 +699,8 @@
 
     <footer class="site-footer">
         <div class="container">
-            <p><strong>Platform:</strong> AI-Backed Research | Tokamak Network Research Lab</p>
-            <p class="copyright">© 2026 Tokamak Network Research Lab. All rights reserved.</p>
+            <p><strong>Platform:</strong> Autonomous Research Press</p>
+            <p class="copyright">© 2026 Autonomous Research Press. All rights reserved.</p>
         </div>
     </footer>
 
@@ -706,9 +717,10 @@
                 if (apiResponse && apiResponse.ok) {
                     const apiData = await apiResponse.json();
                     if (apiData && apiData.workflows && apiData.workflows.length > 0) {
-                        // Split API workflows into accepted and rejected
+                        // Split API workflows into accepted, interrupted, and rejected
                         const accepted = apiData.workflows.filter(wf =>
                             wf.status === 'completed' ||
+                            wf.status === 'interrupted' ||
                             ['queued', 'writing', 'reviewing', 'revising', 'composing_team'].includes(wf.status)
                         );
                         const rejected = apiData.workflows.filter(wf =>
@@ -747,6 +759,7 @@
                         status: status,
                         current_round: wf.total_rounds || 0,
                         total_rounds: wf.total_rounds || 0,
+                        rounds: wf.rounds || [],  // Add rounds data
                         progress_percentage: 100,
                         message: message,
                         error: null,
@@ -798,11 +811,17 @@
 
             emptyDiv.style.display = 'none';
 
-            // Sort accepted workflows: active first, then by project_id desc
+            // Sort accepted workflows: interrupted first, then active, then by project_id desc
             acceptedWorkflows.sort((a, b) => {
-                const activeStatuses = ['queued', 'writing', 'reviewing', 'revising'];
+                const activeStatuses = ['queued', 'writing', 'reviewing', 'revising', 'interrupted'];
+                const aInterrupted = a.status === 'interrupted';
+                const bInterrupted = b.status === 'interrupted';
                 const aActive = activeStatuses.includes(a.status);
                 const bActive = activeStatuses.includes(b.status);
+
+                // Interrupted workflows come first
+                if (aInterrupted && !bInterrupted) return -1;
+                if (!aInterrupted && bInterrupted) return 1;
 
                 if (aActive && !bActive) return -1;
                 if (!aActive && bActive) return 1;
@@ -840,7 +859,9 @@
         function createWorkflowCard(wf) {
             const topic = extractTopicFromId(wf.project_id);
             const isActive = ['queued', 'writing', 'reviewing', 'revising', 'composing_team'].includes(wf.status);
-            const progressClass = wf.status === 'completed' ? 'completed' :
+            const isInterrupted = wf.status === 'interrupted';
+            const isCompleted = wf.status === 'completed' || wf.status === 'rejected';
+            const progressClass = isCompleted ? 'completed' :
                                  wf.status === 'failed' ? 'failed' : '';
 
             // Check if this workflow should be highlighted
@@ -914,6 +935,11 @@
                     <a href="articles/${wf.project_id}.html" class="btn btn-primary">Read Article</a>
                     <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
                 `;
+            } else if (wf.status === 'interrupted') {
+                actions = `
+                    <button class="btn btn-primary" onclick="resumeWorkflow('${wf.project_id}')">▶ Resume Workflow</button>
+                    <button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>
+                `;
             } else if (wf.status === 'failed') {
                 actions = `<button class="btn btn-secondary" onclick="retryWorkflow('${wf.project_id}')">Retry</button>`;
             } else if (isActive) {
@@ -971,13 +997,38 @@
                     ${dashboardHtml}
                     <div class="progress-section">
                         <div class="progress-bar">
-                            <div class="progress-fill ${progressClass}" style="width: ${wf.progress_percentage}%"></div>
+                            <div class="progress-fill ${progressClass}" style="width: ${isCompleted ? '100' : wf.progress_percentage}%"></div>
                         </div>
                         <div class="progress-text">
-                            <span>${wf.message}</span>
-                            <span>Round ${wf.current_round}/${wf.total_rounds}</span>
+                            <span>${isCompleted ? `Completed - Final Score: ${wf.final_score ? wf.final_score.toFixed(1) : 'N/A'}/10` : wf.message}</span>
+                            <span>${isCompleted ? `${wf.total_rounds} rounds completed` : `Round ${wf.current_round}/${wf.total_rounds}`}</span>
                         </div>
                     </div>
+                    ${wf.rounds && wf.rounds.length > 0 ? `
+                        <div class="rounds-detail" style="margin-top: 1rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px;">
+                            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Review Rounds</div>
+                            ${wf.rounds.map(round => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle);">
+                                    <span style="font-size: 0.875rem;">Round ${round.round}</span>
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <span style="font-size: 0.875rem; font-weight: 600; color: ${round.score >= 8 ? 'var(--success)' : round.score >= 7 ? 'var(--warning)' : 'var(--error)'};">${round.score.toFixed(1)}/10</span>
+                                        <span style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: ${round.passed ? 'var(--success-bg)' : 'var(--warning-bg)'}; color: ${round.passed ? 'var(--success)' : 'var(--warning)'}; border-radius: 3px; text-transform: uppercase;">${round.decision.replace('_', ' ')}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    ${isCompleted ? `
+                        <div style="margin-top: 1rem;">
+                            <button class="btn btn-secondary" style="width: 100%; font-size: 0.875rem;" onclick="toggleDetailedLog('${wf.project_id}')">
+                                📋 View Detailed Log
+                            </button>
+                            <div id="detailed-log-${wf.project_id}" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Workflow Timeline</div>
+                                <div id="timeline-${wf.project_id}">Loading...</div>
+                            </div>
+                        </div>
+                    ` : ''}
                     ${errorHtml}
                     ${isActive ? activityFeedHtml : ''}
                     ${actions ? `<div class="workflow-actions">${actions}</div>` : ''}
@@ -1076,11 +1127,13 @@
         function updateStats(workflows) {
             const total = workflows.length;
             const active = workflows.filter(w => ['queued', 'writing', 'reviewing', 'revising', 'composing_team'].includes(w.status)).length;
+            const interrupted = workflows.filter(w => w.status === 'interrupted').length;
             const completed = workflows.filter(w => w.status === 'completed').length;
             const rejected = workflows.filter(w => w.status === 'failed' || w.status === 'rejected').length;
 
             document.getElementById('stat-total').textContent = total;
-            document.getElementById('stat-active').textContent = active;
+            // Show interrupted count in active stat if any, otherwise show active
+            document.getElementById('stat-active').textContent = interrupted > 0 ? `${active} (${interrupted} paused)` : active;
             document.getElementById('stat-completed').textContent = completed;
             document.getElementById('stat-rejected').textContent = rejected;
         }
@@ -1101,8 +1154,147 @@
             return div.innerHTML;
         }
 
+        async function toggleDetailedLog(projectId) {
+            const logElement = document.getElementById(`detailed-log-${projectId}`);
+            if (logElement.style.display === 'none') {
+                logElement.style.display = 'block';
+                await loadDetailedLog(projectId);
+            } else {
+                logElement.style.display = 'none';
+            }
+        }
+
+        async function loadDetailedLog(projectId) {
+            const timelineElement = document.getElementById(`timeline-${projectId}`);
+            try {
+                const response = await fetch(`data/${projectId}.json`);
+                if (!response.ok) throw new Error('Failed to load workflow data');
+
+                const data = await response.json();
+                const performance = data.performance;
+
+                if (!performance) {
+                    timelineElement.innerHTML = '<div style="color: var(--text-tertiary);">No performance data available</div>';
+                    return;
+                }
+
+                const workflowStart = new Date(performance.workflow_start);
+
+                let timeline = [];
+                timeline.push({
+                    time: formatTimestamp(performance.workflow_start),
+                    event: '🚀 Workflow Started',
+                    duration: null
+                });
+
+                // Add rounds
+                if (performance.rounds && performance.rounds.length > 0) {
+                    performance.rounds.forEach(round => {
+                        const roundStart = new Date(round.review_start);
+                        const roundEnd = new Date(round.review_end);
+
+                        timeline.push({
+                            time: formatTimestamp(round.review_start),
+                            event: `📝 Round ${round.round_number} - Review Started`,
+                            duration: null
+                        });
+
+                        // Add reviewer times
+                        if (round.reviewer_times) {
+                            Object.entries(round.reviewer_times).forEach(([reviewer, time]) => {
+                                timeline.push({
+                                    time: '',
+                                    event: `  └ ${reviewer}: ${time.toFixed(1)}s`,
+                                    duration: null
+                                });
+                            });
+                        }
+
+                        if (round.moderator_time) {
+                            timeline.push({
+                                time: '',
+                                event: `  └ Moderator Decision: ${round.moderator_time.toFixed(1)}s`,
+                                duration: null
+                            });
+                        }
+
+                        if (round.revision_time) {
+                            timeline.push({
+                                time: '',
+                                event: `  └ Revision: ${round.revision_time.toFixed(1)}s`,
+                                duration: null
+                            });
+                        }
+
+                        timeline.push({
+                            time: formatTimestamp(round.review_end),
+                            event: `✓ Round ${round.round_number} Complete`,
+                            duration: `${round.review_duration.toFixed(1)}s`
+                        });
+                    });
+                }
+
+                timeline.push({
+                    time: formatTimestamp(performance.workflow_end),
+                    event: '🎉 Workflow Completed',
+                    duration: `Total: ${performance.total_duration.toFixed(1)}s`
+                });
+
+                timelineElement.innerHTML = timeline.map(entry => `
+                    <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; ${entry.time ? 'margin-top: 0.5rem;' : ''}">
+                        <span style="font-family: monospace; color: var(--text-secondary);">${entry.time}</span>
+                        <span style="flex: 1; padding-left: 1rem; ${!entry.time ? 'padding-left: 2rem; color: var(--text-tertiary);' : ''}">${entry.event}</span>
+                        ${entry.duration ? `<span style="color: var(--success); font-weight: 600;">${entry.duration}</span>` : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading detailed log:', error);
+                timelineElement.innerHTML = '<div style="color: var(--error);">Failed to load timeline data</div>';
+            }
+        }
+
+        function formatTimestamp(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
         function retryWorkflow(projectId) {
             alert('Retry functionality coming soon');
+        }
+
+        async function resumeWorkflow(projectId) {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.textContent = 'Resuming...';
+
+                const response = await fetch(`${API_BASE}/api/workflows/${encodeURIComponent(projectId)}/resume`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to resume workflow');
+                }
+
+                const result = await response.json();
+                console.log('Resume result:', result);
+
+                // Reload workflows to update the UI
+                await loadWorkflows();
+
+                // Show success notification
+                btn.textContent = '✓ Resumed!';
+                setTimeout(() => loadWorkflows(), 1000);
+
+            } catch (error) {
+                console.error('Error resuming workflow:', error);
+                alert(`Failed to resume workflow: ${error.message}`);
+                event.target.disabled = false;
+                event.target.textContent = '▶ Resume Workflow';
+            }
         }
 
         // Auto-refresh handling

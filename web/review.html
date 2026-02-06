@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Peer Review System</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
+    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -454,6 +457,7 @@
             border-radius: 6px;
             padding: 1.25rem;
             margin-bottom: 1.25rem;
+            text-align: left;
         }
 
         .moderator-decision {
@@ -494,6 +498,7 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 1.25rem;
+            text-align: left;
         }
 
         .reviewer-header {
@@ -532,6 +537,80 @@
 
         .review-section {
             margin: 0.875rem 0;
+            text-align: left;
+        }
+
+        .rebuttal-panel {
+            background: var(--surface);
+            border-left: 3px solid #3b82f6;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+
+        /* Citation hyperlinks */
+        .citation-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0 2px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+
+        .citation-link:hover {
+            background-color: #dbeafe;
+            border-radius: 2px;
+        }
+
+        .citation-group {
+            white-space: nowrap;
+        }
+
+        .reference-entry {
+            scroll-margin-top: 100px;
+        }
+
+        .rebuttal-header {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .rebuttal-content {
+            font-size: 0.9375rem;
+            line-height: 1.7;
+            color: var(--text);
+            text-align: left;
+        }
+
+        .rebuttal-content h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+
+        .rebuttal-content h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 1.25rem 0 0.5rem 0;
+        }
+
+        .rebuttal-content p {
+            margin: 0.75rem 0;
+        }
+
+        .rebuttal-content ul,
+        .rebuttal-content ol {
+            margin: 0.75rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .rebuttal-content li {
+            margin: 0.5rem 0;
         }
 
         .review-section-title {
@@ -831,11 +910,18 @@
                 <div class="section">
                     <div class="section-title">Manuscript Versions</div>
                     <div class="version-tabs" id="version-tabs">
-                        ${data.rounds.map(r => `
-                            <button class="version-tab ${r.round === 1 ? 'active' : ''}" onclick="selectVersion(${r.round})">
-                                V${r.round} (${r.overall_average}/10)
-                            </button>
-                        `).join('')}
+                        ${data.rounds.map(r => {
+                            // Only show version button if manuscript exists
+                            const manuscriptKey = `manuscript_v${r.round}`;
+                            if (manuscripts[manuscriptKey]) {
+                                return `
+                                    <button class="version-tab ${r.round === 1 ? 'active' : ''}" onclick="selectVersion(${r.round})">
+                                        V${r.round} (${r.overall_average}/10)
+                                    </button>
+                                `;
+                            }
+                            return '';
+                        }).join('')}
                         ${blogUrl ? `
                             <a href="${blogUrl}" class="blog-link-btn" target="_blank">
                                 <svg viewBox="0 0 20 20" fill="currentColor">
@@ -863,7 +949,7 @@
                     </div>
                 </div>
 
-                ${data.rounds.map((round, idx) => renderRound(round, idx)).join('')}
+                ${data.rounds.map((round, idx) => renderRound(round, idx, data.rounds)).join('')}
 
                 ${data.performance ? renderPerformanceMetrics(data.performance) : ''}
             `;
@@ -908,7 +994,68 @@
                 const prevText = manuscripts[prevKey] || '';
                 viewer.innerHTML = renderDiff(prevText, manuscriptText);
             } else {
-                viewer.innerHTML = marked.parse(manuscriptText);
+                // Parse markdown and add citation hyperlinks
+                let html = marked.parse(manuscriptText);
+                html = addCitationHyperlinks(html);
+                viewer.innerHTML = html;
+            }
+        }
+
+        function addCitationHyperlinks(html) {
+            // Convert inline citations [1], [2,3] to hyperlinks
+            return html.replace(/\[(\d+(?:,\d+)*)\]/g, (match, nums) => {
+                const ids = nums.split(',');
+                const links = ids.map(id => {
+                    const trimmedId = id.trim();
+                    return `<a href="#ref-${trimmedId}" class="citation-link" onclick="highlightReference(${trimmedId}); return false;">[${trimmedId}]</a>`;
+                }).join(',');
+                return `<span class="citation-group">${links}</span>`;
+            });
+        }
+
+        function highlightReference(refId) {
+            // Remove previous highlights
+            document.querySelectorAll('.reference-entry').forEach(el => {
+                el.classList.remove('highlight-flash');
+            });
+
+            // Find reference in manuscript viewer
+            const viewer = document.getElementById('manuscript-viewer');
+            if (!viewer) return;
+
+            // Look for reference by ID or by text pattern
+            const refPattern = new RegExp(`\\[${refId}\\]\\s+[^\\[]+`, 'i');
+            const allText = viewer.innerText;
+
+            if (refPattern.test(allText)) {
+                // Find the element containing this reference
+                const walker = document.createTreeWalker(
+                    viewer,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+
+                let node;
+                while (node = walker.nextNode()) {
+                    if (refPattern.test(node.textContent)) {
+                        const element = node.parentElement;
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        // Highlight temporarily
+                        const originalBg = element.style.backgroundColor;
+                        const originalBorder = element.style.borderLeft;
+                        element.style.backgroundColor = '#fef3c7';
+                        element.style.borderLeft = '4px solid #f59e0b';
+
+                        setTimeout(() => {
+                            element.style.backgroundColor = originalBg;
+                            element.style.borderLeft = originalBorder;
+                        }, 2000);
+
+                        break;
+                    }
+                }
             }
         }
 
@@ -950,8 +1097,17 @@
             return div.innerHTML;
         }
 
-        function renderRound(round, idx) {
+        function renderMarkdown(text) {
+            if (!text) return '';
+            return marked.parse(text);
+        }
+
+        function renderRound(round, idx, allRounds) {
             const moderator = round.moderator_decision;
+            // Get rebuttal from previous round (if this is not the first round)
+            const previousRound = idx > 0 ? allRounds[idx - 1] : null;
+            const previousRebuttal = previousRound?.author_rebuttal;
+            const isLastRound = idx === allRounds.length - 1;
 
             return `
                 <div class="section">
@@ -967,37 +1123,39 @@
                         </div>
 
                         ${moderator ? `
-                            <div class="moderator-panel">
-                                <div class="moderator-decision">
-                                    ${moderator.decision} (Confidence: ${moderator.confidence}/5)
-                                </div>
-                                <div class="moderator-meta">${moderator.meta_review}</div>
-                                ${moderator.required_changes.length > 0 ? `
-                                    <div class="changes-list">
-                                        <strong>Required Changes:</strong>
-                                        <ul>
-                                            ${moderator.required_changes.map(c => `<li>${c}</li>`).join('')}
-                                        </ul>
+                            <div class="moderator-panel" style="background: ${moderator.decision === 'ACCEPT' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : moderator.decision.includes('MAJOR') ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'}; border: 2px solid ${moderator.decision === 'ACCEPT' ? '#10b981' : moderator.decision.includes('MAJOR') ? '#ef4444' : '#f59e0b'}; border-left: 6px solid ${moderator.decision === 'ACCEPT' ? '#059669' : moderator.decision.includes('MAJOR') ? '#dc2626' : '#d97706'};">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="color: ${moderator.decision === 'ACCEPT' ? '#059669' : moderator.decision.includes('MAJOR') ? '#dc2626' : '#d97706'};">
+                                            <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.75 3.5a.75.75 0 011.5 0v3.5a.75.75 0 01-1.5 0v-3.5zM8 11a1 1 0 100 2 1 1 0 000-2z"/>
+                                        </svg>
+                                        <span style="font-weight: 700; font-size: 1rem; color: ${moderator.decision === 'ACCEPT' ? '#047857' : moderator.decision.includes('MAJOR') ? '#b91c1c' : '#b45309'};">Editorial Decision</span>
                                     </div>
-                                ` : ''}
-                            </div>
-                        ` : ''}
-
-                        ${round.author_rebuttal ? `
-                            <div class="moderator-panel" style="background: var(--bg-tertiary); border-left: 4px solid #0f62fe;">
-                                <div style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 3zm0 8a1 1 0 100 2 1 1 0 000-2z"/>
-                                    </svg>
-                                    Author Rebuttal
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 0.75rem; color: ${moderator.decision === 'ACCEPT' ? '#047857' : moderator.decision.includes('MAJOR') ? '#b91c1c' : '#b45309'}; text-transform: uppercase; letter-spacing: 0.05em;">Confidence</span>
+                                        <span style="font-size: 1.125rem; font-weight: 700; color: ${moderator.decision === 'ACCEPT' ? '#047857' : moderator.decision.includes('MAJOR') ? '#b91c1c' : '#b45309'};">${moderator.confidence}/5</span>
+                                    </div>
                                 </div>
-                                <div style="white-space: pre-wrap; font-size: 0.875rem; line-height: 1.5; color: var(--text-secondary);">${round.author_rebuttal}</div>
+                                <div style="display: inline-block; padding: 0.625rem 1.25rem; background: ${moderator.decision === 'ACCEPT' ? '#059669' : moderator.decision.includes('MAJOR') ? '#dc2626' : '#d97706'}; color: white; border-radius: 6px; font-weight: 700; font-size: 1.125rem; letter-spacing: 0.02em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    ${moderator.decision.replace('_', ' ')}
+                                </div>
                             </div>
                         ` : ''}
 
                         <div class="reviews-grid">
                             ${round.reviews.map(r => renderReview(r)).join('')}
                         </div>
+
+                        ${previousRebuttal && !isLastRound ? `
+                            <div class="rebuttal-panel">
+                                <div class="rebuttal-header">
+                                    Author Rebuttal — Response to Round ${round.round - 1}
+                                </div>
+                                <div class="rebuttal-content">
+                                    ${renderMarkdown(previousRebuttal)}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -1090,25 +1248,43 @@
                 };
             });
 
-            datasets.unshift({
-                label: 'Overall Average',
-                data: data.rounds.map(r => r.overall_average),
-                borderColor: '#10b981',
-                backgroundColor: '#10b98120',
-                borderWidth: 4,
-                tension: 0.4,
-                fill: false,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: '#10b981',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointHoverBorderWidth: 3
+            // Filter rounds to only show those with manuscripts (actual completed rounds)
+            const completedRounds = data.rounds.filter((r, idx) => {
+                const manuscriptKey = `manuscript_v${r.round}`;
+                return manuscripts[manuscriptKey] !== undefined;
             });
+
+            // Update labels to only show completed rounds
+            const completedRoundLabels = completedRounds.map(r => `Round ${r.round}`);
+
+            // Update datasets to only include completed round data
+            const filteredDatasets = datasets.map(dataset => ({
+                ...dataset,
+                data: completedRounds.map(r => {
+                    const review = r.reviews.find(rev => rev.specialist_name === dataset.label);
+                    return review ? review.average : null;
+                })
+            }));
+
+            // Calculate dynamic y-axis range for better readability
+            const allScores = [];
+            completedRounds.forEach(round => {
+                round.reviews.forEach(review => {
+                    if (review.average != null) {
+                        allScores.push(review.average);
+                    }
+                });
+            });
+            const minScore = Math.min(...allScores);
+            const maxScore = Math.max(...allScores);
+            const range = maxScore - minScore;
+            // Add 20% padding above and below, but keep within 0-10 bounds
+            const yMin = Math.max(0, Math.floor(minScore - range * 0.3));
+            const yMax = Math.min(10, Math.ceil(maxScore + range * 0.3));
 
             scoreChart = new Chart(ctx, {
                 type: 'line',
-                data: { labels: rounds, datasets: datasets },
+                data: { labels: completedRoundLabels, datasets: filteredDatasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -1125,11 +1301,12 @@
                     },
                     scales: {
                         y: {
-                            beginAtZero: true,
-                            max: 10,
+                            min: yMin,
+                            max: yMax,
                             ticks: {
                                 color: textColor,
-                                font: { size: 12, weight: '500' }
+                                font: { size: 12, weight: '500' },
+                                stepSize: 0.5
                             },
                             grid: {
                                 color: gridColor,
