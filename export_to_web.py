@@ -9,6 +9,15 @@ from datetime import datetime
 from research_cli.utils.citation_manager import CitationManager
 
 
+def extract_title(markdown_text):
+    """Extract the first H1 heading as the article title."""
+    for line in markdown_text.split('\n'):
+        match = re.match(r'^#\s+(.+)', line)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
 def extract_headings(markdown_text):
     """Extract H2 headings for table of contents."""
     headings = []
@@ -79,7 +88,7 @@ def generate_article_html(project_id, workflow_data, manuscript_text):
                 </a>
                 <div class="header-content">
                     <h1 class="site-title">Autonomous Research Press</h1>
-                    <p class="site-subtitle">AI-Powered Publication Platform</p>
+                    <p class="site-subtitle">Autonomous Research Platform</p>
                 </div>
                 <button class="theme-toggle" aria-label="Toggle dark mode">
                     <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -362,9 +371,20 @@ def export_results_to_web():
                 "passed": rd.get("passed", False)
             })
 
+        # Extract article title from latest manuscript
+        article_title = None
+        if manuscripts:
+            versioned = [k for k in manuscripts.keys() if '_v' in k]
+            if versioned:
+                latest_key = max(versioned, key=lambda x: int(x.split('_v')[1]))
+            else:
+                latest_key = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
+            article_title = extract_title(manuscripts[latest_key])
+
         # Add to index
         workflows.append({
             "id": project_id,
+            "title": article_title,
             "topic": workflow_data.get("topic", project_id.replace("-", " ").title()),
             "final_score": workflow_data.get("final_score", 0),
             "passed": workflow_data.get("passed", False),

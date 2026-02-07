@@ -1081,7 +1081,7 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
                 </a>
                 <div class="header-content">
                     <h1 class="site-title">Autonomous Research Press</h1>
-                    <p class="site-subtitle">AI-Powered Publication Platform</p>
+                    <p class="site-subtitle">Autonomous Research Platform</p>
                 </div>
                 <button class="theme-toggle" aria-label="Toggle dark mode">
                     <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

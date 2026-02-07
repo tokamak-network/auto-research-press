@@ -27,13 +27,13 @@
         <div class="container">
             <div class="header-content">
                 <h1 class="site-title">Autonomous Research Press</h1>
-                <p class="site-description">AI-Powered Publication Platform</p>
+                <p class="site-description">Autonomous Research Platform</p>
             </div>
             <nav class="site-nav">
                 <a href="#articles" class="nav-link">Publications</a>
                 <a href="research-queue.html" class="nav-link">Queue</a>
                 <a href="api-docs.html" class="nav-link">API</a>
-                <a href="ask-topic.html" class="btn btn-primary">Ask Topic</a>
+                <a href="ask-topic.html" class="btn btn-primary">Ask Research</a>
                 <button class="theme-toggle" aria-label="Toggle dark mode">
                     <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -106,7 +106,7 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>Autonomous Research Press</h3>
-                    <p>AI-powered research publication platform</p>
+                    <p>Autonomous research platform</p>
                 </div>
                 <div class="footer-section">
                     <h4>Capabilities</h4>
@@ -121,7 +121,7 @@
                     <h4>Resources</h4>
                     <ul>
                         <li><a href="research-queue.html">Research Queue</a></li>
-                        <li><a href="ask-topic.html">Ask Topic</a></li>
+                        <li><a href="ask-topic.html">Ask Research</a></li>
                     </ul>
                 </div>
             </div>
@@ -192,7 +192,7 @@
                             <span class="meta-reading-time">${readingTime} min read</span>
                         </div>
                         <h3 class="card-title">
-                            <a href="articles/${proj.id}.html">${proj.topic}</a>
+                            <a href="articles/${proj.id}.html">${proj.title || proj.topic}</a>
                         </h3>
                         <p class="card-description">
                             Autonomous research with AI-powered peer review.
