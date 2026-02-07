@@ -315,6 +315,7 @@ async def _run_workflow(
 ):
     """Run the complete workflow asynchronously."""
     from .agents import TeamComposerAgent
+    from .categories import suggest_category_from_topic
     from .interactive import TeamEditor
     from .workflow import WorkflowOrchestrator
     from .models.expert import ExpertConfig
@@ -404,12 +405,16 @@ async def _run_workflow(
         console.print(f"[green]✓[/green] Loaded manuscript: {manuscript_file}")
         console.print(f"   Length: {len(initial_manuscript.split()):,} words\n")
 
+    # Detect academic category from topic
+    category = suggest_category_from_topic(topic)
+
     # Create and run orchestrator
     orchestrator = WorkflowOrchestrator(
         expert_configs=expert_configs,
         topic=topic,
         max_rounds=max_rounds,
-        threshold=threshold
+        threshold=threshold,
+        category=category,
     )
 
     try:

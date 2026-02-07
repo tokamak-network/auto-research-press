@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from research_cli.agents.team_composer import TeamComposerAgent
+from research_cli.categories import suggest_category_from_topic
 from research_cli.workflow.orchestrator import WorkflowOrchestrator
 from research_cli.models.expert import ExpertConfig
 
@@ -303,122 +304,6 @@ activity_logs: Dict[str, List[dict]] = {}
 async def health():
     """Health check endpoint."""
     return {"status": "ok", "service": "AI-Backed Research API"}
-
-
-def suggest_category_from_topic(topic: str) -> dict:
-    """Suggest academic category based on topic keywords."""
-    topic_lower = topic.lower()
-
-    # Blockchain/Crypto related
-    if any(kw in topic_lower for kw in ['blockchain', 'crypto', 'ethereum', 'bitcoin', 'rollup', 'zk', 'zero-knowledge', 'smart contract', 'defi', 'consensus', 'proof of stake', 'proof of work']):
-        return {"major": "computer_science", "subfield": "security"}
-
-    # AI/ML related
-    if any(kw in topic_lower for kw in ['machine learning', 'deep learning', 'neural network', 'nlp', 'natural language', 'computer vision', 'reinforcement learning', 'transformer', 'gpt', 'llm']):
-        return {"major": "computer_science", "subfield": "ai_ml"}
-
-    # Systems/Distributed
-    if any(kw in topic_lower for kw in ['distributed', 'database', 'scalability', 'performance', 'latency', 'throughput', 'networking', 'cloud', 'operating system']):
-        return {"major": "computer_science", "subfield": "systems"}
-
-    # Software Engineering / HCI
-    if any(kw in topic_lower for kw in ['software engineering', 'devops', 'testing', 'programming language', 'compiler', 'ide']):
-        return {"major": "computer_science", "subfield": "software_eng"}
-    if any(kw in topic_lower for kw in ['user experience', 'ux', 'hci', 'human-computer', 'accessibility', 'visualization', 'interface design']):
-        return {"major": "computer_science", "subfield": "hci"}
-
-    # Medicine & Health
-    if any(kw in topic_lower for kw in ['medicine', 'clinical', 'surgery', 'diagnosis', 'therapeutic', 'patient', 'hospital']):
-        return {"major": "medicine_health", "subfield": "clinical"}
-    if any(kw in topic_lower for kw in ['epidemiology', 'public health', 'disease prevention', 'global health', 'pandemic', 'vaccine']):
-        return {"major": "medicine_health", "subfield": "public_health"}
-    if any(kw in topic_lower for kw in ['pharmacology', 'drug', 'pharmaceutical', 'clinical trial', 'toxicology']):
-        return {"major": "medicine_health", "subfield": "pharmacology"}
-
-    # Biology / Life Sciences
-    if any(kw in topic_lower for kw in ['biology', 'genetics', 'genomics', 'molecular', 'cell', 'organism', 'ecology', 'evolution', 'dna', 'rna', 'protein']):
-        return {"major": "natural_sciences", "subfield": "biology"}
-
-    # Chemistry
-    if any(kw in topic_lower for kw in ['chemistry', 'chemical', 'molecule', 'reaction', 'catalyst', 'organic', 'inorganic', 'polymer']):
-        return {"major": "natural_sciences", "subfield": "chemistry"}
-
-    # Physics
-    if any(kw in topic_lower for kw in ['physics', 'quantum', 'particle', 'astrophysics', 'cosmology', 'relativity', 'condensed matter', 'optics']):
-        return {"major": "natural_sciences", "subfield": "physics"}
-
-    # Earth & Environmental Sciences
-    if any(kw in topic_lower for kw in ['earth', 'climate', 'environment', 'geology', 'oceanography', 'atmospheric', 'sustainability', 'ecosystem']):
-        return {"major": "natural_sciences", "subfield": "earth_science"}
-
-    # Mathematics
-    if any(kw in topic_lower for kw in ['mathematics', 'theorem', 'proof', 'algebra', 'topology', 'number theory', 'calculus', 'statistics']):
-        return {"major": "natural_sciences", "subfield": "mathematics"}
-
-    # Psychology
-    if any(kw in topic_lower for kw in ['psychology', 'cognitive', 'behavioral', 'mental health', 'neuroscience', 'perception', 'emotion']):
-        return {"major": "social_sciences", "subfield": "psychology"}
-
-    # Sociology
-    if any(kw in topic_lower for kw in ['sociology', 'social structure', 'inequality', 'demography', 'urbanization', 'social network', 'social movement']):
-        return {"major": "social_sciences", "subfield": "sociology"}
-
-    # Political Science
-    if any(kw in topic_lower for kw in ['political', 'government', 'democracy', 'election', 'geopolitics', 'international relations', 'diplomacy']):
-        return {"major": "social_sciences", "subfield": "political_science"}
-
-    # Economics (social sciences track)
-    if any(kw in topic_lower for kw in ['economics', 'microeconomics', 'macroeconomics', 'econometrics', 'game theory']):
-        return {"major": "social_sciences", "subfield": "economics"}
-
-    # Anthropology
-    if any(kw in topic_lower for kw in ['anthropology', 'ethnography', 'archaeology', 'cultural', 'indigenous']):
-        return {"major": "social_sciences", "subfield": "anthropology"}
-
-    # Philosophy
-    if any(kw in topic_lower for kw in ['philosophy', 'ethics', 'epistemology', 'metaphysics', 'moral', 'existential']):
-        return {"major": "humanities", "subfield": "philosophy"}
-
-    # History
-    if any(kw in topic_lower for kw in ['history', 'ancient', 'medieval', 'colonial', 'war', 'civilization', 'historiography']):
-        return {"major": "humanities", "subfield": "history"}
-
-    # Literature
-    if any(kw in topic_lower for kw in ['literature', 'literary', 'novel', 'poetry', 'narrative', 'fiction']):
-        return {"major": "humanities", "subfield": "literature"}
-
-    # Linguistics
-    if any(kw in topic_lower for kw in ['linguistics', 'language', 'syntax', 'semantics', 'phonology', 'sociolinguistics', 'grammar']):
-        return {"major": "humanities", "subfield": "linguistics"}
-
-    # Law
-    if any(kw in topic_lower for kw in ['law', 'legal', 'court', 'constitutional', 'jurisprudence', 'legislation', 'judicial']):
-        return {"major": "law_policy", "subfield": "law"}
-
-    # Policy
-    if any(kw in topic_lower for kw in ['policy', 'regulation', 'governance', 'public administration', 'bureaucracy', 'reform']):
-        return {"major": "law_policy", "subfield": "policy"}
-
-    # Finance/Business
-    if any(kw in topic_lower for kw in ['finance', 'trading', 'market', 'investment', 'portfolio', 'risk management', 'accounting']):
-        return {"major": "business_economics", "subfield": "finance"}
-    if any(kw in topic_lower for kw in ['management', 'strategy', 'leadership', 'organizational', 'innovation', 'startup', 'entrepreneurship']):
-        return {"major": "business_economics", "subfield": "management"}
-    if any(kw in topic_lower for kw in ['marketing', 'brand', 'consumer', 'advertising', 'market research']):
-        return {"major": "business_economics", "subfield": "marketing"}
-
-    # Engineering
-    if any(kw in topic_lower for kw in ['electrical', 'circuit', 'signal processing', 'embedded', 'power system', 'semiconductor']):
-        return {"major": "engineering", "subfield": "electrical"}
-    if any(kw in topic_lower for kw in ['mechanical', 'thermodynamics', 'fluid', 'robotics', 'actuator', 'mechanism']):
-        return {"major": "engineering", "subfield": "mechanical"}
-    if any(kw in topic_lower for kw in ['civil', 'structural', 'construction', 'bridge', 'geotechnical', 'transportation infrastructure']):
-        return {"major": "engineering", "subfield": "civil"}
-    if any(kw in topic_lower for kw in ['materials science', 'nanomaterial', 'metallurgy', 'composite', 'ceramic']):
-        return {"major": "engineering", "subfield": "materials"}
-
-    # Default to CS/theory for general tech topics
-    return {"major": "computer_science", "subfield": "theory"}
 
 
 @app.get("/api/queue-status")
@@ -818,7 +703,8 @@ async def run_workflow_background(
             output_dir=Path(f"results/{project_id}"),
             status_callback=lambda status, round_num, msg: update_workflow_status(
                 project_id, status, round_num, max_rounds, msg
-            )
+            ),
+            category=category,
         )
 
         # Run workflow
@@ -1035,11 +921,12 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
         project_id = f"{project_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         # Escape markdown for JS embedding
+        # Only escape ${ (JS template literal interpolation), not bare $ (needed for KaTeX math)
         escaped_markdown = (
             request.content
             .replace('\\', '\\\\')
             .replace('`', '\\`')
-            .replace('$', '\\$')
+            .replace('${', '\\${')
         )
 
         # Extract headings for TOC

@@ -31,18 +31,20 @@ class ResearchPlannerAgent:
     async def create_research_plan(
         self,
         topic: str,
-        target_length: str = "comprehensive"  # "short", "medium", "comprehensive"
+        target_length: str = "comprehensive",  # "short", "medium", "comprehensive"
+        domain: str = "interdisciplinary research",
     ) -> ResearchPlan:
         """Create detailed research plan with section breakdown.
 
         Args:
             topic: Research topic
             target_length: Desired paper length
+            domain: Domain description for specialization context
 
         Returns:
             Complete research plan with sections
         """
-        system_prompt = """You are an expert research planner specializing in blockchain and distributed systems.
+        system_prompt = f"""You are an expert research planner specializing in {domain}.
 
 Your role:
 - Analyze research topics and identify key questions

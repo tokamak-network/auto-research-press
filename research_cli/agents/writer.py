@@ -35,6 +35,7 @@ class WriterAgent:
         topic: str,
         profile: str = "academic",
         references: Optional[List[Reference]] = None,
+        domain: str = "interdisciplinary research",
     ) -> str:
         """Write initial research manuscript.
 
@@ -42,11 +43,12 @@ class WriterAgent:
             topic: Research topic
             profile: Writing profile (academic, technical, etc.)
             references: Optional list of real references to cite
+            domain: Domain description for specialization context
 
         Returns:
             Manuscript text in markdown format
         """
-        system_prompt = """You are an expert research writer specializing in blockchain technology and distributed systems.
+        system_prompt = f"""You are an expert research writer specializing in {domain}.
 
 Your writing style:
 - Clear, precise technical language
@@ -210,6 +212,7 @@ Write the complete rebuttal now."""
         reviews: List[Dict],
         round_number: int,
         references: Optional[List[Reference]] = None,
+        domain: str = "interdisciplinary research",
     ) -> str:
         """Revise manuscript based on specialist feedback.
 
@@ -218,6 +221,7 @@ Write the complete rebuttal now."""
             reviews: List of review dictionaries from specialists
             round_number: Current revision round (1, 2, 3, etc.)
             references: Optional list of real references available for citation
+            domain: Domain description for specialization context
 
         Returns:
             Revised manuscript text
@@ -363,7 +367,7 @@ Focus on substantive improvements that address reviewer concerns."""
         section_spec = context.section_spec
         previous_summaries = context.get_all_previous_summaries()
 
-        system_prompt = """You are an expert research writer specializing in blockchain technology and distributed systems.
+        system_prompt = """You are an expert research writer.
 
 Your writing style:
 - Clear, precise technical language

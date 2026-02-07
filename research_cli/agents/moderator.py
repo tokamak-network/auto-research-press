@@ -33,7 +33,8 @@ class ModeratorAgent:
         reviews: List[Dict],
         round_number: int,
         max_rounds: int,
-        previous_rounds: List[Dict] = None
+        previous_rounds: List[Dict] = None,
+        domain: str = "interdisciplinary research"
     ) -> Dict:
         """Make accept/reject decision based on peer reviews.
 
@@ -43,11 +44,12 @@ class ModeratorAgent:
             round_number: Current round number
             max_rounds: Maximum rounds allowed
             previous_rounds: Previous round data for trajectory analysis
+            domain: Domain description for editorial context
 
         Returns:
             Dictionary with decision, reasoning, and meta-review
         """
-        system_prompt = """You are the Editor-in-Chief for a leading research publication in blockchain and distributed systems.
+        system_prompt = f"""You are the Editor-in-Chief for a leading research publication in {domain}.
 
 Your role is to exercise EDITORIAL JUDGMENT, not mechanical score calculation.
 

@@ -16,6 +16,7 @@ from ..llm import ClaudeLLM
 from ..agents import WriterAgent, ModeratorAgent
 from ..agents.desk_editor import DeskEditorAgent
 from ..agents.specialist_factory import SpecialistFactory
+from ..categories import get_domain_description
 from ..models.expert import ExpertConfig
 from ..models.collaborative_research import Reference
 from ..performance import PerformanceTracker
@@ -301,7 +302,8 @@ class WorkflowOrchestrator:
         max_rounds: int = 3,
         threshold: float = 8.0,
         output_dir: Optional[Path] = None,
-        status_callback = None
+        status_callback = None,
+        category: Optional[dict] = None
     ):
         """Initialize workflow orchestrator.
 
@@ -312,6 +314,7 @@ class WorkflowOrchestrator:
             threshold: Score threshold for acceptance
             output_dir: Output directory for results
             status_callback: Optional callback function(status, round_num, message)
+            category: Optional dict with 'major' and 'subfield' keys for domain detection
         """
         self.expert_configs = expert_configs
         self.topic = topic
@@ -320,6 +323,14 @@ class WorkflowOrchestrator:
         self.output_dir = output_dir or Path("results") / topic.replace(" ", "-").lower()
         self.tracker = PerformanceTracker()
         self.status_callback = status_callback
+
+        # Compute domain description from category
+        if category and category.get("major"):
+            self.domain_desc = get_domain_description(
+                category["major"], category.get("subfield", "")
+            )
+        else:
+            self.domain_desc = "interdisciplinary research"
 
         # Create specialists from configs
         self.specialists = SpecialistFactory.create_specialists_dict(
@@ -473,7 +484,8 @@ class WorkflowOrchestrator:
                     reviews,
                     round_num,
                     self.max_rounds,
-                    previous_rounds=all_rounds  # Pass previous rounds for trajectory analysis
+                    previous_rounds=all_rounds,  # Pass previous rounds for trajectory analysis
+                    domain=self.domain_desc,
                 )
                 moderator_time = self.tracker.end_operation("moderator")
                 self.tracker.record_moderator_time(moderator_time)
@@ -615,6 +627,7 @@ class WorkflowOrchestrator:
                     reviews,
                     round_num,
                     references=self.sources if self.sources else None,
+                    domain=self.domain_desc,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
@@ -675,6 +688,7 @@ class WorkflowOrchestrator:
             manuscript = await self.writer.write_manuscript(
                 self.topic,
                 references=self.sources if self.sources else None,
+                domain=self.domain_desc,
             )
             duration = self.tracker.end_operation("initial_draft")
             self.tracker.record_initial_draft(duration, 0)
@@ -910,7 +924,8 @@ class WorkflowOrchestrator:
                     reviews,
                     round_num,
                     self.max_rounds,
-                    previous_rounds=all_rounds
+                    previous_rounds=all_rounds,
+                    domain=self.domain_desc,
                 )
                 moderator_time = self.tracker.end_operation("moderator")
                 self.tracker.record_moderator_time(moderator_time)
@@ -1050,6 +1065,7 @@ class WorkflowOrchestrator:
                     reviews,
                     round_num,
                     references=self.sources if self.sources else None,
+                    domain=self.domain_desc,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
