@@ -232,7 +232,7 @@ class ActivityLogEntry(BaseModel):
 
 class WorkflowStatusResponse(BaseModel):
     project_id: str
-    status: str  # "queued", "composing_team", "writing", "reviewing", "revising", "completed", "failed"
+    status: str  # "queued", "composing_team", "writing", "desk_screening", "reviewing", "revising", "completed", "failed"
     current_round: int
     total_rounds: int
     progress_percentage: int
@@ -286,7 +286,7 @@ async def queue_status():
         "queued_jobs": job_queue.qsize(),
         "active_workflows": sum(
             1 for s in workflow_status.values()
-            if s["status"] in ("queued", "composing_team", "writing", "reviewing", "revising")
+            if s["status"] in ("queued", "composing_team", "writing", "desk_screening", "reviewing", "revising")
         )
     }
 
@@ -741,6 +741,9 @@ def update_workflow_status(project_id: str, status: str, round_num: int, total_r
     if status == "writing":
         progress = 10
         add_activity_log(project_id, "info", message)
+    elif status == "desk_screening":
+        progress = 8
+        add_activity_log(project_id, "info", "Editor screening manuscript...")
     elif status == "reviewing":
         # Progress based on current round within review phase (10-80%)
         review_progress = (round_num / total_rounds) * 70

@@ -14,6 +14,7 @@ from rich.table import Table
 from ..config import get_config
 from ..llm import ClaudeLLM
 from ..agents import WriterAgent, ModeratorAgent
+from ..agents.desk_editor import DeskEditorAgent
 from ..agents.specialist_factory import SpecialistFactory
 from ..models.expert import ExpertConfig
 from ..performance import PerformanceTracker
@@ -314,6 +315,7 @@ class WorkflowOrchestrator:
         # Initialize agents
         self.writer = WriterAgent(model="claude-opus-4.5")
         self.moderator = ModeratorAgent(model="claude-opus-4.5")
+        self.desk_editor = DeskEditorAgent(model="claude-haiku-4")
 
     async def run(self, initial_manuscript: Optional[str] = None) -> dict:
         """Run the complete workflow.
@@ -359,6 +361,59 @@ class WorkflowOrchestrator:
         all_rounds = []
         current_manuscript = manuscript
         previous_manuscript = None
+
+        # Desk screening - quick editor check before expensive peer review
+        if self.status_callback:
+            self.status_callback("desk_screening", 0, "Editor screening manuscript...")
+
+        console.print("\n[cyan]Desk editor screening manuscript...[/cyan]")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("[cyan]Desk editor screening...", total=None)
+            desk_result = await self.desk_editor.screen(current_manuscript, self.topic)
+            progress.update(task, completed=True)
+
+        if desk_result["decision"] == "DESK_REJECT":
+            console.print(f"\n[bold red]DESK REJECTED[/bold red]")
+            console.print(f"[red]Reason: {desk_result['reason']}[/red]\n")
+
+            # Save the rejected manuscript
+            final_path = self.output_dir / "manuscript_final.md"
+            final_path.write_text(current_manuscript)
+
+            # Save round data for desk reject (round 0)
+            round_data = {
+                "round": 0,
+                "manuscript_version": "v1",
+                "word_count": len(current_manuscript.split()),
+                "reviews": [],
+                "overall_average": 0,
+                "moderator_decision": {
+                    "decision": "DESK_REJECT",
+                    "reason": desk_result["reason"],
+                    "tokens": desk_result["tokens"]
+                },
+                "author_rebuttal": None,
+                "manuscript_diff": None,
+                "threshold": self.threshold,
+                "passed": False,
+                "timestamp": datetime.now().isoformat()
+            }
+            all_rounds.append(round_data)
+
+            round_file = self.output_dir / "round_0.json"
+            with open(round_file, "w") as f:
+                json.dump(round_data, f, indent=2)
+
+            if self.status_callback:
+                self.status_callback("completed", 0, "Desk rejected by editor")
+
+            return await self._finalize_workflow(all_rounds)
+
+        console.print(f"[green]Desk screening: PASS[/green] - {desk_result['reason']}")
 
         # Iterative review loop
         for round_num in range(1, self.max_rounds + 1):

@@ -9,6 +9,7 @@ from .integration_editor import IntegrationEditorAgent
 from .research_notes_agent import ResearchNotesAgent
 from .data_analysis_agent import DataAnalysisAgent
 from .paper_writer_agent import PaperWriterAgent
+from .desk_editor import DeskEditorAgent
 
 __all__ = [
     "WriterAgent",
@@ -19,5 +20,6 @@ __all__ = [
     "IntegrationEditorAgent",
     "ResearchNotesAgent",
     "DataAnalysisAgent",
-    "PaperWriterAgent"
+    "PaperWriterAgent",
+    "DeskEditorAgent"
 ]
