@@ -56,15 +56,32 @@ _raw_keys = os.environ.get("RESEARCH_API_KEYS", "")
 if _raw_keys:
     ALLOWED_API_KEYS = {k.strip() for k in _raw_keys.split(",") if k.strip()}
 
+ADMIN_API_KEY = os.environ.get("RESEARCH_ADMIN_KEY", "")
+
 
 async def verify_api_key(request: Request) -> str:
     """FastAPI dependency: validate X-API-Key header."""
     key = request.headers.get("X-API-Key")
-    if not ALLOWED_API_KEYS:
+    if not ALLOWED_API_KEYS and not ADMIN_API_KEY:
         # No keys configured → auth disabled (dev mode)
+        return key or "anonymous"
+    if ADMIN_API_KEY and key == ADMIN_API_KEY:
+        return key  # admin key is always valid
+    if not ALLOWED_API_KEYS:
         return key or "anonymous"
     if not key or key not in ALLOWED_API_KEYS:
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    return key
+
+
+async def verify_admin_key(request: Request) -> str:
+    """FastAPI dependency: validate admin API key."""
+    key = request.headers.get("X-API-Key")
+    if not ADMIN_API_KEY:
+        # Admin key not configured → dev mode: allow all
+        return key or "anonymous"
+    if key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Admin access required")
     return key
 
 
@@ -873,6 +890,65 @@ def update_workflow_status(project_id: str, status: str, round_num: int, total_r
         "message": message,
         "estimated_time_remaining_seconds": estimated_remaining
     })
+
+
+@app.get("/api/check-admin")
+async def check_admin(request: Request):
+    """Check if the current API key has admin privileges."""
+    key = request.headers.get("X-API-Key")
+    is_admin = bool(ADMIN_API_KEY and key == ADMIN_API_KEY)
+    # No admin key configured → dev mode: everyone is admin
+    if not ADMIN_API_KEY:
+        is_admin = True
+    return {"is_admin": is_admin}
+
+
+@app.delete("/api/workflows/{project_id}")
+async def delete_workflow(project_id: str, api_key: str = Depends(verify_admin_key)):
+    """Delete a workflow (admin only). Only interrupted/completed/failed workflows can be deleted."""
+    if project_id not in workflow_status:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    status = workflow_status[project_id]["status"]
+    deletable_statuses = {"interrupted", "completed", "failed", "rejected"}
+    if status not in deletable_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete workflow in '{status}' state. Only {', '.join(sorted(deletable_statuses))} workflows can be deleted."
+        )
+
+    # Remove from in-memory stores
+    del workflow_status[project_id]
+    activity_logs.pop(project_id, None)
+
+    # Remove results directory
+    import shutil
+    results_path = Path(f"results/{project_id}")
+    if results_path.exists():
+        shutil.rmtree(results_path)
+
+    # Remove article HTML
+    article_path = Path(f"web/articles/{project_id}.html")
+    if article_path.exists():
+        article_path.unlink()
+
+    # Remove from index.json
+    index_path = Path("web/data/index.json")
+    if index_path.exists():
+        try:
+            with open(index_path) as f:
+                index_data = json.load(f)
+            index_data["projects"] = [
+                p for p in index_data.get("projects", [])
+                if p.get("id") != project_id
+            ]
+            index_data["updated_at"] = datetime.now().isoformat()
+            with open(index_path, "w") as f:
+                json.dump(index_data, f, indent=2)
+        except Exception:
+            pass  # Non-critical: index.json update failure shouldn't block deletion
+
+    return {"message": f"Workflow '{project_id}' deleted", "project_id": project_id}
 
 
 @app.post("/api/submit-article")

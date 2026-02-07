@@ -263,6 +263,16 @@
             background: var(--background);
         }
 
+        .btn-danger {
+            background: #da1e28;
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background: #b81922;
+        }
+
         .error-message {
             background: #fee2e2;
             border: 1px solid #fca5a5;
@@ -717,6 +727,7 @@
     <script>
         const API_BASE = 'http://localhost:8000';
         let autoRefreshInterval = null;
+        let isAdmin = false;
 
         // --- API Key helpers ---
         function getApiKey() {
@@ -727,6 +738,8 @@
             localStorage.setItem('research_api_key', key);
             document.getElementById('api-key-status').textContent = key ? 'Saved' : 'Cleared';
             setTimeout(() => document.getElementById('api-key-status').textContent = '', 2000);
+            checkAdmin();
+            loadWorkflows();
         }
         function apiHeaders() {
             const headers = {};
@@ -734,13 +747,29 @@
             if (key) headers['X-API-Key'] = key;
             return headers;
         }
+
+        async function checkAdmin() {
+            try {
+                const resp = await fetch(`${API_BASE}/api/check-admin`, { headers: apiHeaders() });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    isAdmin = data.is_admin;
+                } else {
+                    isAdmin = false;
+                }
+            } catch {
+                isAdmin = false;
+            }
+        }
+
         // Load saved key on page load
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const saved = getApiKey();
             if (saved) {
                 document.getElementById('api-key').value = saved;
                 document.getElementById('api-key-status').textContent = 'Loaded from saved';
             }
+            await checkAdmin();
         });
 
         async function loadWorkflows() {
@@ -972,21 +1001,26 @@
                 `;
             }
 
+            const deleteBtn = isAdmin ? `<button class="btn btn-danger" onclick="deleteWorkflow('${wf.project_id}')">Delete</button>` : '';
+
             let actions = '';
             if (isCompleted) {
                 actions = `
                     <a href="articles/${wf.project_id}.html" class="btn btn-primary">Read Article</a>
                     <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
+                    ${deleteBtn}
                 `;
             } else if (isRejected) {
                 actions = `
                     <a href="articles/${wf.project_id}.html" class="btn btn-secondary">Read Draft</a>
                     <a href="review.html?id=${wf.project_id}" class="btn btn-secondary">View Reviews</a>
+                    ${deleteBtn}
                 `;
             } else if (wf.status === 'interrupted') {
                 actions = `
                     <button class="btn btn-primary" onclick="resumeWorkflow('${wf.project_id}')">▶ Resume Workflow</button>
                     <button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>
+                    ${deleteBtn}
                 `;
             } else if (isActive) {
                 actions = `<button class="btn btn-secondary" onclick="toggleActivityFeed('${wf.project_id}')">View Activity Log</button>`;
@@ -1346,6 +1380,23 @@
                 alert(`Failed to resume workflow: ${error.message}`);
                 event.target.disabled = false;
                 event.target.textContent = '▶ Resume Workflow';
+            }
+        }
+
+        async function deleteWorkflow(projectId) {
+            if (!confirm('Delete this workflow? All associated data (results, article, logs) will be permanently removed.')) return;
+            try {
+                const resp = await fetch(`${API_BASE}/api/workflows/${encodeURIComponent(projectId)}`, {
+                    method: 'DELETE',
+                    headers: apiHeaders()
+                });
+                if (!resp.ok) {
+                    const error = await resp.json();
+                    throw new Error(error.detail || 'Failed to delete workflow');
+                }
+                await loadWorkflows();
+            } catch (error) {
+                alert(`Failed to delete: ${error.message}`);
             }
         }
 

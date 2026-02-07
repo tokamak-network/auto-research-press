@@ -67,6 +67,7 @@
         }
         .method-badge.get { background: #10b981; }
         .method-badge.post { background: #3b82f6; }
+        .method-badge.delete { background: #da1e28; }
         .endpoint-path {
             font-family: monospace;
             font-size: 1rem;
@@ -87,6 +88,7 @@
             font-weight: 600;
         }
         .auth-badge.key { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .auth-badge.admin { background: rgba(218, 30, 40, 0.1); color: #da1e28; }
         .auth-badge.rate { background: rgba(245, 158, 11, 0.1); color: #d97706; }
         .auth-badge.none { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
         code {
@@ -219,6 +221,10 @@
             <h3>Getting an API Key</h3>
             <p>Contact the platform administrator to receive an API key. Keys are configured server-side via the <code class="inline-code">RESEARCH_API_KEYS</code> environment variable.</p>
 
+            <h3>Admin Key</h3>
+            <p>A separate admin key (<code class="inline-code">RESEARCH_ADMIN_KEY</code>) grants access to administrative endpoints like workflow deletion. The admin key also works as a regular API key for all other endpoints.</p>
+            <div class="note">If neither <code class="inline-code">RESEARCH_API_KEYS</code> nor <code class="inline-code">RESEARCH_ADMIN_KEY</code> are configured, auth is disabled (dev mode) and all users have admin access.</div>
+
             <h3>Usage</h3>
 <pre>curl -H "X-API-Key: YOUR_API_KEY" \
      https://your-host:8000/api/workflows</pre>
@@ -246,6 +252,8 @@
                 <tr><td><code>GET /api/workflows</code></td><td>API Key</td><td>None</td></tr>
                 <tr><td><code>GET /api/workflow-status/{id}</code></td><td>None</td><td>None</td></tr>
                 <tr><td><code>POST /api/workflows/{id}/resume</code></td><td>API Key</td><td>None</td></tr>
+                <tr><td><code>DELETE /api/workflows/{id}</code></td><td>Admin Key</td><td>None</td></tr>
+                <tr><td><code>GET /api/check-admin</code></td><td>None</td><td>None</td></tr>
             </table>
 
             <div class="note">When rate limited, the response includes the number of seconds to wait: <code class="inline-code">{"detail": "Rate limited. Try again in 1423s"}</code></div>
@@ -419,6 +427,43 @@
                     <span class="auth-badge key">API Key</span>
                 </div>
                 <p class="endpoint-desc">Resume an interrupted workflow from its last checkpoint.</p>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge delete">DELETE</span>
+                    <span class="endpoint-path">/api/workflows/{project_id}</span>
+                    <span class="auth-badge admin">Admin Key</span>
+                </div>
+                <p class="endpoint-desc">Delete a workflow and all associated data (results, article, logs). Only workflows in <code class="inline-code">interrupted</code>, <code class="inline-code">completed</code>, <code class="inline-code">failed</code>, or <code class="inline-code">rejected</code> status can be deleted. Active workflows cannot be deleted.</p>
+
+                <h3>Example</h3>
+<pre>curl -X DELETE http://localhost:8000/api/workflows/my-project-id \
+  -H "X-API-Key: YOUR_ADMIN_KEY"
+
+# Response:
+{"message": "Workflow 'my-project-id' deleted", "project_id": "my-project-id"}</pre>
+
+                <h3>Error Responses</h3>
+                <table>
+                    <tr><th>Status</th><th>Meaning</th></tr>
+                    <tr><td><code>400</code></td><td>Workflow is in an active state and cannot be deleted</td></tr>
+                    <tr><td><code>403</code></td><td>Admin access required</td></tr>
+                    <tr><td><code>404</code></td><td>Workflow not found</td></tr>
+                </table>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/check-admin</span>
+                    <span class="auth-badge none">No Auth</span>
+                </div>
+                <p class="endpoint-desc">Check if the provided API key has admin privileges. Used by the frontend to determine whether to show admin controls.</p>
+<pre>curl -H "X-API-Key: YOUR_KEY" http://localhost:8000/api/check-admin
+
+# Response:
+{"is_admin": true}</pre>
             </div>
         </div>
 
