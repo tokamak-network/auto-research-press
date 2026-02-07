@@ -33,10 +33,11 @@ class CollaborativeWorkflowOrchestrator:
         reviewer_configs: list,
         output_dir: Path,
         max_rounds: int = 3,
-        threshold: float = 8.0,
+        threshold: float = 7.5,
         target_manuscript_length: int = 4000,
         research_cycles: int = 1,
-        status_callback: Optional[Callable] = None
+        status_callback: Optional[Callable] = None,
+        article_length: str = "full"
     ):
         """Initialize collaborative workflow.
 
@@ -52,6 +53,7 @@ class CollaborativeWorkflowOrchestrator:
             target_manuscript_length: Target length in words
             research_cycles: Number of research note iterations (default 1)
             status_callback: Status update callback
+            article_length: "full" or "short" — passed to reviewers for adjusted expectations
         """
         self.topic = topic
         self.major_field = major_field
@@ -64,6 +66,7 @@ class CollaborativeWorkflowOrchestrator:
         self.target_manuscript_length = target_manuscript_length
         self.research_cycles = research_cycles
         self.status_callback = status_callback
+        self.article_length = article_length
 
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -75,14 +78,19 @@ class CollaborativeWorkflowOrchestrator:
     async def run(self) -> dict:
         """Run complete collaborative workflow."""
 
+        # Hybrid model strategy: coauthors use Sonnet for efficiency
+        # (research, plan feedback, section review are auxiliary tasks)
+        for ca in self.writer_team.coauthors:
+            ca.model = "claude-sonnet-4"
+
         console.print("\n[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]")
         console.print("[bold green] Collaborative Research Workflow[/bold green]")
         console.print("[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]\n")
 
         console.print(f"[bold]Topic:[/bold] {self.topic}")
         console.print(f"[bold]Category:[/bold] {self.category}")
-        console.print(f"[bold]Lead Author:[/bold] {self.writer_team.lead_author.name}")
-        console.print(f"[bold]Co-Authors:[/bold] {', '.join(ca.name for ca in self.writer_team.coauthors)}")
+        console.print(f"[bold]Lead Author:[/bold] {self.writer_team.lead_author.name} ({self.writer_team.lead_author.model})")
+        console.print(f"[bold]Co-Authors:[/bold] {', '.join(f'{ca.name} ({ca.model})' for ca in self.writer_team.coauthors)}")
         console.print(f"[bold]Reviewers:[/bold] {len(self.reviewer_configs)} external reviewers\n")
 
         # Phase 1: Collaborative Research
@@ -111,7 +119,8 @@ class CollaborativeWorkflowOrchestrator:
             research_notes=research_notes,
             output_dir=self.output_dir,
             target_length=self.target_manuscript_length,
-            status_callback=self.status_callback
+            status_callback=self.status_callback,
+            parallel=True
         )
 
         manuscript = await writing_phase.run()
@@ -131,7 +140,9 @@ class CollaborativeWorkflowOrchestrator:
             output_dir=self.output_dir,
             max_rounds=self.max_rounds,
             threshold=self.threshold,
-            status_callback=self.status_callback
+            status_callback=self.status_callback,
+            category={"major": self.major_field, "subfield": self.subfield},
+            article_length=self.article_length
         )
 
         # Run review workflow with pre-written manuscript

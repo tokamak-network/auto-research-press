@@ -175,8 +175,25 @@ def generate_article_html(project_id, workflow_data, manuscript_text):
         // Render markdown content
         const markdownContent = `{escaped_markdown}`;
 
-        // Parse with marked
-        const htmlContent = marked.parse(markdownContent);
+        // Protect math blocks from marked processing
+        const mathBlocks = [];
+        let protectedContent = markdownContent
+            .replace(/\\$\\$[\\s\\S]+?\\$\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }})
+            .replace(/\\$(?!\\$)([^\\$\\n]+?)\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }});
+
+        // Parse markdown (math is safely extracted)
+        let htmlContent = marked.parse(protectedContent);
+
+        // Restore math blocks
+        mathBlocks.forEach((block, i) => {{
+            htmlContent = htmlContent.replace(`%%MATH_BLOCK_${{i}}%%`, block);
+        }});
 
         // Create temporary div to process HTML
         const tempDiv = document.createElement('div');

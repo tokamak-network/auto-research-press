@@ -172,6 +172,7 @@ Exercise your judgment now."""
 
         # Parse JSON response
         import json
+        import re
         content = response.content.strip()
         if content.startswith("```json"):
             content = content[7:]
@@ -181,15 +182,34 @@ Exercise your judgment now."""
             content = content[:-3]
         content = content.strip()
 
+        decision_data = None
         try:
             decision_data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Failed to parse moderator decision as JSON: {e}\n"
-                f"Raw response length: {len(response.content)}\n"
-                f"Cleaned content length: {len(content)}\n"
-                f"Content preview: {content[:200]}..."
-            )
+        except json.JSONDecodeError:
+            # Fallback 1: extract ```json ... ``` block from within text
+            json_match = re.search(r'```json\s*\n(.*?)\n```', response.content, re.DOTALL)
+            if json_match:
+                try:
+                    decision_data = json.loads(json_match.group(1).strip())
+                except json.JSONDecodeError:
+                    pass
+
+            # Fallback 2: find raw JSON object { ... } in the response
+            if decision_data is None:
+                brace_match = re.search(r'\{.*\}', response.content, re.DOTALL)
+                if brace_match:
+                    try:
+                        decision_data = json.loads(brace_match.group(0))
+                    except json.JSONDecodeError:
+                        pass
+
+            if decision_data is None:
+                raise ValueError(
+                    f"Failed to parse moderator decision as JSON: no valid JSON found\n"
+                    f"Raw response length: {len(response.content)}\n"
+                    f"Cleaned content length: {len(content)}\n"
+                    f"Content preview: {content[:200]}..."
+                )
 
         # Add metadata
         decision_data["round"] = round_number

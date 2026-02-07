@@ -13,15 +13,19 @@ class OpenAILLM(BaseLLM):
     Uses the official OpenAI Python SDK.
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
+    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview", base_url: Optional[str] = None):
         """Initialize OpenAI client.
 
         Args:
             api_key: OpenAI API key
             model: GPT model ID (default: GPT-4 Turbo)
+            base_url: Optional custom base URL (e.g. OpenRouter)
         """
         super().__init__(api_key, model)
-        self.client = AsyncOpenAI(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = AsyncOpenAI(**client_kwargs)
 
     async def generate(
         self,
@@ -48,10 +52,13 @@ class OpenAILLM(BaseLLM):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        # gpt-5 models only support temperature=1
+        api_temp = 1.0 if "gpt-5" in self.model else temperature
+
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            temperature=temperature,
+            temperature=api_temp,
             max_tokens=max_tokens,
             **kwargs
         )
@@ -89,10 +96,12 @@ class OpenAILLM(BaseLLM):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        api_temp = 1.0 if "gpt-5" in self.model else temperature
+
         stream = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            temperature=temperature,
+            temperature=api_temp,
             max_tokens=max_tokens,
             stream=True,
             **kwargs

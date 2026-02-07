@@ -467,10 +467,13 @@ Return JSON:
 Your specializations: {', '.join(self.focus_areas)}
 
 You are writing a section of a research manuscript. Write with:
-- Clear, precise academic language
+- Flowing academic prose with well-developed paragraphs
+- Clear topic sentences followed by evidence and analysis
 - Strong evidence and specific examples
 - Proper flow and logical structure
-- Numbered citations [1], [2], etc. where appropriate"""
+- Numbered citations [1], [2], etc. where appropriate
+- NEVER bullet-point lists for analysis or discussion (lists only for technical specs/requirements)
+- Never use "..." or ellipsis to abbreviate content"""
 
         # Summarize previous sections for context
         previous_context = ""
@@ -529,13 +532,15 @@ OVERALL MANUSCRIPT NARRATIVE:
 {refs_text}
 
 INSTRUCTIONS:
-1. Write in academic style appropriate for the target journal
+1. Write in flowing academic prose — full paragraphs, not bullet lists
 2. Use numbered citations [1], [2] inline where appropriate
 3. Ensure smooth flow from previous sections
 4. Include all specified subsections
 5. Target exactly {section_spec.target_length} words (±10%)
 6. Provide strong evidence and specific examples
 7. Maintain technical rigor
+8. NEVER use bullet-point lists for analysis or discussion
+9. Never use "..." to abbreviate content
 
 Write the complete section in Markdown format. Start with the section title as ## heading."""
 
@@ -571,9 +576,9 @@ Write the complete section in Markdown format. Start with the section title as #
     ) -> Manuscript:
         """Integrate all sections into complete manuscript."""
 
-        # Combine sections
+        # Combine sections in original order (already ordered by spec.order)
         sections_content = []
-        for section in sorted(sections, key=lambda s: s.id):
+        for section in sections:
             sections_content.append(section.content)
 
         main_content = "\n\n---\n\n".join(sections_content)

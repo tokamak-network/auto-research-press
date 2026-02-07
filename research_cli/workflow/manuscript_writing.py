@@ -37,7 +37,8 @@ class ManuscriptWritingPhase:
         research_notes: CollaborativeResearchNotes,
         output_dir: Path,
         target_length: int = 4000,
-        status_callback: Optional[Callable] = None
+        status_callback: Optional[Callable] = None,
+        parallel: bool = False
     ):
         """Initialize writing phase.
 
@@ -49,6 +50,7 @@ class ManuscriptWritingPhase:
             output_dir: Output directory
             target_length: Target manuscript length in words
             status_callback: Optional callback for status updates
+            parallel: If True, write sections in parallel instead of sequentially
         """
         self.topic = topic
         self.category = category
@@ -57,6 +59,7 @@ class ManuscriptWritingPhase:
         self.output_dir = output_dir
         self.target_length = target_length
         self.status_callback = status_callback
+        self.parallel = parallel
 
         # Initialize agents
         lead = writer_team.lead_author
@@ -91,7 +94,7 @@ class ManuscriptWritingPhase:
         console.print("[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]\n")
 
         # Step 1: Lead plans structure
-        self._update_status("[1/8] Lead: Planning manuscript structure...")
+        self._update_status("[1/7] Lead: Planning manuscript structure...")
         initial_plan = await self.lead_agent.plan_manuscript_structure(
             research_notes=self.research_notes,
             topic=self.topic,
@@ -108,7 +111,7 @@ class ManuscriptWritingPhase:
         console.print()
 
         # Step 2: Co-authors provide feedback on structure
-        self._update_status("[2/8] Co-authors: Providing feedback on plan...")
+        self._update_status("[2/7] Co-authors: Providing feedback on plan...")
 
         plan_dict = {
             "title": initial_plan.title,
@@ -131,7 +134,7 @@ class ManuscriptWritingPhase:
         console.print()
 
         # Step 3: Lead finalizes structure based on feedback
-        self._update_status("[3/8] Lead: Finalizing structure (integrating feedback)...")
+        self._update_status("[3/7] Lead: Finalizing structure (integrating feedback)...")
 
         plan = await self.lead_agent.finalize_plan_with_feedback(
             original_plan=initial_plan,
@@ -145,28 +148,21 @@ class ManuscriptWritingPhase:
             console.print(f"    {section.order}. {section.title} ({section.target_length} words)")
         console.print()
 
-        # Step 4: Write sections sequentially
-        self._update_status("[4/8] Writing sections sequentially...")
-        sections = await self._write_sections_sequentially(plan)
+        # Step 4: Write sections
+        if self.parallel:
+            self._update_status("[4/7] Writing sections in parallel...")
+            sections = await self._write_sections_parallel(plan)
+        else:
+            self._update_status("[4/7] Writing sections sequentially...")
+            sections = await self._write_sections_sequentially(plan)
 
         total_words = sum(s.word_count for s in sections)
         total_citations = len(set(c for s in sections for c in s.citations))
 
         console.print(f"\n  Total: {total_words} words, {total_citations} citations\n")
 
-        # Step 5: Co-authors review sections
-        self._update_status("[5/8] Co-authors reviewing sections...")
-        feedbacks = await self._coauthor_section_review(sections)
-
-        total_suggestions = sum(len(fb["suggestions"]) for fb_list in feedbacks.values() for fb in fb_list)
-        console.print(f"  ✓ All sections reviewed ({total_suggestions} suggestions)\n")
-
-        # Step 6: Refine sections (simplified - skipping for now)
-        self._update_status("[6/8] Refining sections with feedback...")
-        console.print("  ✓ Sections refined\n")
-
-        # Step 7: Integrate manuscript
-        self._update_status("[7/8] Integrating sections into manuscript...")
+        # Step 5: Integrate manuscript
+        self._update_status("[5/7] Integrating sections into manuscript...")
         manuscript = await self.lead_agent.integrate_sections(
             sections=sections,
             plan=plan,
@@ -177,8 +173,15 @@ class ManuscriptWritingPhase:
         console.print("  ✓ Citations formatted")
         console.print("  ✓ References compiled\n")
 
-        # Step 8: Final polish (simplified)
-        self._update_status("[8/8] Final polish...")
+        # Step 6: Co-authors review full manuscript (parallel)
+        self._update_status("[6/7] Co-authors reviewing full manuscript...")
+        feedbacks = await self._coauthor_manuscript_review(manuscript.content)
+
+        total_suggestions = sum(len(fb["suggestions"]) for fb in feedbacks)
+        console.print(f"  ✓ Manuscript reviewed ({total_suggestions} suggestions)\n")
+
+        # Step 7: Final polish (simplified)
+        self._update_status("[7/7] Final polish...")
         console.print("  ✓ Flow checked")
         console.print("  ✓ Formatting standardized\n")
 
@@ -233,39 +236,58 @@ class ManuscriptWritingPhase:
 
         return sections
 
-    async def _coauthor_section_review(
+    async def _write_sections_parallel(
         self,
-        sections: List[SectionDraft]
-    ) -> Dict[str, List[dict]]:
-        """Co-authors review all sections."""
+        plan: ManuscriptPlan
+    ) -> List[SectionDraft]:
+        """Write all sections in parallel using plan context only."""
 
-        feedbacks_by_section = {}
+        sorted_specs = sorted(plan.sections, key=lambda s: s.order)
 
-        async def review_section(section: SectionDraft, agent: CoauthorAgent):
-            """Single section review."""
+        console.print(f"\n  Writing {len(sorted_specs)} sections in parallel...")
+
+        async def write_one(section_spec: 'SectionSpec') -> SectionDraft:
+            section_draft = await self.lead_agent.write_section(
+                section_spec=section_spec,
+                research_notes=self.research_notes,
+                previous_sections=[],  # No sequential context — plan is sufficient
+                manuscript_plan=plan
+            )
+            console.print(f"  ✓ {section_spec.title}: {section_draft.word_count} words, "
+                         f"{len(section_draft.citations)} citations")
+            return section_draft
+
+        drafts = await asyncio.gather(*(write_one(spec) for spec in sorted_specs))
+
+        # Return in section order
+        return list(drafts)
+
+    async def _coauthor_manuscript_review(
+        self,
+        manuscript_content: str
+    ) -> List[dict]:
+        """Co-authors review the full integrated manuscript in parallel."""
+
+        async def review_manuscript(agent: CoauthorAgent) -> dict:
             feedback = await agent.review_section(
-                section_content=section.content,
-                section_title=section.title
+                section_content=manuscript_content,
+                section_title="Full Manuscript"
             )
             feedback["reviewer"] = agent.name
             return feedback
 
-        # Review all sections in parallel
-        for section in sections:
-            review_futures = [
-                review_section(section, agent)
-                for agent in self.coauthor_agents
-            ]
+        review_futures = [
+            review_manuscript(agent)
+            for agent in self.coauthor_agents
+        ]
 
-            section_feedbacks = await asyncio.gather(*review_futures)
-            feedbacks_by_section[section.id] = section_feedbacks
+        feedbacks = await asyncio.gather(*review_futures)
 
-            # Display feedback summary
-            for fb in section_feedbacks:
-                console.print(f"  → {fb['reviewer']}: "
-                             f"{len(fb['suggestions'])} suggestions")
+        for fb in feedbacks:
+            console.print(f"  → {fb['reviewer']}: "
+                         f"{len(fb['suggestions'])} suggestions")
 
-        return feedbacks_by_section
+        return list(feedbacks)
 
     def _save_manuscript(self, manuscript: Manuscript):
         """Save manuscript to file."""

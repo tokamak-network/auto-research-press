@@ -66,6 +66,42 @@ class ClaudeLLM(BaseLLM):
             output_tokens=response.usage.output_tokens,
         )
 
+    async def generate_streaming(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 1.0,
+        max_tokens: int = 4096,
+        **kwargs
+    ) -> LLMResponse:
+        """Generate text using streaming to prevent proxy idle-connection timeouts.
+
+        Behaves identically to generate() but uses the streaming API internally,
+        keeping the HTTP connection alive with incremental chunks.  Returns the
+        same LLMResponse once the full message has been received.
+        """
+        messages = [{"role": "user", "content": prompt}]
+
+        async with self.client.messages.stream(
+            model=self.model,
+            messages=messages,
+            system=system if system else None,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        ) as stream:
+            async for _chunk in stream.text_stream:
+                pass  # drain the stream to keep connection alive
+            message = await stream.get_final_message()
+
+        return LLMResponse(
+            content=message.content[0].text,
+            model=message.model,
+            provider="anthropic",
+            input_tokens=message.usage.input_tokens,
+            output_tokens=message.usage.output_tokens,
+        )
+
     async def stream(
         self,
         prompt: str,

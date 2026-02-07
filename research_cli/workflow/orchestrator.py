@@ -12,7 +12,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ..config import get_config
-from ..llm import ClaudeLLM
+from ..llm import ClaudeLLM, OpenAILLM, GeminiLLM
 from ..agents import WriterAgent, ModeratorAgent
 from ..agents.desk_editor import DeskEditorAgent
 from ..agents.specialist_factory import SpecialistFactory
@@ -33,7 +33,9 @@ async def generate_review(
     tracker: PerformanceTracker,
     previous_reviews: Optional[List[dict]] = None,
     previous_manuscript: Optional[str] = None,
-    author_rebuttal: Optional[str] = None
+    author_response: Optional[str] = None,
+    article_length: str = "full",
+    audience_level: str = "professional"
 ) -> dict:
     """Generate review from a specialist.
 
@@ -45,7 +47,9 @@ async def generate_review(
         tracker: Performance tracker
         previous_reviews: Reviews from previous round
         previous_manuscript: Manuscript from previous round
-        author_rebuttal: Author's rebuttal to previous reviews
+        author_response: Author's response to previous reviews
+        article_length: "full" or "short" — adjusts reviewer expectations
+        audience_level: "beginner", "intermediate", or "professional"
 
     Returns:
         Review data dictionary
@@ -56,11 +60,13 @@ async def generate_review(
     model = specialist["model"]
 
     llm_config = config.get_llm_config(provider, model)
-    llm = ClaudeLLM(
-        api_key=llm_config.api_key,
-        model=llm_config.model,
-        base_url=llm_config.base_url
-    )
+
+    if provider == "openai":
+        llm = OpenAILLM(api_key=llm_config.api_key, model=llm_config.model, base_url=llm_config.base_url)
+    elif provider == "google":
+        llm = GeminiLLM(api_key=llm_config.api_key, model=llm_config.model)
+    else:
+        llm = ClaudeLLM(api_key=llm_config.api_key, model=llm_config.model, base_url=llm_config.base_url)
 
     # Build context from previous reviews
     previous_context = ""
@@ -85,22 +91,22 @@ Focus especially on whether your specific suggestions were implemented.
 ---
 """
 
-    # Add author rebuttal context if available
-    rebuttal_context = ""
-    if author_rebuttal:
-        rebuttal_context = f"""
-AUTHOR REBUTTAL TO PREVIOUS REVIEWS:
+    # Add author response context if available
+    response_context = ""
+    if author_response:
+        response_context = f"""
+AUTHOR RESPONSE TO PREVIOUS REVIEWS:
 
-The authors have responded to reviewer feedback. Read their rebuttal carefully to understand:
+The authors have responded to reviewer feedback. Read their response carefully to understand:
 - What changes they made
 - Their rationale for decisions
 - Clarifications of misunderstandings
 
-{author_rebuttal}
+{author_response}
 
 ---
 
-IMPORTANT: Consider the author's rebuttal when evaluating this revision:
+IMPORTANT: Consider the author's response when evaluating this revision:
 - Did they address your concerns adequately?
 - Are their explanations/disagreements reasonable?
 - Does the revised manuscript reflect their stated changes?
@@ -109,10 +115,41 @@ IMPORTANT: Consider the author's rebuttal when evaluating this revision:
 ---
 """
 
+    # Short paper context
+    short_paper_note = ""
+    if article_length == "short":
+        short_paper_note = """NOTE: This is a SHORT PAPER (1,500-2,500 words). Adjust your expectations accordingly:
+- Narrower scope is expected; do not penalize for limited breadth
+- Evaluate conciseness positively — reward focused, efficient argumentation
+- Fewer citations are acceptable if the core claims are well-supported
+- A single key contribution explored in depth is sufficient
+
+"""
+
+    # Audience level context
+    audience_note = ""
+    if audience_level == "beginner":
+        audience_note = """NOTE: This manuscript targets a BEGINNER audience (non-experts). Evaluate accordingly:
+- Technical terms should be explained on first use
+- Analogies and examples should make complex concepts accessible
+- Content should progress from simple to complex
+- Penalize unnecessary jargon; reward clear, accessible explanations
+- Assess whether a non-specialist reader could understand the key points
+
+"""
+    elif audience_level == "intermediate":
+        audience_note = """NOTE: This manuscript targets an INTERMEDIATE audience (basic domain knowledge assumed). Evaluate accordingly:
+- Fundamental concepts can be assumed without explanation
+- Advanced or specialized terms should still be explained
+- Balance between theoretical depth and practical applicability
+- Assess whether someone with basic knowledge could follow the advanced arguments
+
+"""
+
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
 
-{previous_context}
-{rebuttal_context}
+{short_paper_note}{audience_note}{previous_context}
+{response_context}
 MANUSCRIPT:
 {manuscript}
 
@@ -166,7 +203,7 @@ Be honest and constructive. Focus on your domain of expertise.
     duration = tracker.end_operation(f"review_{specialist_id}")
     tracker.record_reviewer_time(specialist_id, duration)
 
-    # Parse JSON
+    # Parse JSON — extract from response even if surrounded by text
     content = response.content.strip()
     if content.startswith("```json"):
         content = content[7:]
@@ -178,13 +215,37 @@ Be honest and constructive. Focus on your domain of expertise.
 
     try:
         review_data = json.loads(content)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"Failed to parse review from {specialist_id} as JSON: {e}\n"
-            f"Raw response length: {len(response.content)}\n"
-            f"Cleaned content length: {len(content)}\n"
-            f"Content preview: {content[:200]}..."
-        )
+    except json.JSONDecodeError:
+        # Try extracting JSON block from within the text
+        import re
+        json_match = re.search(r'```json\s*\n(.*?)\n```', response.content, re.DOTALL)
+        if json_match:
+            try:
+                review_data = json.loads(json_match.group(1).strip())
+            except json.JSONDecodeError as e2:
+                raise ValueError(
+                    f"Failed to parse review from {specialist_id} as JSON: {e2}\n"
+                    f"Raw response length: {len(response.content)}\n"
+                    f"Content preview: {response.content[:300]}..."
+                )
+        else:
+            # Try finding raw JSON object
+            brace_match = re.search(r'\{.*\}', response.content, re.DOTALL)
+            if brace_match:
+                try:
+                    review_data = json.loads(brace_match.group(0))
+                except json.JSONDecodeError as e3:
+                    raise ValueError(
+                        f"Failed to parse review from {specialist_id} as JSON: {e3}\n"
+                        f"Raw response length: {len(response.content)}\n"
+                        f"Content preview: {response.content[:300]}..."
+                    )
+            else:
+                raise ValueError(
+                    f"No JSON found in review from {specialist_id}\n"
+                    f"Raw response length: {len(response.content)}\n"
+                    f"Content preview: {response.content[:300]}..."
+                )
     scores = review_data["scores"]
     average = sum(scores.values()) / len(scores)
 
@@ -211,7 +272,9 @@ async def run_review_round(
     tracker: PerformanceTracker,
     previous_reviews: Optional[List[dict]] = None,
     previous_manuscript: Optional[str] = None,
-    author_rebuttal: Optional[str] = None
+    author_response: Optional[str] = None,
+    article_length: str = "full",
+    audience_level: str = "professional"
 ) -> tuple[List[Dict], float]:
     """Run one round of peer review.
 
@@ -222,7 +285,9 @@ async def run_review_round(
         tracker: Performance tracker
         previous_reviews: Reviews from previous round
         previous_manuscript: Manuscript from previous round
-        author_rebuttal: Author's rebuttal to previous reviews
+        author_response: Author's response to previous reviews
+        article_length: "full" or "short" — adjusts reviewer expectations
+        audience_level: "beginner", "intermediate", or "professional"
 
     Returns:
         (reviews, overall_average)
@@ -245,7 +310,7 @@ async def run_review_round(
 
         # Generate reviews concurrently
         review_tasks = [
-            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript, author_rebuttal)
+            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript, author_response, article_length, audience_level)
             for specialist_id, specialist in specialists.items()
         ]
 
@@ -300,10 +365,12 @@ class WorkflowOrchestrator:
         expert_configs: List[ExpertConfig],
         topic: str,
         max_rounds: int = 3,
-        threshold: float = 8.0,
+        threshold: float = 7.5,
         output_dir: Optional[Path] = None,
         status_callback = None,
-        category: Optional[dict] = None
+        category: Optional[dict] = None,
+        article_length: str = "full",
+        audience_level: str = "professional",
     ):
         """Initialize workflow orchestrator.
 
@@ -315,6 +382,8 @@ class WorkflowOrchestrator:
             output_dir: Output directory for results
             status_callback: Optional callback function(status, round_num, message)
             category: Optional dict with 'major' and 'subfield' keys for domain detection
+            article_length: "full" (3,000-5,000 words) or "short" (1,500-2,500 words)
+            audience_level: "beginner", "intermediate", or "professional"
         """
         self.expert_configs = expert_configs
         self.topic = topic
@@ -323,6 +392,9 @@ class WorkflowOrchestrator:
         self.output_dir = output_dir or Path("results") / topic.replace(" ", "-").lower()
         self.tracker = PerformanceTracker()
         self.status_callback = status_callback
+        self.category = category
+        self.article_length = article_length
+        self.audience_level = audience_level
 
         # Compute domain description from category
         if category and category.get("major"):
@@ -339,7 +411,8 @@ class WorkflowOrchestrator:
         )
 
         # Initialize agents
-        self.writer = WriterAgent(model="claude-opus-4.5")
+        self.writer = WriterAgent(model="claude-opus-4.5")  # initial draft, revisions
+        self.light_writer = WriterAgent(model="claude-sonnet-4")  # author response, citation verification
         self.moderator = ModeratorAgent(model="claude-opus-4.5")
         self.desk_editor = DeskEditorAgent(model="claude-sonnet-4.5")
 
@@ -374,6 +447,29 @@ class WorkflowOrchestrator:
         else:
             manuscript = initial_manuscript
             console.print(f"\n[bold]Using provided manuscript[/bold]")
+
+        # Citation verification pass (if sources available)
+        if self.sources:
+            console.print("\n[cyan]Running citation verification pass...[/cyan]")
+            if self.status_callback:
+                self.status_callback("writing", 0, "Verifying and strengthening citations...")
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("[cyan]Verifying citations...", total=None)
+                self.tracker.start_operation("citation_verification")
+                manuscript = await self.light_writer.verify_citations(
+                    manuscript,
+                    self.sources,
+                    domain=self.domain_desc,
+                )
+                cv_time = self.tracker.end_operation("citation_verification")
+                progress.update(task, completed=True)
+
+            console.print(f"[green]✓ Citation verification complete[/green]")
 
         word_count = len(manuscript.split())
         console.print(f"Length: {word_count:,} words")
@@ -425,7 +521,7 @@ class WorkflowOrchestrator:
                     "reason": desk_result["reason"],
                     "tokens": desk_result["tokens"]
                 },
-                "author_rebuttal": None,
+                "author_response": None,
                 "manuscript_diff": None,
                 "threshold": self.threshold,
                 "passed": False,
@@ -452,9 +548,9 @@ class WorkflowOrchestrator:
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Expert reviews in progress...")
 
-            # Get previous reviews and rebuttal for context
+            # Get previous reviews and author response for context
             prev_reviews = all_rounds[-1]['reviews'] if all_rounds else None
-            prev_rebuttal = all_rounds[-1].get('author_rebuttal') if all_rounds else None
+            prev_response = all_rounds[-1].get('author_response') or all_rounds[-1].get('author_rebuttal') if all_rounds else None
 
             reviews, overall_average = await run_review_round(
                 current_manuscript,
@@ -463,33 +559,60 @@ class WorkflowOrchestrator:
                 self.tracker,
                 prev_reviews,
                 previous_manuscript,
-                prev_rebuttal  # Pass author rebuttal to reviewers
+                prev_response,  # Pass author response to reviewers
+                self.article_length,
+                self.audience_level
             )
 
             # Update status after reviews complete
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Reviews complete, moderator evaluating...")
 
-            # Moderator decision
-            console.print("\n[cyan]Moderator evaluating reviews...[/cyan]")
+            # Moderator decision + author response in parallel
+            # Author response only needs reviews (not moderator decision), so they can overlap
+            console.print("\n[cyan]Moderator evaluating + Author preparing response (parallel)...[/cyan]")
+
+            async def _run_moderator():
+                self.tracker.start_operation("moderator")
+                result = await self.moderator.make_decision(
+                    current_manuscript,
+                    reviews,
+                    round_num,
+                    self.max_rounds,
+                    previous_rounds=all_rounds,
+                    domain=self.domain_desc,
+                )
+                moderator_time = self.tracker.end_operation("moderator")
+                self.tracker.record_moderator_time(moderator_time)
+                return result
+
+            async def _run_author_response():
+                self.tracker.start_operation("author_response")
+                result = await self.light_writer.write_author_response(
+                    current_manuscript,
+                    reviews,
+                    round_num
+                )
+                response_time = self.tracker.end_operation("author_response")
+                return result
+
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
                 console=console
             ) as progress:
-                task = progress.add_task("[cyan]Moderator making decision...", total=None)
-                self.tracker.start_operation("moderator")
-                moderator_decision = await self.moderator.make_decision(
-                    current_manuscript,
-                    reviews,
-                    round_num,
-                    self.max_rounds,
-                    previous_rounds=all_rounds,  # Pass previous rounds for trajectory analysis
-                    domain=self.domain_desc,
+                task = progress.add_task("[cyan]Moderator + Author response (parallel)...", total=None)
+                moderator_decision, speculative_author_response = await asyncio.gather(
+                    _run_moderator(),
+                    _run_author_response()
                 )
-                moderator_time = self.tracker.end_operation("moderator")
-                self.tracker.record_moderator_time(moderator_time)
                 progress.update(task, completed=True)
+
+            # Report score + decision via status callback for activity log
+            if self.status_callback:
+                decision_str = moderator_decision["decision"]
+                score_str = f"{overall_average:.1f}/10"
+                self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Score {score_str} — {decision_str}")
 
             # Display moderator decision
             decision_color = {
@@ -509,39 +632,22 @@ class WorkflowOrchestrator:
                 border_style=decision_color
             ))
 
-            # Author rebuttal (if revision needed)
-            author_rebuttal = None
+            # Use author response only if revision is needed (otherwise discard)
+            author_response = None
             if moderator_decision["decision"] != "ACCEPT":
-                console.print("\n[cyan]Author writing rebuttal...[/cyan]")
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console
-                ) as progress:
-                    task = progress.add_task("[cyan]Author responding to reviews...", total=None)
-                    self.tracker.start_operation("rebuttal")
-                    author_rebuttal = await self.writer.write_rebuttal(
-                        current_manuscript,
-                        reviews,
-                        round_num
-                    )
-                    rebuttal_time = self.tracker.end_operation("rebuttal")
-                    progress.update(task, completed=True)
+                author_response = speculative_author_response
+                console.print(f"[green]✓ Author response complete[/green]")
 
-                console.print(f"[green]✓ Author rebuttal complete[/green]")
-
-                # Display rebuttal summary
-                rebuttal_preview = author_rebuttal[:300] + "..." if len(author_rebuttal) > 300 else author_rebuttal
+                response_preview = author_response[:300] + "..." if len(author_response) > 300 else author_response
                 console.print(Panel.fit(
-                    rebuttal_preview,
-                    title="Author Rebuttal (preview)",
+                    response_preview,
+                    title="Author Response (preview)",
                     border_style="cyan"
                 ))
 
-                # Save full rebuttal
-                rebuttal_file = self.output_dir / f"rebuttal_round_{round_num}.md"
-                rebuttal_file.write_text(author_rebuttal)
-                console.print(f"[dim]Saved: {rebuttal_file}[/dim]")
+                response_file = self.output_dir / f"author_response_round_{round_num}.md"
+                response_file.write_text(author_response)
+                console.print(f"[dim]Saved: {response_file}[/dim]")
 
             # Calculate manuscript diff
             manuscript_diff = None
@@ -564,7 +670,7 @@ class WorkflowOrchestrator:
                 "reviews": reviews,
                 "overall_average": round(overall_average, 1),
                 "moderator_decision": moderator_decision,
-                "author_rebuttal": author_rebuttal,  # Include rebuttal
+                "author_response": author_response,
                 "manuscript_diff": manuscript_diff,
                 "threshold": self.threshold,
                 "passed": moderator_decision["decision"] == "ACCEPT",
@@ -578,11 +684,11 @@ class WorkflowOrchestrator:
 
             all_rounds.append(round_data)
 
-            # Save checkpoint for resume capability
-            self._save_checkpoint(round_num, current_manuscript, all_rounds)
-
             # Check if passed
             if moderator_decision["decision"] == "ACCEPT":
+                # Save checkpoint before finalizing (manuscript unchanged, just for completeness)
+                self._save_checkpoint(round_num, current_manuscript, all_rounds)
+
                 console.print(f"\n[bold green]✓ ACCEPTED BY MODERATOR[/bold green]")
                 console.print(f"[green]Manuscript accepted after {round_num} round(s) of review![/green]\n")
 
@@ -596,6 +702,8 @@ class WorkflowOrchestrator:
 
             # Check if max rounds reached
             if round_num >= self.max_rounds:
+                self._save_checkpoint(round_num, current_manuscript, all_rounds)
+
                 console.print(f"\n[yellow]⚠ MAX ROUNDS REACHED[/yellow]")
                 console.print(f"[yellow]Final decision: {moderator_decision['decision']}[/yellow]\n")
 
@@ -608,6 +716,9 @@ class WorkflowOrchestrator:
             revision_type = moderator_decision["decision"].replace("_", " ")
             console.print(f"\n[yellow]⚠ {revision_type} REQUIRED[/yellow]")
             console.print(f"[cyan]Round {round_num + 1}: Generating revision...[/cyan]\n")
+
+            # Save checkpoint BEFORE revision (if interrupted, resume will re-do revision)
+            self._save_checkpoint(round_num, current_manuscript, all_rounds)
 
             previous_manuscript = current_manuscript
 
@@ -628,6 +739,9 @@ class WorkflowOrchestrator:
                     round_num,
                     references=self.sources if self.sources else None,
                     domain=self.domain_desc,
+                    article_length=self.article_length,
+                    author_response=author_response,
+                    audience_level=self.audience_level,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
@@ -644,6 +758,22 @@ class WorkflowOrchestrator:
             console.print(f"[dim]Saved: {manuscript_path_next}[/dim]")
 
             current_manuscript = revised_manuscript
+
+            # Update round data with actual revision diff
+            revision_diff = {
+                "words_added": new_word_count - len(previous_manuscript.split()),
+                "previous_version": f"v{round_num}",
+                "current_version": f"v{round_num + 1}"
+            }
+            round_data["manuscript_diff"] = revision_diff
+            round_data["revised_word_count"] = new_word_count
+
+            # Re-save round file with updated revision diff
+            with open(round_file, "w") as f:
+                json.dump(round_data, f, indent=2)
+
+            # Update checkpoint with REVISED manuscript (resume gets correct version)
+            self._save_checkpoint(round_num, current_manuscript, all_rounds)
 
         # Generate summary and export
         return await self._finalize_workflow(all_rounds)
@@ -689,6 +819,8 @@ class WorkflowOrchestrator:
                 self.topic,
                 references=self.sources if self.sources else None,
                 domain=self.domain_desc,
+                article_length=self.article_length,
+                audience_level=self.audience_level,
             )
             duration = self.tracker.end_operation("initial_draft")
             self.tracker.record_initial_draft(duration, 0)
@@ -748,6 +880,8 @@ class WorkflowOrchestrator:
             "output_directory": str(self.output_dir),
             "max_rounds": self.max_rounds,
             "threshold": self.threshold,
+            "category": self.category,
+            "audience_level": self.audience_level,
             "expert_team": [config.to_dict() for config in self.expert_configs],
             "rounds": all_rounds,
             "final_score": all_rounds[-1]["overall_average"],
@@ -786,6 +920,8 @@ class WorkflowOrchestrator:
             "current_manuscript": current_manuscript,
             "all_rounds": all_rounds,
             "expert_configs": [config.to_dict() for config in self.expert_configs],
+            "category": self.category,
+            "audience_level": self.audience_level,
             "checkpoint_time": datetime.now().isoformat(),
             "status": "in_progress"
         }
@@ -831,7 +967,9 @@ class WorkflowOrchestrator:
             max_rounds=checkpoint["max_rounds"],
             threshold=checkpoint["threshold"],
             output_dir=output_dir,
-            status_callback=status_callback
+            status_callback=status_callback,
+            category=checkpoint.get("category"),
+            audience_level=checkpoint.get("audience_level", "professional"),
         )
 
         # Restore state
@@ -883,6 +1021,55 @@ class WorkflowOrchestrator:
             console.print(f"[yellow]⚠ Already at max rounds ({self.max_rounds})[/yellow]")
             return await self._finalize_workflow(all_rounds)
 
+        # Check if revision was interrupted: last decision needed revision but revised manuscript missing
+        revised_path = self.output_dir / f"manuscript_v{start_round + 1}.md"
+        if last_decision in ("MINOR_REVISION", "MAJOR_REVISION") and not revised_path.exists():
+            console.print(f"[yellow]Revision for round {start_round} was interrupted — re-running revision...[/yellow]")
+
+            if self.status_callback:
+                self.status_callback("revising", start_round, f"Round {start_round}: Re-running interrupted revision...")
+
+            prev_reviews = last_round.get("reviews", [])
+            prev_author_response = last_round.get("author_response")
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("[cyan]Writer revising manuscript (resumed)...", total=None)
+                self.tracker.start_operation("revision")
+                revised_manuscript = await self.writer.revise_manuscript(
+                    current_manuscript,
+                    prev_reviews,
+                    start_round,
+                    references=self.sources if self.sources else None,
+                    domain=self.domain_desc,
+                    article_length=self.article_length,
+                    author_response=prev_author_response,
+                    audience_level=self.audience_level,
+                )
+                revision_time = self.tracker.end_operation("revision")
+                self.tracker.record_revision_time(revision_time)
+                progress.update(task, completed=True)
+
+            new_word_count = len(revised_manuscript.split())
+            console.print(f"[green]✓ Revision complete[/green] — {new_word_count:,} words")
+
+            revised_path.write_text(revised_manuscript)
+            current_manuscript = revised_manuscript
+
+            # Update last round data with revision diff
+            last_round["manuscript_diff"] = {
+                "words_added": new_word_count - len(current_manuscript.split()),
+                "previous_version": f"v{start_round}",
+                "current_version": f"v{start_round + 1}"
+            }
+            last_round["revised_word_count"] = new_word_count
+
+            # Update checkpoint with revised manuscript
+            self._save_checkpoint(start_round, current_manuscript, all_rounds)
+
         # Continue iteration from next round
         previous_manuscript = current_manuscript
 
@@ -893,9 +1080,9 @@ class WorkflowOrchestrator:
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Expert reviews in progress...")
 
-            # Get previous reviews and rebuttal
+            # Get previous reviews and author response
             prev_reviews = all_rounds[-1]['reviews'] if all_rounds else None
-            prev_rebuttal = all_rounds[-1].get('author_rebuttal') if all_rounds else None
+            prev_response = all_rounds[-1].get('author_response') or all_rounds[-1].get('author_rebuttal') if all_rounds else None
 
             reviews, overall_average = await run_review_round(
                 current_manuscript,
@@ -904,22 +1091,20 @@ class WorkflowOrchestrator:
                 self.tracker,
                 prev_reviews,
                 previous_manuscript,
-                prev_rebuttal
+                prev_response,
+                self.article_length,
+                self.audience_level
             )
 
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Reviews complete, moderator evaluating...")
 
-            # Moderator decision
-            console.print("\n[cyan]Moderator evaluating reviews...[/cyan]")
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                task = progress.add_task("[cyan]Moderator making decision...", total=None)
+            # Moderator decision + author response in parallel (same as main run())
+            console.print("\n[cyan]Moderator evaluating + Author preparing response (parallel)...[/cyan]")
+
+            async def _run_moderator_resume():
                 self.tracker.start_operation("moderator")
-                moderator_decision = await self.moderator.make_decision(
+                result = await self.moderator.make_decision(
                     current_manuscript,
                     reviews,
                     round_num,
@@ -929,7 +1114,35 @@ class WorkflowOrchestrator:
                 )
                 moderator_time = self.tracker.end_operation("moderator")
                 self.tracker.record_moderator_time(moderator_time)
+                return result
+
+            async def _run_author_response_resume():
+                self.tracker.start_operation("author_response")
+                result = await self.light_writer.write_author_response(
+                    current_manuscript,
+                    reviews,
+                    round_num
+                )
+                response_time = self.tracker.end_operation("author_response")
+                return result
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("[cyan]Moderator + Author response (parallel)...", total=None)
+                moderator_decision, speculative_author_response = await asyncio.gather(
+                    _run_moderator_resume(),
+                    _run_author_response_resume()
+                )
                 progress.update(task, completed=True)
+
+            # Report score + decision via status callback for activity log
+            if self.status_callback:
+                decision_str = moderator_decision["decision"]
+                score_str = f"{overall_average:.1f}/10"
+                self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Score {score_str} — {decision_str}")
 
             # Display decision
             decision_color = {
@@ -949,37 +1162,22 @@ class WorkflowOrchestrator:
                 border_style=decision_color
             ))
 
-            # Author rebuttal
-            author_rebuttal = None
+            # Use author response only if revision is needed
+            author_response = None
             if moderator_decision["decision"] != "ACCEPT":
-                console.print("\n[cyan]Author writing rebuttal...[/cyan]")
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console
-                ) as progress:
-                    task = progress.add_task("[cyan]Author responding to reviews...", total=None)
-                    self.tracker.start_operation("rebuttal")
-                    author_rebuttal = await self.writer.write_rebuttal(
-                        current_manuscript,
-                        reviews,
-                        round_num
-                    )
-                    rebuttal_time = self.tracker.end_operation("rebuttal")
-                    progress.update(task, completed=True)
+                author_response = speculative_author_response
+                console.print(f"[green]✓ Author response complete[/green]")
 
-                console.print(f"[green]✓ Author rebuttal complete[/green]")
-
-                rebuttal_preview = author_rebuttal[:300] + "..." if len(author_rebuttal) > 300 else author_rebuttal
+                response_preview = author_response[:300] + "..." if len(author_response) > 300 else author_response
                 console.print(Panel.fit(
-                    rebuttal_preview,
-                    title="Author Rebuttal (preview)",
+                    response_preview,
+                    title="Author Response (preview)",
                     border_style="cyan"
                 ))
 
-                rebuttal_file = self.output_dir / f"rebuttal_round_{round_num}.md"
-                rebuttal_file.write_text(author_rebuttal)
-                console.print(f"[dim]Saved: {rebuttal_file}[/dim]")
+                response_file = self.output_dir / f"author_response_round_{round_num}.md"
+                response_file.write_text(author_response)
+                console.print(f"[dim]Saved: {response_file}[/dim]")
 
             # Calculate diff
             manuscript_diff = None
@@ -1002,7 +1200,7 @@ class WorkflowOrchestrator:
                 "reviews": reviews,
                 "overall_average": round(overall_average, 1),
                 "moderator_decision": moderator_decision,
-                "author_rebuttal": author_rebuttal,
+                "author_response": author_response,
                 "manuscript_diff": manuscript_diff,
                 "threshold": self.threshold,
                 "passed": moderator_decision["decision"] == "ACCEPT",
@@ -1016,11 +1214,10 @@ class WorkflowOrchestrator:
 
             all_rounds.append(round_data)
 
-            # Save checkpoint
-            self._save_checkpoint(round_num, current_manuscript, all_rounds)
-
             # Check if passed
             if moderator_decision["decision"] == "ACCEPT":
+                self._save_checkpoint(round_num, current_manuscript, all_rounds)
+
                 console.print(f"\n[bold green]✓ ACCEPTED BY MODERATOR[/bold green]")
                 console.print(f"[green]Manuscript accepted after {round_num} round(s) of review![/green]\n")
 
@@ -1034,6 +1231,8 @@ class WorkflowOrchestrator:
 
             # Check if max rounds reached
             if round_num >= self.max_rounds:
+                self._save_checkpoint(round_num, current_manuscript, all_rounds)
+
                 console.print(f"\n[yellow]⚠ MAX ROUNDS REACHED[/yellow]")
                 console.print(f"[yellow]Final decision: {moderator_decision['decision']}[/yellow]\n")
 
@@ -1046,6 +1245,9 @@ class WorkflowOrchestrator:
             revision_type = moderator_decision["decision"].replace("_", " ")
             console.print(f"\n[yellow]⚠ {revision_type} REQUIRED[/yellow]")
             console.print(f"[cyan]Round {round_num + 1}: Generating revision...[/cyan]\n")
+
+            # Save checkpoint BEFORE revision (if interrupted, resume will re-do revision)
+            self._save_checkpoint(round_num, current_manuscript, all_rounds)
 
             previous_manuscript = current_manuscript
 
@@ -1066,6 +1268,9 @@ class WorkflowOrchestrator:
                     round_num,
                     references=self.sources if self.sources else None,
                     domain=self.domain_desc,
+                    article_length=self.article_length,
+                    author_response=author_response,
+                    audience_level=self.audience_level,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
@@ -1082,6 +1287,22 @@ class WorkflowOrchestrator:
             console.print(f"[dim]Saved: {manuscript_path_next}[/dim]")
 
             current_manuscript = revised_manuscript
+
+            # Update round data with actual revision diff
+            revision_diff = {
+                "words_added": new_word_count - len(previous_manuscript.split()),
+                "previous_version": f"v{round_num}",
+                "current_version": f"v{round_num + 1}"
+            }
+            round_data["manuscript_diff"] = revision_diff
+            round_data["revised_word_count"] = new_word_count
+
+            # Re-save round file with updated revision diff
+            with open(round_file, "w") as f:
+                json.dump(round_data, f, indent=2)
+
+            # Update checkpoint with REVISED manuscript (resume gets correct version)
+            self._save_checkpoint(round_num, current_manuscript, all_rounds)
 
         # Generate summary and export
         return await self._finalize_workflow(all_rounds)

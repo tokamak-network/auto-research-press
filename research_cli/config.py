@@ -22,7 +22,7 @@ class WorkflowConfig:
     """Configuration for research workflow."""
 
     max_review_rounds: int = 3
-    score_threshold: float = 8.0
+    score_threshold: float = 7.5
     results_dir: Path = Path("results")
 
 
@@ -81,19 +81,27 @@ class Config:
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")
         self.anthropic_base_url = os.getenv("ANTHROPIC_BASE_URL")
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
+
+        # OpenRouter fallback: if OPENAI_API_KEY not set but ANTHROPIC key + base_url exist,
+        # reuse Anthropic credentials for OpenAI provider (same OpenRouter key)
+        if not self.openai_api_key and self.anthropic_api_key and self.anthropic_base_url:
+            self.openai_api_key = self.anthropic_api_key
+            if not self.openai_base_url:
+                self.openai_base_url = self.anthropic_base_url
 
         # Default models
         self.default_writer_model = self._normalize_model_name(
             os.getenv("DEFAULT_WRITER_MODEL", "claude-opus-4.5")
         )
         self.default_reviewer_model = self._normalize_model_name(
-            os.getenv("DEFAULT_REVIEWER_MODEL", "claude-opus-4.5")
+            os.getenv("DEFAULT_REVIEWER_MODEL", "claude-sonnet-4")
         )
 
         # Workflow settings
         self.max_review_rounds = int(os.getenv("MAX_REVIEW_ROUNDS", "3"))
-        self.score_threshold = float(os.getenv("SCORE_THRESHOLD", "8.0"))
+        self.score_threshold = float(os.getenv("SCORE_THRESHOLD", "7.5"))
         self.results_dir = Path(os.getenv("RESULTS_DIR", "results"))
 
     def get_llm_config(
@@ -143,6 +151,8 @@ class Config:
         base_url = None
         if provider == "anthropic":
             base_url = self.anthropic_base_url
+        elif provider == "openai":
+            base_url = self.openai_base_url
 
         return LLMConfig(
             provider=provider,

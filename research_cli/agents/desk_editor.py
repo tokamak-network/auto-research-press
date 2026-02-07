@@ -13,11 +13,11 @@ class DeskEditorAgent:
     peer review. Uses a cheap, fast model (Haiku) with a short prompt.
     """
 
-    def __init__(self, model: str = "claude-haiku-4"):
+    def __init__(self, model: str = "claude-sonnet-4.5"):
         """Initialize desk editor agent.
 
         Args:
-            model: Claude model to use (Haiku for cost efficiency)
+            model: Claude model to use for screening
         """
         config = get_config()
         llm_config = config.get_llm_config("anthropic", model)

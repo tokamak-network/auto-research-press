@@ -4,6 +4,7 @@
 import asyncio
 import json
 import os
+import re
 import secrets
 import time
 import uuid
@@ -23,6 +24,7 @@ from research_cli.workflow.orchestrator import WorkflowOrchestrator
 from research_cli.workflow.collaborative_workflow import CollaborativeWorkflowOrchestrator
 from research_cli.models.expert import ExpertConfig
 from research_cli.models.author import AuthorRole, WriterTeam
+from research_cli.utils.citation_manager import CitationManager
 
 
 app = FastAPI(title="AI-Backed Research API")
@@ -38,20 +40,27 @@ app.add_middleware(
 
 
 # --- Job Queue ---
+MAX_CONCURRENT_WORKERS = 3
 job_queue: asyncio.Queue = asyncio.Queue()
+_active_worker_count = 0  # Track how many workers are currently processing a job
 
 
-async def job_worker():
-    """Single worker: pull jobs from queue and execute sequentially."""
+async def job_worker(worker_id: int):
+    """Worker: pull jobs from queue and execute."""
+    global _active_worker_count
+    print(f"  Worker {worker_id} started")
     while True:
         job = await job_queue.get()
+        _active_worker_count += 1
+        pid = job.get("project_id", "?")
+        print(f"  Worker {worker_id} picked up job: {pid[:50]}")
         try:
             job_fn = job.pop("_fn")
             await job_fn(**job)
         except Exception as e:
-            # Error handling is inside run_workflow_background / resume_workflow_background
-            print(f"Job worker error: {e}")
+            print(f"  Worker {worker_id} error: {e}")
         finally:
+            _active_worker_count -= 1
             job_queue.task_done()
 
 
@@ -121,8 +130,8 @@ async def verify_admin_key(request: Request) -> str:
     return key
 
 
-# --- Rate Limit (per API key, 30 min = 1800s) ---
-RATE_LIMIT_SECONDS = 1800
+# --- Rate Limit (per API key, 60s cooldown for parallel submission) ---
+RATE_LIMIT_SECONDS = 60
 rate_limit_store: Dict[str, float] = {}  # api_key → last_request_timestamp
 
 
@@ -141,9 +150,10 @@ async def check_rate_limit(api_key: str):
 
 @app.on_event("startup")
 async def startup_event():
-    """Scan for interrupted workflows and start job worker on startup."""
+    """Scan for interrupted workflows and start job workers on startup."""
     await scan_interrupted_workflows()
-    asyncio.create_task(job_worker())
+    for i in range(MAX_CONCURRENT_WORKERS):
+        asyncio.create_task(job_worker(i))
 
 
 async def scan_interrupted_workflows():
@@ -256,11 +266,12 @@ class StartWorkflowRequest(BaseModel):
     topic: str
     experts: List[dict]
     max_rounds: int = 3
-    threshold: float = 8.0
+    threshold: float = 7.5
     research_cycles: int = 1  # Number of research note iterations
     category: Optional[CategoryInfo] = None  # Academic category
     article_length: Optional[str] = "full"  # "full" or "short"
     workflow_mode: Optional[str] = "standard"  # "standard" or "collaborative"
+    audience_level: Optional[str] = "professional"  # "beginner", "intermediate", "professional"
 
 
 class SubmitArticleRequest(BaseModel):
@@ -315,6 +326,8 @@ async def queue_status():
     """Return current job queue size and running job info."""
     return {
         "queued_jobs": job_queue.qsize(),
+        "active_workers": _active_worker_count,
+        "max_workers": MAX_CONCURRENT_WORKERS,
         "active_workflows": sum(
             1 for s in workflow_status.values()
             if s["status"] in ("queued", "composing_team", "writing", "desk_screening", "reviewing", "revising", "research", "writing_sections")
@@ -409,10 +422,11 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
     await check_rate_limit(api_key)
 
     try:
-        # Generate unique project ID
-        project_id = request.topic.lower().replace(" ", "-")
-        # Add timestamp to make it unique
-        project_id = f"{project_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        # Generate unique project ID (sanitize: lowercase, hyphens, strip control chars)
+        project_id = re.sub(r'[^a-z0-9\-]', '-', request.topic.lower().replace(" ", "-"))
+        project_id = re.sub(r'-{2,}', '-', project_id).strip('-')
+        # Truncate overly long slugs, add timestamp for uniqueness
+        project_id = f"{project_id[:80]}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         # Initialize status
         workflow_status[project_id] = {
@@ -455,6 +469,7 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
             "category": request.category.dict() if request.category else None,
             "article_length": request.article_length or "full",
             "workflow_mode": request.workflow_mode or "standard",
+            "audience_level": request.audience_level or "professional",
         })
 
         return {
@@ -499,10 +514,18 @@ async def get_workflow_status(project_id: str):
 @app.get("/api/workflows")
 async def list_workflows(api_key: str = Depends(verify_api_key)):
     """List all workflows."""
-    return {"workflows": [
-        {"project_id": pid, **status}
-        for pid, status in workflow_status.items()
-    ]}
+    results = []
+    for pid, status in workflow_status.items():
+        entry = {"project_id": pid, **status}
+        # Dynamically calculate elapsed time for active workflows
+        if status.get("status") not in ("completed", "failed", "interrupted", "rejected"):
+            try:
+                start_time = datetime.fromisoformat(status.get("start_time", datetime.now().isoformat()))
+                entry["elapsed_time_seconds"] = int((datetime.now() - start_time).total_seconds())
+            except (ValueError, TypeError):
+                pass
+        results.append(entry)
+    return {"workflows": results}
 
 
 @app.get("/api/workflow-activity/{project_id}")
@@ -541,28 +564,39 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
         with open(checkpoint_file) as f:
             checkpoint = json.load(f)
 
-        # Initialize workflow status if not exists
-        if project_id not in workflow_status:
-            workflow_status[project_id] = {
-                "project_id": project_id,
-                "status": "queued",
-                "current_round": checkpoint["current_round"],
-                "total_rounds": checkpoint["max_rounds"],
-                "progress_percentage": int((checkpoint["current_round"] / checkpoint["max_rounds"]) * 100),
-                "message": f"Resuming from Round {checkpoint['current_round']}...",
-                "error": None,
-                "expert_status": [],
-                "cost_estimate": None,
-                "start_time": datetime.now().isoformat(),
-                "elapsed_time_seconds": 0,
-                "estimated_time_remaining_seconds": (checkpoint["max_rounds"] - checkpoint["current_round"]) * 180
-            }
+        # Reset workflow status to queued (handles both new and failed/interrupted)
+        workflow_status[project_id] = {
+            "project_id": project_id,
+            "status": "queued",
+            "current_round": checkpoint["current_round"],
+            "total_rounds": checkpoint["max_rounds"],
+            "progress_percentage": int((checkpoint["current_round"] / checkpoint["max_rounds"]) * 100),
+            "message": f"Resuming from Round {checkpoint['current_round']}...",
+            "error": None,
+            "expert_status": [],
+            "cost_estimate": None,
+            "start_time": datetime.now().isoformat(),
+            "elapsed_time_seconds": 0,
+            "estimated_time_remaining_seconds": (checkpoint["max_rounds"] - checkpoint["current_round"]) * 180
+        }
 
         # Initialize activity log
         if project_id not in activity_logs:
             activity_logs[project_id] = []
 
+        # Check if another workflow is actively running
+        active_statuses = {"composing_team", "writing", "desk_screening", "reviewing", "revising", "research", "writing_sections"}
+        active_workflows = [
+            pid for pid, s in workflow_status.items()
+            if s["status"] in active_statuses and pid != project_id
+        ]
+
         add_activity_log(project_id, "info", f"Resuming workflow from Round {checkpoint['current_round']}")
+
+        if active_workflows:
+            queue_msg = f"Queued to resume from Round {checkpoint['current_round']} (waiting for active workflow to finish)"
+            workflow_status[project_id]["message"] = queue_msg
+            add_activity_log(project_id, "warning", f"Another workflow is running ({active_workflows[0][:40]}...). This resume is queued.")
 
         # Enqueue resume job
         await job_queue.put({
@@ -571,11 +605,14 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             "project_dir": project_dir,
         })
 
+        queue_position = job_queue.qsize()
         return {
             "project_id": project_id,
             "status": "queued",
             "message": f"Workflow resumed from Round {checkpoint['current_round']}",
-            "queue_position": job_queue.qsize()
+            "queue_position": queue_position,
+            "has_active_workflow": len(active_workflows) > 0,
+            "active_workflow_id": active_workflows[0] if active_workflows else None,
         }
 
     except HTTPException:
@@ -648,17 +685,42 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
             status_callback=status_update
         )
 
-        # Mark as completed
+        # Mark as completed with round/score data
         update_workflow_status(project_id, "completed", result["total_rounds"], result["total_rounds"], "Workflow completed successfully")
+        _enrich_completed_status(project_id)
         add_activity_log(project_id, "success", f"Workflow completed with score {result['final_score']}/10")
 
     except Exception as e:
-        error_msg = f"Workflow failed: {str(e)}"
-        update_workflow_status(project_id, "failed", 0, 0, error_msg)
-        add_activity_log(project_id, "error", error_msg, {"error": str(e)})
+        error_msg = f"Workflow error: {str(e)}"
 
-        if project_id in workflow_status:
-            workflow_status[project_id]["error"] = error_msg
+        # Checkpoint still exists (resume didn't finish) → mark as interrupted
+        checkpoint_file = project_dir / "workflow_checkpoint.json"
+        if checkpoint_file.exists():
+            try:
+                with open(checkpoint_file) as f:
+                    cp = json.load(f)
+                cp_round = cp.get("current_round", 0)
+                cp_max = cp.get("max_rounds", 3)
+            except Exception:
+                cp_round, cp_max = 0, 3
+
+            if project_id in workflow_status:
+                workflow_status[project_id].update({
+                    "status": "interrupted",
+                    "current_round": cp_round,
+                    "total_rounds": cp_max,
+                    "progress_percentage": int((cp_round / cp_max) * 100) if cp_max else 0,
+                    "message": f"Error at Round {cp_round} — Resume available",
+                    "error": str(e),
+                    "estimated_time_remaining_seconds": (cp_max - cp_round) * 180,
+                    "can_resume": True,
+                })
+            add_activity_log(project_id, "warning", f"Resume interrupted by error: {str(e)}. Checkpoint preserved — try again.")
+        else:
+            update_workflow_status(project_id, "failed", 0, 0, error_msg)
+            add_activity_log(project_id, "error", error_msg, {"error": str(e)})
+            if project_id in workflow_status:
+                workflow_status[project_id]["error"] = error_msg
 
 
 def _generate_reviewers_from_category(category: dict, topic: str) -> List[ExpertConfig]:
@@ -678,11 +740,20 @@ def _generate_reviewers_from_category(category: dict, topic: str) -> List[Expert
     if not pool:
         return []
 
+    # Cross-assign reviewer models across providers for rate limit distribution
+    reviewer_models = [
+        ("anthropic", "claude-sonnet-4"),
+        ("openai", "gpt-5.2-pro"),
+        ("openai", "gpt-5.2-pro"),
+    ]
+
     reviewers = []
     for i, expert_id in enumerate(pool[:3]):
         # Convert snake_case ID to human-readable name
         name = expert_id.replace("_expert", "").replace("_", " ").title() + " Expert"
         domain = expert_id.replace("_expert", "").replace("_", " ").title()
+
+        provider, model = reviewer_models[i % len(reviewer_models)]
 
         config = ExpertConfig(
             id=f"reviewer-{i+1}",
@@ -690,8 +761,8 @@ def _generate_reviewers_from_category(category: dict, topic: str) -> List[Expert
             domain=domain,
             focus_areas=[],
             system_prompt="",  # SpecialistFactory will auto-generate
-            provider="anthropic",
-            model="claude-sonnet-4"
+            provider=provider,
+            model=model,
         )
         reviewers.append(config)
 
@@ -708,6 +779,7 @@ async def run_workflow_background(
     category: Optional[dict] = None,
     article_length: str = "full",
     workflow_mode: str = "standard",
+    audience_level: str = "professional",
 ):
     """Run workflow in background and update status."""
     try:
@@ -720,6 +792,7 @@ async def run_workflow_background(
         add_activity_log(project_id, "info", f"Starting {workflow_mode} workflow - team composition")
 
         # Convert expert dicts to ExpertConfig objects
+        # Reviewers use Sonnet for speed; writer (WriterAgent) uses Opus separately
         expert_configs = []
         for i, exp in enumerate(experts):
             config = ExpertConfig(
@@ -729,7 +802,7 @@ async def run_workflow_background(
                 focus_areas=exp.get("focus_areas", []),
                 system_prompt="",  # Will be generated by SpecialistFactory
                 provider="anthropic",
-                model=exp.get("suggested_model", "claude-opus-4.5")
+                model="claude-sonnet-4"
             )
             expert_configs.append(config)
             add_activity_log(
@@ -738,6 +811,11 @@ async def run_workflow_background(
                 f"Added expert: {config.name}",
                 {"model": config.model, "focus_areas": config.focus_areas}
             )
+
+        # Cap max_rounds for short papers
+        if article_length == "short" and max_rounds > 2:
+            max_rounds = 2
+            add_activity_log(project_id, "info", "Short paper: capped max_rounds to 2")
 
         status_callback = lambda status, round_num, msg: update_workflow_status(
             project_id, status, round_num, max_rounds, msg
@@ -805,6 +883,7 @@ async def run_workflow_background(
                 target_manuscript_length=target_manuscript_length,
                 research_cycles=research_cycles,
                 status_callback=status_callback,
+                article_length=article_length,
             )
 
             add_activity_log(project_id, "info", "Starting collaborative workflow execution")
@@ -822,6 +901,7 @@ async def run_workflow_background(
                 status_callback=status_callback,
                 category=category,
                 article_length=article_length,
+                audience_level=audience_level,
             )
 
             add_activity_log(project_id, "info", "Starting standard workflow execution")
@@ -835,26 +915,6 @@ async def run_workflow_background(
         cost_info = calculate_cost_estimate(total_input, total_output, experts[0].get("suggested_model", "claude-opus-4.5"))
         workflow_status[project_id]["cost_estimate"] = cost_info
 
-        # Export results to web directory
-        try:
-            add_activity_log(project_id, "info", "Exporting results to web directory")
-            import subprocess
-            result = subprocess.run(
-                ["./venv/bin/python", "export_to_web.py", f"results/{project_id}"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            if result.returncode == 0:
-                print(f"✓ Exported {project_id} to web directory")
-                add_activity_log(project_id, "success", "Results exported successfully")
-            else:
-                print(f"✗ Failed to export {project_id}: {result.stderr}")
-                add_activity_log(project_id, "warning", f"Export failed: {result.stderr[:100]}")
-        except Exception as e:
-            print(f"✗ Error exporting {project_id}: {e}")
-            add_activity_log(project_id, "error", f"Export error: {str(e)}")
-
         # Update status: completed (if not already done by callback)
         if workflow_status[project_id]["status"] != "completed":
             workflow_status[project_id].update({
@@ -864,16 +924,69 @@ async def run_workflow_background(
                 "estimated_time_remaining_seconds": 0
             })
             add_activity_log(project_id, "success", "Workflow completed successfully")
+        _enrich_completed_status(project_id)
 
     except Exception as e:
+        # Check if a checkpoint exists — if so, mark as "interrupted" (resumable)
+        checkpoint_file = Path(f"results/{project_id}/workflow_checkpoint.json")
+        if checkpoint_file.exists():
+            try:
+                with open(checkpoint_file) as f:
+                    cp = json.load(f)
+                cp_round = cp.get("current_round", 0)
+                cp_max = cp.get("max_rounds", 3)
+            except Exception:
+                cp_round, cp_max = 0, 3
+
+            workflow_status[project_id].update({
+                "status": "interrupted",
+                "current_round": cp_round,
+                "total_rounds": cp_max,
+                "progress_percentage": int((cp_round / cp_max) * 100) if cp_max else 0,
+                "message": f"Error at Round {cp_round} — Resume available",
+                "error": str(e),
+                "estimated_time_remaining_seconds": (cp_max - cp_round) * 180,
+                "can_resume": True,
+            })
+            add_activity_log(project_id, "warning", f"Workflow interrupted by error: {str(e)}. Checkpoint saved — resume available.")
+        else:
+            workflow_status[project_id].update({
+                "status": "failed",
+                "progress_percentage": 0,
+                "message": "Workflow failed",
+                "error": str(e),
+                "estimated_time_remaining_seconds": 0,
+            })
+            add_activity_log(project_id, "error", f"Workflow failed: {str(e)}")
+
+
+def _enrich_completed_status(project_id: str):
+    """Read workflow_complete.json and enrich in-memory status with round/score data."""
+    try:
+        complete_file = Path(f"results/{project_id}/workflow_complete.json")
+        if not complete_file.exists():
+            return
+        with open(complete_file) as f:
+            data = json.load(f)
+
+        rounds_summary = []
+        for r in data.get("rounds", []):
+            rounds_summary.append({
+                "round": r.get("round_number", 0),
+                "score": r.get("overall_average", 0),
+                "decision": r.get("final_decision", ""),
+            })
+
         workflow_status[project_id].update({
-            "status": "failed",
-            "progress_percentage": 0,
-            "message": "Workflow failed",
-            "error": str(e),
-            "estimated_time_remaining_seconds": 0
+            "rounds": rounds_summary,
+            "final_score": data.get("final_score"),
+            "final_decision": "ACCEPT" if data.get("passed") else (
+                rounds_summary[-1]["decision"] if rounds_summary else "UNKNOWN"
+            ),
+            "total_rounds": data.get("total_rounds", len(rounds_summary)),
         })
-        add_activity_log(project_id, "error", f"Workflow failed: {str(e)}")
+    except Exception:
+        pass  # Non-critical: don't break workflow on enrichment failure
 
 
 def update_workflow_status(project_id: str, status: str, round_num: int, total_rounds: int, message: str):
@@ -933,6 +1046,258 @@ def update_workflow_status(project_id: str, status: str, round_num: int, total_r
     })
 
 
+# --- Projects API: serve directly from results/ ---
+
+def _extract_title(markdown_text: str) -> Optional[str]:
+    """Extract the first H1 heading as the article title."""
+    for line in markdown_text.split('\n'):
+        match = re.match(r'^#\s+(.+)', line)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _get_latest_manuscript(project_dir: Path) -> tuple[Optional[str], Optional[str]]:
+    """Get the latest manuscript text and its version key from a project dir.
+
+    Returns (manuscript_text, version_key) or (None, None).
+    """
+    manuscripts = {}
+    for f in project_dir.glob("manuscript_*.md"):
+        manuscripts[f.stem] = f.read_text(encoding="utf-8")
+    if not manuscripts:
+        return None, None
+    versioned = [k for k in manuscripts if '_v' in k]
+    if versioned:
+        latest_key = max(versioned, key=lambda x: int(x.split('_v')[1]))
+    else:
+        latest_key = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
+    return manuscripts[latest_key], latest_key
+
+
+def _build_project_summary(project_dir: Path) -> Optional[dict]:
+    """Build a project summary dict from a results/ subdirectory."""
+    workflow_file = project_dir / "workflow_complete.json"
+    if not workflow_file.exists():
+        return None
+
+    try:
+        with open(workflow_file) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+    project_id = project_dir.name
+
+    # Determine status from final round decision
+    rounds = data.get("rounds", [])
+    final_decision = "PENDING"
+    if rounds:
+        final_decision = rounds[-1].get("moderator_decision", {}).get("decision", "PENDING")
+    if final_decision == "ACCEPT":
+        status = "completed"
+    else:
+        # REJECT, MAJOR_REVISION, MINOR_REVISION → all are editorial decisions (not errors)
+        status = "rejected"
+
+    # Round summaries
+    rounds_summary = []
+    for rd in rounds:
+        rounds_summary.append({
+            "round": rd.get("round", 0),
+            "score": rd.get("overall_average", 0),
+            "decision": rd.get("moderator_decision", {}).get("decision", ""),
+            "passed": rd.get("passed", False),
+        })
+
+    # Extract title from latest manuscript
+    manuscript_text, _ = _get_latest_manuscript(project_dir)
+    title = _extract_title(manuscript_text) if manuscript_text else None
+
+    # Word count from last round
+    word_count = rounds[-1].get("word_count", 0) if rounds else 0
+
+    performance = data.get("performance", {})
+    category = data.get("category")
+
+    # Calculate total tokens from all rounds (review + moderator tokens)
+    total_tokens = 0
+    for rd in rounds:
+        total_tokens += sum(rev.get("tokens", 0) for rev in rd.get("reviews", []))
+        total_tokens += rd.get("moderator_decision", {}).get("tokens", 0)
+
+    # Calculate elapsed time from actual processing duration (not wall-clock)
+    # Sum all round durations from performance metrics for accurate total
+    perf_rounds = performance.get("rounds", [])
+    if perf_rounds:
+        elapsed_seconds = int(sum(r.get("review_duration", 0) + (r.get("revision_time", 0) or 0) for r in perf_rounds))
+        # Add initial draft time and team composition time
+        elapsed_seconds += int(performance.get("initial_draft_time", 0))
+        elapsed_seconds += int(performance.get("team_composition_time", 0))
+    else:
+        elapsed_seconds = int(performance.get("total_duration", 0))
+
+    # Use performance total_tokens if available (more comprehensive than round-level sum)
+    perf_tokens = performance.get("total_tokens", 0)
+    if perf_tokens > total_tokens:
+        total_tokens = perf_tokens
+
+    start_time_str = ""
+    ts_match = re.search(r'(\d{8}-\d{6})$', project_id)
+    if ts_match:
+        try:
+            start_dt = datetime.strptime(ts_match.group(1), "%Y%m%d-%H%M%S")
+            start_time_str = start_dt.isoformat()
+        except (ValueError, TypeError):
+            pass
+
+    return {
+        "id": project_id,
+        "title": title,
+        "topic": data.get("topic", project_id.replace("-", " ").title()),
+        "final_score": data.get("final_score", 0),
+        "passed": data.get("passed", False),
+        "status": status,
+        "total_rounds": data.get("total_rounds", 0),
+        "rounds": rounds_summary,
+        "timestamp": data.get("timestamp", ""),
+        "start_time": start_time_str,
+        "elapsed_time_seconds": elapsed_seconds,
+        "final_decision": final_decision,
+        "word_count": word_count,
+        "category": category,
+        "total_tokens": total_tokens,
+        "estimated_cost": round(performance.get("estimated_cost", 0), 4),
+        "expert_team": data.get("expert_team", []),
+        "audience_level": data.get("audience_level", "professional"),
+    }
+
+
+@app.get("/api/projects")
+async def list_projects():
+    """List all completed projects from results/ directory."""
+    results_dir = Path("results")
+    if not results_dir.exists():
+        return {"projects": [], "updated_at": datetime.now().isoformat()}
+
+    projects = []
+    for project_dir in results_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+        summary = _build_project_summary(project_dir)
+        if summary:
+            projects.append(summary)
+
+    # Sort by timestamp (newest first)
+    projects.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+    return {"projects": projects, "updated_at": datetime.now().isoformat()}
+
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    """Get full workflow data for a project."""
+    project_dir = Path("results") / project_id
+    workflow_file = project_dir / "workflow_complete.json"
+
+    if not workflow_file.exists():
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    try:
+        with open(workflow_file) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        raise HTTPException(status_code=500, detail=f"Error reading project data: {e}")
+
+    return data
+
+
+@app.get("/api/projects/{project_id}/manuscripts")
+async def get_project_manuscripts(project_id: str):
+    """Get all manuscript versions for a project, with citation hyperlinks applied."""
+    project_dir = Path("results") / project_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    manuscripts = {}
+    for f in project_dir.glob("manuscript_*.md"):
+        text = f.read_text(encoding="utf-8")
+        # Apply citation hyperlinks
+        text = CitationManager.add_citation_hyperlinks(text)
+        manuscripts[f.stem] = text
+
+    if not manuscripts:
+        raise HTTPException(status_code=404, detail="No manuscripts found")
+
+    return manuscripts
+
+
+# --- Reviewer Enrichment ---
+
+class ProposeReviewersRequest(BaseModel):
+    topic: str
+    major_field: str
+    subfield: str
+
+
+@app.post("/api/propose-reviewers")
+async def propose_reviewers(request: ProposeReviewersRequest):
+    """Generate enriched reviewer descriptions using AI."""
+    pool = get_expert_pool(request.major_field, request.subfield)
+    if not pool:
+        raise HTTPException(status_code=400, detail="No expert pool found for this category")
+
+    # Build prompt for Haiku to enrich reviewer profiles
+    expert_names = [eid.replace("_expert", "").replace("_", " ").title() + " Expert" for eid in pool]
+    prompt = f"""You are an academic research coordinator. Given the research topic and reviewer pool below, generate a brief professional profile for each reviewer that explains their expertise and relevance.
+
+Research Topic: {request.topic}
+Academic Field: {request.major_field} > {request.subfield}
+
+For each reviewer, provide a JSON object with:
+- "expert_id": the original ID
+- "display_name": human-readable name
+- "description": 1-2 sentence description of their expertise (specific to this topic)
+- "focus_areas": array of 3-4 specific focus areas relevant to reviewing this topic
+- "relevance_to_topic": 1 sentence explaining why this reviewer is important for this paper
+
+Reviewers to profile:
+{json.dumps([{"expert_id": eid, "display_name": name} for eid, name in zip(pool, expert_names)], indent=2)}
+
+Return ONLY a JSON array of reviewer objects. No markdown fences, no explanation."""
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic()
+        response = await client.messages.create(
+            model="claude-haiku-4.5",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result_text = response.content[0].text.strip()
+        # Strip markdown fences if present
+        if result_text.startswith("```"):
+            result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+            result_text = re.sub(r'\s*```$', '', result_text)
+        proposed = json.loads(result_text)
+        return {"proposed_reviewers": proposed}
+    except json.JSONDecodeError:
+        # Fallback: return basic profiles without AI enrichment
+        fallback = [
+            {
+                "expert_id": eid,
+                "display_name": name,
+                "description": f"Specializes in {name.replace(' Expert', '').lower()} within {request.subfield}.",
+                "focus_areas": [name.replace(' Expert', '')],
+                "relevance_to_topic": f"Provides domain expertise in {name.replace(' Expert', '').lower()}.",
+            }
+            for eid, name in zip(pool, expert_names)
+        ]
+        return {"proposed_reviewers": fallback}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate reviewer profiles: {str(e)}")
+
+
 @app.get("/api/check-admin")
 async def check_admin(request: Request):
     """Check if the current API key has admin privileges."""
@@ -947,20 +1312,20 @@ async def check_admin(request: Request):
 @app.delete("/api/workflows/{project_id}")
 async def delete_workflow(project_id: str, api_key: str = Depends(verify_admin_key)):
     """Delete a workflow (admin only). Only interrupted/completed/failed workflows can be deleted."""
-    if project_id not in workflow_status:
+    results_path = Path(f"results/{project_id}")
+
+    if project_id in workflow_status:
+        status = workflow_status[project_id]["status"]
+        deletable_statuses = {"interrupted", "completed", "failed", "rejected"}
+        if status not in deletable_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete workflow in '{status}' state. Only {', '.join(sorted(deletable_statuses))} workflows can be deleted."
+            )
+        del workflow_status[project_id]
+        activity_logs.pop(project_id, None)
+    elif not results_path.exists():
         raise HTTPException(status_code=404, detail="Workflow not found")
-
-    status = workflow_status[project_id]["status"]
-    deletable_statuses = {"interrupted", "completed", "failed", "rejected"}
-    if status not in deletable_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot delete workflow in '{status}' state. Only {', '.join(sorted(deletable_statuses))} workflows can be deleted."
-        )
-
-    # Remove from in-memory stores
-    del workflow_status[project_id]
-    activity_logs.pop(project_id, None)
 
     # Remove results directory
     import shutil
@@ -1038,9 +1403,10 @@ async def delete_key(key_prefix: str, api_key: str = Depends(verify_admin_key)):
 async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(verify_api_key)):
     """Direct article submission (no AI workflow). Saves article to web/articles/ and updates index.json."""
     try:
-        # Generate project ID from title
-        project_id = request.title.lower().replace(" ", "-")
-        project_id = f"{project_id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        # Generate project ID from title (sanitize: lowercase, hyphens, strip control chars)
+        project_id = re.sub(r'[^a-z0-9\-]', '-', request.title.lower().replace(" ", "-"))
+        project_id = re.sub(r'-{2,}', '-', project_id).strip('-')
+        project_id = f"{project_id[:80]}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         # Escape markdown for JS embedding
         # Only escape ${ (JS template literal interpolation), not bare $ (needed for KaTeX math)
@@ -1077,6 +1443,7 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="../styles/main.css">
     <link rel="stylesheet" href="../styles/article.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 </head>
 <body>
     <header class="site-header">
@@ -1138,10 +1505,50 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
     <script src="../js/main.js"></script>
     <script>
+        // Protect math blocks from marked processing
         const rawMarkdown = `{escaped_markdown}`;
-        document.getElementById('article-content').innerHTML = marked.parse(rawMarkdown);
+        const mathBlocks = [];
+        let protectedContent = rawMarkdown
+            .replace(/\\$\\$[\\s\\S]+?\\$\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }})
+            .replace(/\\$(?!\\$)([^\\$\\n]+?)\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }});
+
+        // Parse markdown (math is safely extracted)
+        let htmlContent = marked.parse(protectedContent);
+
+        // Restore math blocks
+        mathBlocks.forEach((block, i) => {{
+            htmlContent = htmlContent.replace(`%%MATH_BLOCK_${{i}}%%`, block);
+        }});
+
+        document.getElementById('article-content').innerHTML = htmlContent;
+
+        // Render math with KaTeX
+        function renderMath() {{
+            if (window.renderMathInElement) {{
+                renderMathInElement(document.getElementById('article-content'), {{
+                    delimiters: [
+                        {{left: '$$', right: '$$', display: true}},
+                        {{left: '$', right: '$', display: false}},
+                        {{left: '\\\\(', right: '\\\\)', display: false}},
+                        {{left: '\\\\[', right: '\\\\]', display: true}}
+                    ],
+                    throwOnError: false
+                }});
+            }} else {{
+                setTimeout(renderMath, 100);
+            }}
+        }}
+        renderMath();
     </script>
 </body>
 </html>'''

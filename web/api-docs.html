@@ -352,7 +352,7 @@
                     <tr><td><code>topic</code></td><td>string</td><td>Yes</td><td>Research topic</td></tr>
                     <tr><td><code>experts</code></td><td>array</td><td>Yes</td><td>Expert configs from propose-team response</td></tr>
                     <tr><td><code>max_rounds</code></td><td>integer</td><td>No</td><td>Max review rounds (default: 3)</td></tr>
-                    <tr><td><code>threshold</code></td><td>float</td><td>No</td><td>Quality threshold 0-10 (default: 8.0)</td></tr>
+                    <tr><td><code>threshold</code></td><td>float</td><td>No</td><td>Quality threshold 0-10 (default: 7.5)</td></tr>
                     <tr><td><code>research_cycles</code></td><td>integer</td><td>No</td><td>Research note iterations (default: 1)</td></tr>
                     <tr><td><code>category</code></td><td>object</td><td>No</td><td><code>{"major": "...", "subfield": "..."}</code></td></tr>
                 </table>
@@ -368,7 +368,7 @@
       {"expert_domain": "Security Analyst", "focus_areas": ["fraud proofs", "ZK"], "suggested_model": "claude-sonnet-4"}
     ],
     "max_rounds": 3,
-    "threshold": 8.0,
+    "threshold": 7.5,
     "category": {"major": "computer_science", "subfield": "security"}
   }'</pre>
 
@@ -587,7 +587,7 @@ result = requests.post(f"{API_URL}/api/start-workflow", json={
     "topic": "ZK-Rollup Security Analysis",
     "experts": team["proposed_experts"],
     "max_rounds": 3,
-    "threshold": 8.0
+    "threshold": 7.5
 }, headers=headers).json()
 
 project_id = result["project_id"]

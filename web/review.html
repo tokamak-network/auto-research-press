@@ -540,7 +540,7 @@
             text-align: left;
         }
 
-        .rebuttal-panel {
+        .author-response-panel {
             background: var(--surface);
             border-left: 3px solid #3b82f6;
             padding: 1.25rem;
@@ -571,7 +571,7 @@
             scroll-margin-top: 100px;
         }
 
-        .rebuttal-header {
+        .author-response-header {
             font-weight: 600;
             font-size: 0.875rem;
             color: var(--text-secondary);
@@ -580,36 +580,36 @@
             letter-spacing: 0.05em;
         }
 
-        .rebuttal-content {
+        .author-response-content {
             font-size: 0.9375rem;
             line-height: 1.7;
             color: var(--text);
             text-align: left;
         }
 
-        .rebuttal-content h2 {
+        .author-response-content h2 {
             font-size: 1.125rem;
             font-weight: 600;
             margin: 1.5rem 0 0.75rem 0;
         }
 
-        .rebuttal-content h3 {
+        .author-response-content h3 {
             font-size: 1rem;
             font-weight: 600;
             margin: 1.25rem 0 0.5rem 0;
         }
 
-        .rebuttal-content p {
+        .author-response-content p {
             margin: 0.75rem 0;
         }
 
-        .rebuttal-content ul,
-        .rebuttal-content ol {
+        .author-response-content ul,
+        .author-response-content ol {
             margin: 0.75rem 0;
             padding-left: 1.5rem;
         }
 
-        .rebuttal-content li {
+        .author-response-content li {
             margin: 0.5rem 0;
         }
 
@@ -785,7 +785,7 @@
 
         async function loadProjects() {
             try {
-                const indexRes = await fetch('data/index.json');
+                const indexRes = await fetch('/api/projects');
                 if (!indexRes.ok) throw new Error('No data found');
 
                 const index = await indexRes.json();
@@ -850,10 +850,9 @@
                     console.warn('Project element not found for ID:', projectId);
                 }
 
-                const project = allProjects.find(p => p.id === projectId);
                 const [dataRes, manuscriptsRes] = await Promise.all([
-                    fetch(project.data_file),
-                    fetch(`data/${projectId}_manuscripts.json`)
+                    fetch(`/api/projects/${projectId}`),
+                    fetch(`/api/projects/${projectId}/manuscripts`)
                 ]);
 
                 currentData = await dataRes.json();
@@ -889,7 +888,7 @@
             });
 
             if (projectId) {
-                const url = `articles/${projectId}.html`;
+                const url = `article.html?id=${projectId}`;
                 console.log('Generated article URL:', url);
                 return url;
             }
@@ -1104,9 +1103,9 @@
 
         function renderRound(round, idx, allRounds) {
             const moderator = round.moderator_decision;
-            // Get rebuttal from previous round (if this is not the first round)
+            // Get author response from previous round (if this is not the first round)
             const previousRound = idx > 0 ? allRounds[idx - 1] : null;
-            const previousRebuttal = previousRound?.author_rebuttal;
+            const previousResponse = previousRound?.author_response || previousRound?.author_rebuttal;
             const isLastRound = idx === allRounds.length - 1;
 
             return `
@@ -1146,13 +1145,13 @@
                             ${round.reviews.map(r => renderReview(r)).join('')}
                         </div>
 
-                        ${previousRebuttal && !isLastRound ? `
-                            <div class="rebuttal-panel">
-                                <div class="rebuttal-header">
-                                    Author Rebuttal — Response to Round ${round.round - 1}
+                        ${previousResponse && !isLastRound ? `
+                            <div class="author-response-panel">
+                                <div class="author-response-header">
+                                    Author Response — Response to Round ${round.round - 1}
                                 </div>
-                                <div class="rebuttal-content">
-                                    ${renderMarkdown(previousRebuttal)}
+                                <div class="author-response-content">
+                                    ${renderMarkdown(previousResponse)}
                                 </div>
                             </div>
                         ` : ''}

@@ -504,6 +504,43 @@
             color: var(--text-secondary);
         }
 
+        /* Audience Level Selector */
+        .audience-level-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .audience-option {
+            border: 2px solid var(--border);
+            border-radius: 0;
+            padding: 1rem;
+            cursor: pointer;
+            transition: border-color 70ms cubic-bezier(0.2, 0, 0.38, 0.9),
+                        background 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+            text-align: center;
+        }
+
+        .audience-option:hover {
+            border-color: var(--primary-600);
+        }
+
+        .audience-option.selected {
+            border-color: var(--primary-600);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .audience-option .type-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .audience-option .type-description {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
         @media (max-width: 768px) {
             .category-grid,
             .settings-grid,
@@ -512,6 +549,10 @@
             }
 
             .research-type-selector {
+                grid-template-columns: 1fr;
+            }
+
+            .audience-level-selector {
                 grid-template-columns: 1fr;
             }
         }
@@ -615,6 +656,25 @@
                 </div>
             </div>
 
+            <!-- Audience Level -->
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label>Target Audience</label>
+                <div class="audience-level-selector">
+                    <div class="audience-option" data-level="beginner" onclick="selectAudienceLevel('beginner')">
+                        <div class="type-title">Beginner</div>
+                        <div class="type-description">Non-specialist readers</div>
+                    </div>
+                    <div class="audience-option" data-level="intermediate" onclick="selectAudienceLevel('intermediate')">
+                        <div class="type-title">Intermediate</div>
+                        <div class="type-description">Basic domain knowledge</div>
+                    </div>
+                    <div class="audience-option selected" data-level="professional" onclick="selectAudienceLevel('professional')">
+                        <div class="type-title">Professional</div>
+                        <div class="type-description">Domain experts</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="button-group">
                 <button id="analyze-btn" class="btn btn-primary" onclick="analyzeTopicAndProposeTeam()">
                     Analyze Topic & Propose Team
@@ -713,7 +773,7 @@
                 </div>
                 <div class="setting-item">
                     <label for="threshold">Quality Threshold</label>
-                    <input type="number" id="threshold" value="8.0" min="5.0" max="10.0" step="0.1">
+                    <input type="number" id="threshold" value="7.5" min="5.0" max="10.0" step="0.1">
                     <p class="help-text">Score to pass peer review</p>
                 </div>
             </div>
@@ -946,6 +1006,7 @@
             const pool = ACADEMIC_CATEGORIES[selectedCategory.major].subfields[selectedCategory.subfield].expert_pool;
             const container = document.getElementById('reviewers-container');
 
+            // Show static fallback immediately
             container.innerHTML = pool.map((expert, idx) => `
                 <div class="author-card reviewer">
                     <div class="author-header">
@@ -955,6 +1016,62 @@
                     <div class="author-rationale">From category expert pool: ${selectedCategory.subfield}</div>
                 </div>
             `).join('');
+
+            // If topic is available, enrich with AI
+            const topic = document.getElementById('topic').value.trim();
+            if (topic) {
+                enrichReviewerPool(topic);
+            }
+        }
+
+        async function enrichReviewerPool(topic) {
+            if (!selectedCategory.major || !selectedCategory.subfield) return;
+
+            const container = document.getElementById('reviewers-container');
+
+            // Show loading indicator on each card
+            container.querySelectorAll('.author-card.reviewer .author-rationale').forEach(el => {
+                el.innerHTML = '<span style="color: var(--text-secondary); font-style: italic;">Generating reviewer profile...</span>';
+            });
+
+            try {
+                const response = await fetch('/api/propose-reviewers', {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({
+                        topic: topic,
+                        major_field: selectedCategory.major,
+                        subfield: selectedCategory.subfield
+                    })
+                });
+
+                if (!response.ok) {
+                    console.warn('Reviewer enrichment failed, keeping static display');
+                    return;
+                }
+
+                const data = await response.json();
+                const reviewers = data.proposed_reviewers || [];
+
+                if (reviewers.length === 0) return;
+
+                container.innerHTML = reviewers.map((reviewer, idx) => `
+                    <div class="author-card reviewer">
+                        <div class="author-header">
+                            <h4 class="author-name">${reviewer.display_name}</h4>
+                            <span class="author-model">Reviewer ${idx + 1}</span>
+                        </div>
+                        <div class="author-rationale">${reviewer.description || ''}</div>
+                        ${reviewer.relevance_to_topic ? `<div class="author-rationale" style="margin-top: 0.25rem; font-style: italic; color: var(--primary-600);">${reviewer.relevance_to_topic}</div>` : ''}
+                        <div class="author-focus-areas">
+                            ${(reviewer.focus_areas || []).map(area => `<span class="focus-tag">${area}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.warn('Reviewer enrichment error:', error);
+                // Keep static display on error
+            }
         }
 
         function formatExpertName(expertKey) {
@@ -1003,6 +1120,14 @@
                 opt.classList.remove('selected');
             });
             document.querySelector(`#article-length-selector .research-type-option[data-length="${length}"]`).classList.add('selected');
+        }
+
+        // Audience level selection
+        function selectAudienceLevel(level) {
+            document.querySelectorAll('.audience-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`.audience-option[data-level="${level}"]`).classList.add('selected');
         }
 
         // Research type selection
@@ -1072,6 +1197,11 @@
 
                 // Display team
                 displayTeam(proposal);
+
+                // Enrich reviewer profiles with AI if category is set
+                if (selectedCategory.major && selectedCategory.subfield) {
+                    enrichReviewerPool(topic);
+                }
 
                 // Show team section
                 document.getElementById('step-team').classList.add('active');
@@ -1271,6 +1401,7 @@
             try {
                 const articleLength = document.querySelector('#article-length-selector .research-type-option.selected')?.dataset.length || 'full';
                 const workflowMode = document.querySelector('#workflow-mode-selector .research-type-option.selected')?.dataset.mode || 'standard';
+                const audienceLevel = document.querySelector('.audience-option.selected')?.dataset.level || 'professional';
 
                 const response = await fetch(`${API_BASE}/api/start-workflow`, {
                     method: 'POST',
@@ -1283,7 +1414,8 @@
                         research_cycles: researchCycles,
                         category: selectedCategory,
                         article_length: articleLength,
-                        workflow_mode: workflowMode
+                        workflow_mode: workflowMode,
+                        audience_level: audienceLevel
                     })
                 });
 

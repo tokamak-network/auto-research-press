@@ -342,7 +342,7 @@ class SourceRetriever:
     async def search_all(
         self,
         topic: str,
-        max_academic: int = 8,
+        max_academic: int = 15,
         max_web: int = 4,
     ) -> List[Reference]:
         """Search all available sources, deduplicate, and assign IDs.
