@@ -213,15 +213,19 @@ Be honest and constructive. Focus on your domain of expertise.
         content = content[:-3]
     content = content.strip()
 
+    def _parse_json_lenient(text: str):
+        """Parse JSON leniently: allow control chars in strings (strict=False)."""
+        return json.loads(text, strict=False)
+
     try:
-        review_data = json.loads(content)
+        review_data = _parse_json_lenient(content)
     except json.JSONDecodeError:
         # Try extracting JSON block from within the text
         import re
         json_match = re.search(r'```json\s*\n(.*?)\n```', response.content, re.DOTALL)
         if json_match:
             try:
-                review_data = json.loads(json_match.group(1).strip())
+                review_data = _parse_json_lenient(json_match.group(1).strip())
             except json.JSONDecodeError as e2:
                 raise ValueError(
                     f"Failed to parse review from {specialist_id} as JSON: {e2}\n"
@@ -233,7 +237,7 @@ Be honest and constructive. Focus on your domain of expertise.
             brace_match = re.search(r'\{.*\}', response.content, re.DOTALL)
             if brace_match:
                 try:
-                    review_data = json.loads(brace_match.group(0))
+                    review_data = _parse_json_lenient(brace_match.group(0))
                 except json.JSONDecodeError as e3:
                     raise ValueError(
                         f"Failed to parse review from {specialist_id} as JSON: {e3}\n"
@@ -677,7 +681,7 @@ class WorkflowOrchestrator:
                 "author_response": author_response,
                 "manuscript_diff": manuscript_diff,
                 "threshold": self.threshold,
-                "passed": moderator_decision["decision"] == "ACCEPT",
+                "passed": moderator_decision["decision"] in ("ACCEPT", "MINOR_REVISION"),
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -1211,7 +1215,7 @@ class WorkflowOrchestrator:
                 "author_response": author_response,
                 "manuscript_diff": manuscript_diff,
                 "threshold": self.threshold,
-                "passed": moderator_decision["decision"] == "ACCEPT",
+                "passed": moderator_decision["decision"] in ("ACCEPT", "MINOR_REVISION"),
                 "timestamp": datetime.now().isoformat()
             }
 

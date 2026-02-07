@@ -131,7 +131,7 @@ async def verify_admin_key(request: Request) -> str:
 
 
 # --- Rate Limit (per API key, 60s cooldown for parallel submission) ---
-RATE_LIMIT_SECONDS = 60
+RATE_LIMIT_SECONDS = 5
 rate_limit_store: Dict[str, float] = {}  # api_key → last_request_timestamp
 
 
@@ -1101,10 +1101,10 @@ def _build_project_summary(project_dir: Path) -> Optional[dict]:
     final_decision = "PENDING"
     if rounds:
         final_decision = rounds[-1].get("moderator_decision", {}).get("decision", "PENDING")
-    if final_decision == "ACCEPT":
+    if final_decision in ("ACCEPT", "MINOR_REVISION"):
         status = "completed"
     else:
-        # REJECT, MAJOR_REVISION, MINOR_REVISION → all are editorial decisions (not errors)
+        # REJECT, MAJOR_REVISION → editorial rejection
         status = "rejected"
 
     # Round summaries

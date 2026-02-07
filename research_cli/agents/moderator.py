@@ -101,7 +101,7 @@ Think like a real editor who cares about publishing valuable work, not a score c
 SUBMISSION STATUS:
 - Round: {round_number} of {max_rounds}
 - Average reviewer score: {overall_avg:.1f}/10
-{"- FINAL ROUND: Consider accepting if substantial improvement shown and major issues resolved" if round_number >= max_rounds else ""}
+{"- **FINAL ROUND**: You MUST make a binary decision: ACCEPT or REJECT. No further revisions are possible. Consider the full trajectory, improvement shown, and whether remaining issues are minor enough to overlook." if round_number >= max_rounds else ""}
 {trajectory_summary}
 
 PEER REVIEWS:
@@ -142,7 +142,7 @@ Before making your decision, evaluate:
 Make your decision in JSON format:
 
 {{
-  "decision": "ACCEPT|MINOR_REVISION|MAJOR_REVISION|REJECT",
+  "decision": "{f"ACCEPT|REJECT" if round_number >= max_rounds else "ACCEPT|MINOR_REVISION|MAJOR_REVISION|REJECT"}",
   "confidence": <1-5>,
   "meta_review": "<2-3 paragraphs: synthesize reviews, assess validity of concerns, explain your editorial judgment>",
   "key_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
@@ -151,11 +151,11 @@ Make your decision in JSON format:
   "recommendation": "<clear guidance: accept rationale or what's needed for acceptance>"
 }}
 
-DECISION GUIDANCE (not strict rules):
-- ACCEPT: Contribution is valuable, major issues resolved (often 7.5+, but use judgment)
-- MINOR_REVISION: Specific small fixes needed
-- MAJOR_REVISION: Substantial problems remain
-- REJECT: Fundamental flaws or insufficient contribution
+{f"FINAL ROUND — Binary decision only: ACCEPT or REJECT. No more revisions possible. If the paper has shown improvement and remaining issues are minor, ACCEPT. If fundamental problems persist, REJECT." if round_number >= max_rounds else "DECISION GUIDANCE (not strict rules):"}
+{f"" if round_number >= max_rounds else "- ACCEPT: Contribution is valuable, major issues resolved (often 7.5+, but use judgment)"}
+{f"" if round_number >= max_rounds else "- MINOR_REVISION: Specific small fixes needed"}
+{f"" if round_number >= max_rounds else "- MAJOR_REVISION: Substantial problems remain"}
+{f"" if round_number >= max_rounds else "- REJECT: Fundamental flaws or insufficient contribution"}
 
 Remember: You are an EDITOR, not a score calculator. The average score is advisory, not binding.
 A paper at 7.5 with strong improvement trajectory and substantive contribution may merit acceptance.
