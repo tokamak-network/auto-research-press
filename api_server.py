@@ -4,6 +4,7 @@
 import asyncio
 import json
 import os
+import secrets
 import time
 import uuid
 from datetime import datetime
@@ -13,6 +14,7 @@ from typing import Dict, List, Optional, Callable
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from research_cli.agents.team_composer import TeamComposerAgent
@@ -57,6 +59,37 @@ if _raw_keys:
     ALLOWED_API_KEYS = {k.strip() for k in _raw_keys.split(",") if k.strip()}
 
 ADMIN_API_KEY = os.environ.get("RESEARCH_ADMIN_KEY", "")
+
+# --- Dynamic key file management ---
+KEYS_FILE = Path("keys.json")
+
+
+def load_keys_from_file() -> list:
+    """Load dynamic keys from keys.json."""
+    if not KEYS_FILE.exists():
+        return []
+    try:
+        with open(KEYS_FILE) as f:
+            data = json.load(f)
+        return data.get("keys", [])
+    except (json.JSONDecodeError, IOError):
+        return []
+
+
+def save_keys_to_file(keys: list):
+    """Save dynamic keys to keys.json."""
+    with open(KEYS_FILE, "w") as f:
+        json.dump({"keys": keys}, f, indent=2)
+
+
+def sync_keys_from_file():
+    """Sync keys.json entries into ALLOWED_API_KEYS set."""
+    for entry in load_keys_from_file():
+        ALLOWED_API_KEYS.add(entry["key"])
+
+
+# Load dynamic keys on module init
+sync_keys_from_file()
 
 
 async def verify_api_key(request: Request) -> str:
@@ -266,8 +299,8 @@ workflow_status: Dict[str, dict] = {}
 activity_logs: Dict[str, List[dict]] = {}
 
 
-@app.get("/")
-async def root():
+@app.get("/api/health")
+async def health():
     """Health check endpoint."""
     return {"status": "ok", "service": "AI-Backed Research API"}
 
@@ -951,6 +984,48 @@ async def delete_workflow(project_id: str, api_key: str = Depends(verify_admin_k
     return {"message": f"Workflow '{project_id}' deleted", "project_id": project_id}
 
 
+# --- Admin: Dynamic API Key Management ---
+
+@app.get("/api/admin/keys")
+async def list_keys(api_key: str = Depends(verify_admin_key)):
+    """List all dynamic API keys (admin only)."""
+    keys = load_keys_from_file()
+    # Mask keys: show first 8 chars only
+    return {"keys": [
+        {"key_prefix": entry["key"][:8] + "...", "label": entry.get("label", ""), "created": entry.get("created", "")}
+        for entry in keys
+    ]}
+
+
+class CreateKeyRequest(BaseModel):
+    label: str = ""
+
+
+@app.post("/api/admin/keys")
+async def create_key(request: CreateKeyRequest, api_key: str = Depends(verify_admin_key)):
+    """Generate a new API key (admin only)."""
+    new_key = secrets.token_urlsafe(24)
+    keys = load_keys_from_file()
+    keys.append({"key": new_key, "label": request.label, "created": datetime.now().isoformat()})
+    save_keys_to_file(keys)
+    ALLOWED_API_KEYS.add(new_key)
+    return {"key": new_key, "label": request.label, "message": "Key created. Copy it now — it will not be shown again."}
+
+
+@app.delete("/api/admin/keys/{key_prefix}")
+async def delete_key(key_prefix: str, api_key: str = Depends(verify_admin_key)):
+    """Delete an API key by its prefix (admin only)."""
+    keys = load_keys_from_file()
+    to_remove = [entry for entry in keys if entry["key"].startswith(key_prefix)]
+    if not to_remove:
+        raise HTTPException(status_code=404, detail="Key not found")
+    for entry in to_remove:
+        ALLOWED_API_KEYS.discard(entry["key"])
+    keys = [entry for entry in keys if not entry["key"].startswith(key_prefix)]
+    save_keys_to_file(keys)
+    return {"message": "Key deleted", "deleted": len(to_remove)}
+
+
 @app.post("/api/submit-article")
 async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(verify_api_key)):
     """Direct article submission (no AI workflow). Saves article to web/articles/ and updates index.json."""
@@ -1108,6 +1183,9 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit article: {str(e)}")
 
+
+# Serve web/ directory as static files (must be last — catches all unmatched routes)
+app.mount("/", StaticFiles(directory="web", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

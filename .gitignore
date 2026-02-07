@@ -40,3 +40,6 @@ results/*/
 
 # Logs
 *.log
+
+# Dynamic API keys
+keys.json
