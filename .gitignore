@@ -50,3 +50,6 @@ keys.json
 # Generated reports (each server maintains its own)
 web/articles/
 web/data/
+
+# Demo reports
+reports/

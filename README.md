@@ -1,126 +1,122 @@
-# AI-Backed Research
+# Autonomous Research Press
 
-Research reports powered by AI for Tokamak Network Research Lab.
+AI-powered autonomous research paper generation and peer review platform. Submit a topic, and the system composes an expert review team, writes a manuscript, conducts multi-round peer review, and publishes the result.
 
-## Overview
-
-This repository contains comprehensive research reports on blockchain technology, Layer 2 scaling solutions, and related topics. All research is conducted with AI assistance to provide data-driven, quantitative analysis.
-
-## Current Reports
-
-### Layer 2 Fee Structures: A Comparative Analysis (February 2026)
-
-**Focus:** Understanding fee structures across different rollup types (Optimistic vs ZK Rollups)
-
-**Key Findings:**
-- L2s provide **10×-100× cost reduction** compared to Ethereum mainnet
-- EIP-4844 reduced data availability costs by **90-99%**
-- **Base, Arbitrum, and Optimism** process ~90% of all L2 transactions
-- Market consolidation forcing differentiation among L2 projects
-
-**Report Files:**
-- 📄 [Markdown Report](./reports/research-report.md) - Full technical report
-- 🌐 [Web Version](./web/index.html) - Blog-style web presentation
-- 📋 [Task Documentation](./docs/tasks/) - Research process and lessons learned
-
-## Repository Structure
+## How It Works
 
 ```
-ai-backed-research/
-├── reports/          # Research reports in Markdown format
-├── web/              # Web presentation (blog format)
-│   ├── index.html    # Main blog page
-│   ├── styles.css    # Styling
-│   └── script.js     # Interactive features
-├── docs/             # Documentation and task tracking
-│   └── tasks/        # Task lists and lessons learned
-└── README.md         # This file
+Topic Submission -> Team Composition -> Draft Writing -> Desk Edit
+                                                            |
+Publication <-- Moderator Decision <-- Peer Review <--------+
+                     |                      |
+                     +--- Revision Loop ----+
 ```
 
-## Research Topics
+1. **Topic Submission** - User provides a research topic and field
+2. **Team Composition** - AI proposes domain-expert reviewers
+3. **Multi-Stage Writing** - Draft composed with research notes and structured sections
+4. **Desk Edit** - Initial quality gate before peer review
+5. **Peer Review** - Multiple AI reviewers provide scored feedback
+6. **Revision Loop** - Author revises based on feedback until quality threshold is met
+7. **Moderator Decision** - Final accept/reject judgment
+8. **Publication** - Accepted papers published to the web interface
 
-### Completed
-- ✅ **Layer 2 Fee Structures** (February 2026)
-  - Optimistic Rollups vs ZK Rollups comparison
-  - EIP-4844 impact analysis
-  - Real-world cost case studies
-  - Tokamak Network positioning recommendations
+## Features
 
-### Planned
-- 🔜 On-chain distributed randomness mechanisms
-- 🔜 Validator monitoring in Optimistic Rollups (RAT protocol)
-- 🔜 Challenge-based protocol incentive design
+- **9 Academic Categories** - Computer Science, Engineering, Natural Sciences, Social Sciences, Humanities, Business & Economics, Medicine & Health, Law & Public Policy
+- **Multi-Round Peer Review** - Iterative writing/review/revision cycles with configurable thresholds
+- **External Submissions** - Submit your own manuscripts for AI peer review
+- **Role-Based Model Config** - Different AI models for writer, reviewer, moderator, desk editor
+- **Researcher Applications** - Application and approval system for API key access
+- **Job Queue** - Concurrent workflow processing with status tracking
+- **Cost Estimation** - Token-based pricing estimates per workflow
 
-## Viewing the Research
+## Tech Stack
 
-### Option 1: Read Markdown (GitHub)
-Navigate to [reports/research-report.md](./reports/research-report.md)
+| Component | Technology |
+|-----------|------------|
+| Backend | FastAPI + Uvicorn + Gunicorn |
+| AI/LLM | Anthropic Claude, OpenAI GPT |
+| Database | SQLite |
+| Frontend | Static HTML/CSS/JS (IBM Carbon Design) |
+| Deploy | Docker, Railway |
 
-### Option 2: View as Blog (Local)
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/tokamak-network/ai-backed-research.git
-   cd ai-backed-research
-   ```
+## Environment Variables
 
-2. Open the web version:
-   ```bash
-   # Using Python
-   cd web
-   python3 -m http.server 8000
-   # Then open http://localhost:8000
+### Required
 
-   # Or simply open the HTML file
-   open web/index.html  # macOS
-   xdg-open web/index.html  # Linux
-   ```
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `RESEARCH_API_KEYS` | Comma-separated allowed API keys for users |
+| `RESEARCH_ADMIN_KEY` | Admin API key for privileged operations |
 
-### Option 3: Live Website (Vercel)
-The blog is hosted at: `https://research.tokamak.network` (or Vercel auto-generated URL)
+### Optional
 
-**Deploy your own:**
-1. Fork this repository
-2. Import to Vercel: https://vercel.com/new
-3. Connect your GitHub repo
-4. Deploy automatically!
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key (for GPT models) | - |
+| `DEFAULT_WRITER_MODEL` | Writer model override | `claude-sonnet-4-20250514` |
+| `DEFAULT_REVIEWER_MODEL` | Reviewer model override | `claude-sonnet-4-20250514` |
+| `MAX_REVIEW_ROUNDS` | Max review iterations | `3` |
+| `SCORE_THRESHOLD` | Quality score threshold | `8.0` |
+| `PORT` | Server port (Railway sets automatically) | `8000` |
 
-## Research Methodology
+## Local Development
 
-All research reports in this repository follow a structured approach:
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-1. **Subject Profile Analysis** - Understanding the researcher's interests and focus areas
-2. **Topic Selection** - Choosing timely, relevant, and actionable topics
-3. **Data Collection** - Gathering quantitative data from primary sources
-4. **Analysis** - Deep-dive technical and economic analysis
-5. **Practical Recommendations** - Actionable insights for protocols and developers
-6. **Quality Assurance** - Cross-referencing sources and verifying data currency
+# Set environment variables
+export ANTHROPIC_API_KEY=your-key
+export RESEARCH_API_KEYS=your-api-key
+export RESEARCH_ADMIN_KEY=your-admin-key
 
-## Citation
-
-If you use insights from these reports, please cite:
-
-```
-AI-Backed Research - Tokamak Network (2026)
-Layer 2 Fee Structures: A Comparative Analysis
-Available at: https://github.com/tokamak-network/ai-backed-research
+# Run the server
+python -m uvicorn api_server:app --reload --port 8000
 ```
 
-## Contributing
+## Docker
 
-This repository is maintained by the Tokamak Network Research Lab. For questions, suggestions, or collaboration inquiries:
+```bash
+docker build -t auto-research-press .
+docker run -p 8000:8000 \
+  -e ANTHROPIC_API_KEY=your-key \
+  -e RESEARCH_API_KEYS=your-api-key \
+  -e RESEARCH_ADMIN_KEY=your-admin-key \
+  auto-research-press
+```
 
-- **Issues:** Open a GitHub issue
-- **Contact:** suhyeon@tokamak.network
-- **Website:** https://tokamak.network
+## Railway Deployment
+
+1. Deploy from GitHub repo in Railway dashboard
+2. Add a Volume mounted at `/app/persistent` (for SQLite DB and generated articles)
+3. Set required environment variables
+4. Railway auto-detects the Dockerfile and healthcheck at `/api/health`
+
+## Project Structure
+
+```
+auto-research-press/
+├── api_server.py          # FastAPI application
+├── research_cli/          # Core research workflow engine
+│   ├── workflow.py        # WorkflowOrchestrator
+│   ├── agents/            # Writer, Reviewer, Moderator agents
+│   ├── categories.py      # Academic field definitions
+│   └── llm_client.py      # LLM API client
+├── config/                # Model configuration
+├── web/                   # Static frontend
+│   ├── index.html         # Homepage
+│   ├── ask-topic.html     # Start new research
+│   ├── research-queue.html# Monitor workflows
+│   ├── submit.html        # External submission
+│   └── admin.html         # Admin dashboard
+├── Dockerfile
+├── railway.toml
+└── entrypoint.sh          # Volume symlink setup
+```
 
 ## License
 
-© 2026 Tokamak Network. All rights reserved.
-
-Research reports are provided for educational and informational purposes. Data accuracy is maintained to the best of our ability, but cryptocurrency markets and technologies evolve rapidly.
-
----
-
-**Prepared by:** Tokamak Network Research Lab
-**AI Assistant:** Claude (Anthropic)
-**Last Updated:** February 2, 2026
+MIT
