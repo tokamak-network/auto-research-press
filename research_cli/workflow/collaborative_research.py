@@ -58,7 +58,6 @@ class CollaborativeResearchPhase:
         self.lead_agent = LeadAuthorAgent(
             expertise=lead.expertise,
             focus_areas=lead.focus_areas,
-            model=lead.model
         )
 
         self.coauthor_agents = []
@@ -68,7 +67,6 @@ class CollaborativeResearchPhase:
                 name=coauthor.name,
                 expertise=coauthor.expertise,
                 focus_areas=coauthor.focus_areas,
-                model=coauthor.model
             )
             self.coauthor_agents.append(agent)
 
