@@ -115,9 +115,21 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_api_keys_researcher ON api_keys(researcher_id);
         CREATE INDEX IF NOT EXISTS idx_key_usage_key_ts ON key_usage(api_key, timestamp);
         CREATE INDEX IF NOT EXISTS idx_workflow_ownership_researcher ON workflow_ownership(researcher_id);
+        CREATE TABLE IF NOT EXISTS job_queue (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            job_type TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            status TEXT DEFAULT 'queued',
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT
+        );
+
         CREATE INDEX IF NOT EXISTS idx_submissions_api_key ON submissions(api_key);
         CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
         CREATE INDEX IF NOT EXISTS idx_submission_rounds_sub ON submission_rounds(submission_id);
+        CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
     """)
     conn.commit()
 
@@ -499,7 +511,7 @@ def create_submission(
     title: str,
     category_major: str,
     category_subfield: str,
-    deadline_hours: int = 72,
+    deadline_hours: int = 24,
 ) -> dict:
     """Create a new manuscript submission."""
     conn = get_connection()
@@ -654,6 +666,49 @@ def expire_overdue_submissions() -> int:
     )
     conn.commit()
     return cursor.rowcount
+
+
+# --- Job Queue ---
+
+def enqueue_job(job_id: str, project_id: str, job_type: str, payload: dict):
+    """Persist a job to the DB queue."""
+    conn = get_connection()
+    now = _now()
+    conn.execute(
+        """INSERT INTO job_queue (id, project_id, job_type, payload_json, status, created_at)
+           VALUES (?, ?, ?, ?, 'queued', ?)""",
+        (job_id, project_id, job_type, json.dumps(payload), now),
+    )
+    conn.commit()
+
+
+def mark_job_running(job_id: str):
+    """Mark a queued job as running."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE job_queue SET status = 'running', started_at = ? WHERE id = ?",
+        (_now(), job_id),
+    )
+    conn.commit()
+
+
+def complete_job(job_id: str, status: str = "completed"):
+    """Mark a job as completed or failed."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE job_queue SET status = ?, completed_at = ? WHERE id = ?",
+        (status, _now(), job_id),
+    )
+    conn.commit()
+
+
+def get_pending_jobs() -> list:
+    """Get all queued or running jobs (for startup recovery)."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM job_queue WHERE status IN ('queued', 'running') ORDER BY created_at ASC"
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
 
 
 # --- Helpers ---

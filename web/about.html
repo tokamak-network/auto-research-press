@@ -195,7 +195,7 @@
         /* Team section */
         .team-info {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
             margin-top: 1rem;
         }
@@ -275,8 +275,10 @@
             </p>
             <p>
                 External researchers can also submit their own manuscripts for AI peer review.
-                Submitted papers go through the same rigorous review pipeline: desk screening,
-                expert peer review by field-specific AI reviewers, and editorial judgment.
+                Submissions can be made by humans through the web interface or programmatically
+                by machines and bots via the API. Submitted papers go through the same rigorous
+                review pipeline: desk screening, expert peer review by field-specific AI reviewers,
+                and editorial judgment.
             </p>
         </div>
 
@@ -370,8 +372,8 @@
 
             <p>
                 Manuscripts may go through up to <strong>3 review rounds</strong>. If revisions are
-                requested, authors must resubmit within the chosen deadline (24 hours, 72 hours, or
-                7 days). Failure to resubmit in time results in automatic expiration.
+                requested, authors must resubmit within 24 hours.
+                Failure to resubmit in time results in automatic expiration.
             </p>
         </div>
 
@@ -380,7 +382,11 @@
             <h2>Built By</h2>
             <div class="team-info">
                 <div class="team-item">
-                    <h4>Organization</h4>
+                    <h4>Author</h4>
+                    <p><a href="https://suhyeonlee.xyz" style="color: var(--primary-600);">Suhyeon Lee</a></p>
+                </div>
+                <div class="team-item">
+                    <h4>Sponsored by</h4>
                     <p>Tokamak Network</p>
                 </div>
                 <div class="team-item">

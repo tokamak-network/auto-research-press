@@ -54,12 +54,28 @@ async def job_worker(worker_id: int):
         job = await job_queue.get()
         _active_worker_count += 1
         pid = job.get("project_id", "?")
+        db_job_id = job.pop("_db_job_id", None)
         print(f"  Worker {worker_id} picked up job: {pid[:50]}")
+        if db_job_id:
+            try:
+                appdb.mark_job_running(db_job_id)
+            except Exception:
+                pass
         try:
             job_fn = job.pop("_fn")
             await job_fn(**job)
+            if db_job_id:
+                try:
+                    appdb.complete_job(db_job_id, "completed")
+                except Exception:
+                    pass
         except Exception as e:
             print(f"  Worker {worker_id} error: {e}")
+            if db_job_id:
+                try:
+                    appdb.complete_job(db_job_id, "failed")
+                except Exception:
+                    pass
         finally:
             _active_worker_count -= 1
             job_queue.task_done()
@@ -125,11 +141,59 @@ async def check_rate_limit(api_key: str):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize DB, scan for interrupted workflows, start job workers."""
+    """Initialize DB, scan for interrupted workflows, recover pending jobs, start workers."""
     appdb.init_db()
     await scan_interrupted_workflows()
+    await recover_pending_jobs()
     for i in range(MAX_CONCURRENT_WORKERS):
         asyncio.create_task(job_worker(i))
+
+
+async def recover_pending_jobs():
+    """Re-enqueue jobs that were queued or running when the server last stopped."""
+    try:
+        pending_jobs = appdb.get_pending_jobs()
+    except Exception:
+        return
+
+    if not pending_jobs:
+        return
+
+    print(f"  Recovering {len(pending_jobs)} pending job(s) from DB...")
+    for job_row in pending_jobs:
+        job_id = job_row["id"]
+        job_type = job_row["job_type"]
+        try:
+            payload = json.loads(job_row["payload_json"]) if isinstance(job_row["payload_json"], str) else job_row["payload_json"]
+        except (json.JSONDecodeError, TypeError):
+            appdb.complete_job(job_id, "failed")
+            continue
+
+        if job_type == "workflow":
+            await job_queue.put({
+                "_fn": run_workflow_background,
+                "_db_job_id": job_id,
+                **payload,
+            })
+        elif job_type == "submission_review":
+            await job_queue.put({
+                "_fn": run_submission_review_background,
+                "_db_job_id": job_id,
+                **payload,
+            })
+        elif job_type == "resume":
+            # Convert project_dir back to Path
+            payload["project_dir"] = Path(payload["project_dir"])
+            await job_queue.put({
+                "_fn": resume_workflow_background,
+                "_db_job_id": job_id,
+                **payload,
+            })
+        else:
+            appdb.complete_job(job_id, "failed")
+            continue
+
+        print(f"    Recovered job {job_id[:8]}... ({job_type}, project: {payload.get('project_id', '?')[:40]})")
 
 
 async def scan_interrupted_workflows():
@@ -453,9 +517,9 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
         activity_logs[project_id] = []
         add_activity_log(project_id, "info", f"Workflow created for topic: {request.topic[:50]}...")
 
-        # Enqueue job (worker will execute it)
-        await job_queue.put({
-            "_fn": run_workflow_background,
+        # Persist job to DB and enqueue
+        db_job_id = str(uuid.uuid4())
+        job_payload = {
             "project_id": project_id,
             "topic": request.topic,
             "experts": request.experts,
@@ -466,6 +530,15 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
             "article_length": request.article_length or "full",
             "workflow_mode": request.workflow_mode or "standard",
             "audience_level": request.audience_level or "professional",
+        }
+        try:
+            appdb.enqueue_job(db_job_id, project_id, "workflow", job_payload)
+        except Exception:
+            pass
+        await job_queue.put({
+            "_fn": run_workflow_background,
+            "_db_job_id": db_job_id,
+            **job_payload,
         })
 
         return {
@@ -595,9 +668,19 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             workflow_status[project_id]["message"] = queue_msg
             add_activity_log(project_id, "warning", f"Another workflow is running ({active_workflows[0][:40]}...). This resume is queued.")
 
-        # Enqueue resume job
+        # Persist job to DB and enqueue
+        db_job_id = str(uuid.uuid4())
+        job_payload_for_db = {
+            "project_id": project_id,
+            "project_dir": str(project_dir),
+        }
+        try:
+            appdb.enqueue_job(db_job_id, project_id, "resume", job_payload_for_db)
+        except Exception:
+            pass
         await job_queue.put({
             "_fn": resume_workflow_background,
+            "_db_job_id": db_job_id,
             "project_id": project_id,
             "project_dir": project_dir,
         })
@@ -1603,11 +1686,11 @@ class SubmitManuscriptRequest(BaseModel):
     title: str
     content: str  # Markdown
     category: CategoryInfo
-    deadline_hours: Optional[int] = 72
 
 
 class ReviseManuscriptRequest(BaseModel):
     content: str  # Revised Markdown
+    author_response: Optional[str] = None
 
 
 def _check_expired_submission(sub: dict) -> dict:
@@ -1649,11 +1732,6 @@ async def submit_manuscript(request: SubmitManuscriptRequest, api_key: str = Dep
     db_key = appdb.get_api_key(api_key)
     researcher_id = db_key["researcher_id"] if db_key else None
 
-    # Validate deadline_hours
-    deadline_hours = request.deadline_hours or 72
-    if deadline_hours < 1 or deadline_hours > 336:  # max 14 days
-        deadline_hours = 72
-
     # Create DB record
     sub = appdb.create_submission(
         researcher_id=researcher_id,
@@ -1661,7 +1739,7 @@ async def submit_manuscript(request: SubmitManuscriptRequest, api_key: str = Dep
         title=request.title,
         category_major=request.category.major,
         category_subfield=request.category.subfield,
-        deadline_hours=deadline_hours,
+        deadline_hours=24,
     )
     submission_id = sub["id"]
 
@@ -1677,13 +1755,22 @@ async def submit_manuscript(request: SubmitManuscriptRequest, api_key: str = Dep
         except Exception:
             pass
 
-    # Enqueue background review job
-    await job_queue.put({
-        "_fn": run_submission_review_background,
+    # Persist job to DB and enqueue
+    db_job_id = str(uuid.uuid4())
+    job_payload = {
         "project_id": f"sub-{submission_id}",
         "submission_id": submission_id,
         "round_number": 1,
         "is_first_round": True,
+    }
+    try:
+        appdb.enqueue_job(db_job_id, f"sub-{submission_id}", "submission_review", job_payload)
+    except Exception:
+        pass
+    await job_queue.put({
+        "_fn": run_submission_review_background,
+        "_db_job_id": db_job_id,
+        **job_payload,
     })
 
     return {
@@ -1732,7 +1819,7 @@ async def get_submission(submission_id: str, api_key: str = Depends(verify_api_k
         "final_score": sub.get("final_score"),
         "revision_deadline": sub.get("revision_deadline"),
         "remaining_hours": remaining_hours,
-        "deadline_hours": sub.get("deadline_hours", 72),
+        "deadline_hours": sub.get("deadline_hours", 24),
         "created_at": sub["created_at"],
         "updated_at": sub["updated_at"],
         "rounds": [
@@ -1787,16 +1874,31 @@ async def revise_submission(submission_id: str, request: ReviseManuscriptRequest
     sub_dir.mkdir(parents=True, exist_ok=True)
     (sub_dir / f"manuscript_v{next_round}.md").write_text(request.content, encoding="utf-8")
 
+    # Save author response if provided
+    if request.author_response:
+        (sub_dir / f"author_response_round_{next_round}.md").write_text(
+            request.author_response, encoding="utf-8"
+        )
+
     # Update status
     appdb.update_submission_status(submission_id, "reviewing", current_round=next_round)
 
-    # Enqueue review
-    await job_queue.put({
-        "_fn": run_submission_review_background,
+    # Persist job to DB and enqueue
+    db_job_id = str(uuid.uuid4())
+    job_payload = {
         "project_id": f"sub-{submission_id}-r{next_round}",
         "submission_id": submission_id,
         "round_number": next_round,
         "is_first_round": False,
+    }
+    try:
+        appdb.enqueue_job(db_job_id, f"sub-{submission_id}-r{next_round}", "submission_review", job_payload)
+    except Exception:
+        pass
+    await job_queue.put({
+        "_fn": run_submission_review_background,
+        "_db_job_id": db_job_id,
+        **job_payload,
     })
 
     return {
@@ -1927,6 +2029,7 @@ async def run_submission_review_background(
         # Get previous round data for context
         previous_reviews = None
         previous_manuscript = None
+        author_response = None
         if round_number > 1 and sub.get("rounds"):
             prev_round = next(
                 (r for r in sub["rounds"] if r["round_number"] == round_number - 1),
@@ -1937,6 +2040,10 @@ async def run_submission_review_background(
                 prev_ms_file = sub_dir / f"manuscript_v{round_number - 1}.md"
                 if prev_ms_file.exists():
                     previous_manuscript = prev_ms_file.read_text(encoding="utf-8")
+            # Load author response for this round
+            ar_file = sub_dir / f"author_response_round_{round_number}.md"
+            if ar_file.exists():
+                author_response = ar_file.read_text(encoding="utf-8")
 
         # Run reviews concurrently
         tracker = PerformanceTracker()
@@ -1951,6 +2058,7 @@ async def run_submission_review_background(
                 tracker=tracker,
                 previous_reviews=previous_reviews,
                 previous_manuscript=previous_manuscript,
+                author_response=author_response,
             )
             for sid, spec in specialists.items()
         ]
@@ -2032,9 +2140,8 @@ async def run_submission_review_background(
                     final_score=overall_average,
                 )
             else:
-                # Set revision deadline
-                deadline_hours = sub.get("deadline_hours", 72)
-                deadline = datetime.now(timezone.utc) + timedelta(hours=deadline_hours)
+                # Set revision deadline (fixed 24h)
+                deadline = datetime.now(timezone.utc) + timedelta(hours=24)
                 appdb.update_submission_status(
                     submission_id, "awaiting_revision",
                     revision_deadline=deadline.isoformat(),
