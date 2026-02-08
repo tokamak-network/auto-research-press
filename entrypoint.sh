@@ -24,6 +24,10 @@ if [ -d "/app/persistent" ]; then
       echo "[seed] Populating database from seed data..."
       cp /app/seed-data/data/research.db /app/persistent/data/ 2>/dev/null || true
     fi
+    if [ -z "$(ls -A /app/persistent/results 2>/dev/null)" ] || [ "$(ls /app/persistent/results/ | wc -l)" -le 1 ]; then
+      echo "[seed] Populating results from seed data..."
+      cp -r /app/seed-data/results/* /app/persistent/results/ 2>/dev/null || true
+    fi
   fi
 
   # Remove empty dirs created during build, replace with symlinks

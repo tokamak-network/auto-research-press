@@ -1,0 +1,3 @@
+Chart: {'type': 'Scenario analysis chart', 'description': 'Projected throughput under proposed parameter changes (e.g., PeerDAS, increased blob limits)'}
+
+Visualization would be generated here.

@@ -1,0 +1,3 @@
+Chart: {'type': 'Histogram: Data efficiency', 'description': 'Distribution of effective data per blob across different L2s'}
+
+Visualization would be generated here.

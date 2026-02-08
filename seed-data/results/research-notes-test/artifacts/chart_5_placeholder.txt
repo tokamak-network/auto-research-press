@@ -1,0 +1,3 @@
+Chart: {'type': 'Scatter plot: Blob base fee vs. utilization', 'description': 'Relationship between pricing and demand'}
+
+Visualization would be generated here.

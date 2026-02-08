@@ -1,0 +1,3 @@
+Chart: {'type': 'Waterfall chart: Throughput breakdown', 'description': 'Theoretical maximum → network constraints → actual throughput'}
+
+Visualization would be generated here.

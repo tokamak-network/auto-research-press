@@ -1,0 +1,3 @@
+Chart: {'type': 'Time series: Blob usage over time', 'description': 'Line chart of daily blob count and blob gas used since Dencun activation'}
+
+Visualization would be generated here.
