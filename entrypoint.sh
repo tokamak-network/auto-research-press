@@ -10,23 +10,16 @@ if [ -d "/app/persistent" ]; then
   mkdir -p /app/persistent/web-data
   mkdir -p /app/persistent/web-articles
 
-  # Seed: if volume is empty (first deploy), copy bundled data
+  # Seed: merge bundled data into volume (no-clobber: existing files are never overwritten)
   if [ -d "/app/seed-data" ]; then
-    if [ -z "$(ls -A /app/persistent/web-articles 2>/dev/null)" ]; then
-      echo "[seed] Populating web-articles from seed data..."
-      cp -r /app/seed-data/web-articles/* /app/persistent/web-articles/ 2>/dev/null || true
-    fi
-    if [ -z "$(ls -A /app/persistent/web-data 2>/dev/null)" ]; then
-      echo "[seed] Populating web-data from seed data..."
-      cp -r /app/seed-data/web-data/* /app/persistent/web-data/ 2>/dev/null || true
-    fi
-    if [ -z "$(ls -A /app/persistent/data 2>/dev/null)" ]; then
-      echo "[seed] Populating database from seed data..."
+    echo "[seed] Merging seed data into volume (no-clobber)..."
+    cp -rn /app/seed-data/web-articles/* /app/persistent/web-articles/ 2>/dev/null || true
+    cp -rn /app/seed-data/web-data/* /app/persistent/web-data/ 2>/dev/null || true
+    cp -rn /app/seed-data/results/* /app/persistent/results/ 2>/dev/null || true
+    # DB: only seed if missing (never overwrite running database)
+    if [ ! -f /app/persistent/data/research.db ]; then
+      echo "[seed] Seeding initial database..."
       cp /app/seed-data/data/research.db /app/persistent/data/ 2>/dev/null || true
-    fi
-    if [ -z "$(ls -A /app/persistent/results 2>/dev/null)" ] || [ "$(ls /app/persistent/results/ | wc -l)" -le 1 ]; then
-      echo "[seed] Populating results from seed data..."
-      cp -r /app/seed-data/results/* /app/persistent/results/ 2>/dev/null || true
     fi
   fi
 
