@@ -407,7 +407,8 @@ class WorkflowOrchestrator:
 
         # Initialize agents
         self.writer = WriterAgent(role="writer")
-        self.light_writer = WriterAgent(role="writer_light")
+        self.author_response_agent = WriterAgent(role="author_response")
+        self.citation_verifier = WriterAgent(role="citation_verifier")
         self.moderator = ModeratorAgent(role="moderator")
         self.desk_editor = DeskEditorAgent(role="desk_editor")
 
@@ -456,13 +457,13 @@ class WorkflowOrchestrator:
             ) as progress:
                 task = progress.add_task("[cyan]Verifying citations...", total=None)
                 self.tracker.start_operation("citation_verification")
-                manuscript = await self.light_writer.verify_citations(
+                manuscript = await self.citation_verifier.verify_citations(
                     manuscript,
                     self.sources,
                     domain=self.domain_desc,
                 )
                 cv_time = self.tracker.end_operation("citation_verification")
-                self.tracker.record_citation_verification(**self.light_writer.get_last_token_usage())
+                self.tracker.record_citation_verification(**self.citation_verifier.get_last_token_usage())
                 progress.update(task, completed=True)
 
             console.print(f"[green]✓ Citation verification complete[/green]")
@@ -575,13 +576,17 @@ class WorkflowOrchestrator:
                 )
                 console.print(f"[yellow]⚠ {completeness_warning}[/yellow]")
 
-            # Moderator decision + author response in parallel
-            # Author response only needs reviews (not moderator decision), so they can overlap
-            console.print("\n[cyan]Moderator evaluating + Author preparing response (parallel)...[/cyan]")
+            # Moderator decision first
+            console.print("\n[cyan]Moderator evaluating...[/cyan]")
 
-            async def _run_moderator():
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("[cyan]Moderator evaluating...", total=None)
                 self.tracker.start_operation("moderator")
-                result = await self.moderator.make_decision(
+                moderator_decision = await self.moderator.make_decision(
                     current_manuscript,
                     reviews,
                     round_num,
@@ -592,30 +597,7 @@ class WorkflowOrchestrator:
                 )
                 moderator_time = self.tracker.end_operation("moderator")
                 self.tracker.record_moderator_time(moderator_time)
-                self.tracker.record_moderator(tokens=result.get("tokens", 0))
-                return result
-
-            async def _run_author_response():
-                self.tracker.start_operation("author_response")
-                result = await self.light_writer.write_author_response(
-                    current_manuscript,
-                    reviews,
-                    round_num
-                )
-                response_time = self.tracker.end_operation("author_response")
-                self.tracker.record_author_response(**self.light_writer.get_last_token_usage())
-                return result
-
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                task = progress.add_task("[cyan]Moderator + Author response (parallel)...", total=None)
-                moderator_decision, speculative_author_response = await asyncio.gather(
-                    _run_moderator(),
-                    _run_author_response()
-                )
+                self.tracker.record_moderator(tokens=moderator_decision.get("tokens", 0))
                 progress.update(task, completed=True)
 
             # Report score + decision via status callback for activity log
@@ -642,10 +624,29 @@ class WorkflowOrchestrator:
                 border_style=decision_color
             ))
 
-            # Use author response only if revision is needed (otherwise discard)
+            # Generate author response only if revision is needed AND not at max rounds
             author_response = None
-            if moderator_decision["decision"] != "ACCEPT":
-                author_response = speculative_author_response
+            needs_revision = moderator_decision["decision"] != "ACCEPT"
+            is_final_round = round_num >= self.max_rounds
+
+            if needs_revision and not is_final_round:
+                console.print("\n[cyan]Author preparing response...[/cyan]")
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console
+                ) as progress:
+                    task = progress.add_task("[cyan]Author writing response...", total=None)
+                    self.tracker.start_operation("author_response")
+                    author_response = await self.author_response_agent.write_author_response(
+                        current_manuscript,
+                        reviews,
+                        round_num
+                    )
+                    response_time = self.tracker.end_operation("author_response")
+                    self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
+                    progress.update(task, completed=True)
+
                 console.print(f"[green]✓ Author response complete[/green]")
 
                 response_preview = author_response[:300] + "..." if len(author_response) > 300 else author_response
@@ -750,7 +751,6 @@ class WorkflowOrchestrator:
                     references=self.sources if self.sources else None,
                     domain=self.domain_desc,
                     article_length=self.article_length,
-                    author_response=author_response,
                     audience_level=self.audience_level,
                 )
                 revision_time = self.tracker.end_operation("revision")
@@ -769,6 +769,31 @@ class WorkflowOrchestrator:
             console.print(f"[dim]Saved: {manuscript_path_next}[/dim]")
 
             current_manuscript = revised_manuscript
+
+            # Generate author response based on revised manuscript
+            if moderator_decision["decision"] != "ACCEPT":
+                console.print("\n[cyan]Generating author response based on revised manuscript...[/cyan]")
+                self.tracker.start_operation("author_response")
+                author_response = await self.author_response_agent.write_author_response(
+                    current_manuscript,
+                    reviews,
+                    round_num
+                )
+                response_time = self.tracker.end_operation("author_response")
+                self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
+
+                console.print(f"[green]✓ Author response complete[/green]")
+                response_preview = author_response[:300] + "..." if len(author_response) > 300 else author_response
+                console.print(Panel.fit(
+                    response_preview,
+                    title="Author Response (preview)",
+                    border_style="cyan"
+                ))
+                response_file = self.output_dir / f"author_response_round_{round_num}.md"
+                response_file.write_text(author_response)
+                console.print(f"[dim]Saved: {response_file}[/dim]")
+            else:
+                author_response = None
 
             # Update round data with actual revision diff
             revision_diff = {
@@ -1151,13 +1176,13 @@ class WorkflowOrchestrator:
 
             async def _run_author_response_resume():
                 self.tracker.start_operation("author_response")
-                result = await self.light_writer.write_author_response(
+                result = await self.author_response_agent.write_author_response(
                     current_manuscript,
                     reviews,
                     round_num
                 )
                 response_time = self.tracker.end_operation("author_response")
-                self.tracker.record_author_response(**self.light_writer.get_last_token_usage())
+                self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
                 return result
 
             with Progress(
@@ -1303,7 +1328,6 @@ class WorkflowOrchestrator:
                     references=self.sources if self.sources else None,
                     domain=self.domain_desc,
                     article_length=self.article_length,
-                    author_response=author_response,
                     audience_level=self.audience_level,
                 )
                 revision_time = self.tracker.end_operation("revision")
@@ -1322,6 +1346,31 @@ class WorkflowOrchestrator:
             console.print(f"[dim]Saved: {manuscript_path_next}[/dim]")
 
             current_manuscript = revised_manuscript
+
+            # Generate author response based on revised manuscript
+            if moderator_decision["decision"] != "ACCEPT":
+                console.print("\n[cyan]Generating author response based on revised manuscript...[/cyan]")
+                self.tracker.start_operation("author_response")
+                author_response = await self.author_response_agent.write_author_response(
+                    current_manuscript,
+                    reviews,
+                    round_num
+                )
+                response_time = self.tracker.end_operation("author_response")
+                self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
+
+                console.print(f"[green]✓ Author response complete[/green]")
+                response_preview = author_response[:300] + "..." if len(author_response) > 300 else author_response
+                console.print(Panel.fit(
+                    response_preview,
+                    title="Author Response (preview)",
+                    border_style="cyan"
+                ))
+                response_file = self.output_dir / f"author_response_round_{round_num}.md"
+                response_file.write_text(author_response)
+                console.print(f"[dim]Saved: {response_file}[/dim]")
+            else:
+                author_response = None
 
             # Update round data with actual revision diff
             revision_diff = {

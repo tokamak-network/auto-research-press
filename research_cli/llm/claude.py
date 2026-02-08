@@ -52,7 +52,7 @@ class ClaudeLLM(BaseLLM):
         response = await self.client.messages.create(
             model=self.model,
             messages=messages,
-            system=system if system else None,
+            system=[{"type": "text", "text": system}] if system else None,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs
@@ -86,7 +86,7 @@ class ClaudeLLM(BaseLLM):
         async with self.client.messages.stream(
             model=self.model,
             messages=messages,
-            system=system if system else None,
+            system=[{"type": "text", "text": system}] if system else None,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs
@@ -129,7 +129,7 @@ class ClaudeLLM(BaseLLM):
         async with self.client.messages.stream(
             model=self.model,
             messages=messages,
-            system=system if system else None,
+            system=[{"type": "text", "text": system}] if system else None,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs

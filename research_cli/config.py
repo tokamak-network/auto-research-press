@@ -53,15 +53,15 @@ class Config:
         import re
         model = re.sub(r'-\d{8}$', '', model)
 
-        # Fix hyphen vs dot issues
-        model = model.replace('opus-4-5', 'opus-4.5')
-        model = model.replace('sonnet-4-5', 'sonnet-4.5')
+        # Fix hyphen vs dot issues - PREFER HYPHENS for proxy compatibility
+        model = model.replace('opus-4.5', 'opus-4-5')
+        model = model.replace('sonnet-4.5', 'sonnet-4-5')
 
         # Handle malformed names like sonnet-4-20 or sonnet-4
-        if 'sonnet-4' in model and 'sonnet-4.5' not in model:
-            model = model.replace('sonnet-4', 'sonnet-4.5')
-        if 'opus-4' in model and 'opus-4.5' not in model:
-            model = model.replace('opus-4', 'opus-4.5')
+        if 'sonnet-4' in model and 'sonnet-4-5' not in model:
+            model = model.replace('sonnet-4', 'sonnet-4-5')
+        if 'opus-4' in model and 'opus-4-5' not in model:
+            model = model.replace('opus-4', 'opus-4-5')
 
         return model
 
@@ -87,7 +87,8 @@ class Config:
             or os.getenv("ANTHROPIC_AUTH_TOKEN")
             or self.llm_api_key
         )
-        self.anthropic_base_url = os.getenv("ANTHROPIC_BASE_URL") or self.llm_base_url
+        # Anthropic: only use ANTHROPIC_BASE_URL if explicitly set (don't fallback to LLM_BASE_URL)
+        self.anthropic_base_url = os.getenv("ANTHROPIC_BASE_URL")
         self.openai_api_key = os.getenv("OPENAI_API_KEY") or self.llm_api_key
         self.openai_base_url = os.getenv("OPENAI_BASE_URL") or self.llm_base_url
         self.google_api_key = os.getenv("GOOGLE_API_KEY")

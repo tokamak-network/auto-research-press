@@ -1331,55 +1331,25 @@ class ProposeReviewersRequest(BaseModel):
 
 @app.post("/api/propose-reviewers")
 async def propose_reviewers(request: ProposeReviewersRequest):
-    """Generate enriched reviewer descriptions using AI."""
+    """Return static reviewer pool (AI enrichment disabled)."""
     pool = get_expert_pool(request.major_field, request.subfield)
     if not pool:
         raise HTTPException(status_code=400, detail="No expert pool found for this category")
 
-    # Build prompt for Haiku to enrich reviewer profiles
     expert_names = [eid.replace("_expert", "").replace("_", " ").title() + " Expert" for eid in pool]
-    prompt = f"""You are an academic research coordinator. Given the research topic and reviewer pool below, generate a brief professional profile for each reviewer that explains their expertise and relevance.
 
-Research Topic: {request.topic}
-Academic Field: {request.major_field} > {request.subfield}
-
-For each reviewer, provide a JSON object with:
-- "expert_id": the original ID
-- "display_name": human-readable name
-- "description": 1-2 sentence description of their expertise (specific to this topic)
-- "focus_areas": array of 3-4 specific focus areas relevant to reviewing this topic
-- "relevance_to_topic": 1 sentence explaining why this reviewer is important for this paper
-
-Reviewers to profile:
-{json.dumps([{"expert_id": eid, "display_name": name} for eid, name in zip(pool, expert_names)], indent=2)}
-
-Return ONLY a JSON array of reviewer objects. No markdown fences, no explanation."""
-
-    try:
-        llm = create_llm_for_role("propose_reviewers")
-        response = await llm.generate(prompt=prompt, max_tokens=2000, temperature=0.7)
-        result_text = response.content.strip()
-        # Strip markdown fences if present
-        if result_text.startswith("```"):
-            result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
-            result_text = re.sub(r'\s*```$', '', result_text)
-        proposed = json.loads(result_text)
-        return {"proposed_reviewers": proposed}
-    except json.JSONDecodeError:
-        # Fallback: return basic profiles without AI enrichment
-        fallback = [
-            {
-                "expert_id": eid,
-                "display_name": name,
-                "description": f"Specializes in {name.replace(' Expert', '').lower()} within {request.subfield}.",
-                "focus_areas": [name.replace(' Expert', '')],
-                "relevance_to_topic": f"Provides domain expertise in {name.replace(' Expert', '').lower()}.",
-            }
-            for eid, name in zip(pool, expert_names)
-        ]
-        return {"proposed_reviewers": fallback}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate reviewer profiles: {str(e)}")
+    # Return static profiles (AI enrichment removed to avoid compatibility issues)
+    static_profiles = [
+        {
+            "expert_id": eid,
+            "display_name": name,
+            "description": f"Specializes in {name.replace(' Expert', '').lower()} within {request.subfield}.",
+            "focus_areas": [name.replace(' Expert', '')],
+            "relevance_to_topic": f"Provides domain expertise in {name.replace(' Expert', '').lower()}.",
+        }
+        for eid, name in zip(pool, expert_names)
+    ]
+    return {"proposed_reviewers": static_profiles}
 
 
 @app.get("/api/check-admin")

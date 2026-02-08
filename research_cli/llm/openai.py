@@ -72,6 +72,65 @@ class OpenAILLM(BaseLLM):
             stop_reason=response.choices[0].finish_reason,
         )
 
+    async def generate_streaming(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 1.0,
+        max_tokens: int = 4096,
+        **kwargs
+    ) -> LLMResponse:
+        """Generate text using streaming to prevent proxy idle-connection timeouts.
+
+        Behaves identically to generate() but uses the streaming API internally,
+        keeping the HTTP connection alive with incremental chunks. Returns the
+        same LLMResponse once the full message has been received.
+        """
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        # gpt-5 models only support temperature=1
+        api_temp = 1.0 if "gpt-5" in self.model else temperature
+
+        stream = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=api_temp,
+            max_tokens=max_tokens,
+            stream=True,
+            **kwargs
+        )
+
+        full_content = []
+        finish_reason = None
+
+        # Initialize token counters if supported by stream options
+        input_tokens = None
+        output_tokens = None
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                full_content.append(chunk.choices[0].delta.content)
+
+            if chunk.choices and chunk.choices[0].finish_reason:
+                finish_reason = chunk.choices[0].finish_reason
+
+            # Some providers/proxies return usage in the final chunk
+            if hasattr(chunk, "usage") and chunk.usage:
+                input_tokens = chunk.usage.prompt_tokens
+                output_tokens = chunk.usage.completion_tokens
+
+        return LLMResponse(
+            content="".join(full_content),
+            model=self.model,
+            provider="openai",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            stop_reason=finish_reason,
+        )
+
     async def stream(
         self,
         prompt: str,

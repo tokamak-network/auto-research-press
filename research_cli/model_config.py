@@ -77,8 +77,24 @@ def get_role_config(role: str) -> RoleConfig:
         raise KeyError(f"Unknown role '{role}'. Available: {list(roles.keys())}")
 
     role_data = roles[role]
-    primary = ModelSpec(**role_data["primary"])
-    fallback = [ModelSpec(**f) for f in role_data.get("fallback", [])]
+
+    # Handle tiered configuration
+    if "tier" in role_data:
+        tier_name = role_data["tier"]
+        tiers = config.get("tiers", {})
+        if tier_name not in tiers:
+            raise KeyError(f"Unknown tier '{tier_name}' referenced by role '{role}'")
+
+        tier_data = tiers[tier_name]
+        primary_data = tier_data["primary"]
+        fallback_data = tier_data.get("fallback", [])
+    else:
+        # Legacy: direct model specification
+        primary_data = role_data["primary"]
+        fallback_data = role_data.get("fallback", [])
+
+    primary = ModelSpec(**primary_data)
+    fallback = [ModelSpec(**f) for f in fallback_data]
 
     return RoleConfig(
         role=role,
@@ -126,13 +142,20 @@ def _get_base_url(provider: str) -> Optional[str]:
     """Get base URL for a provider from environment.
 
     Priority: provider-specific base_url > LLM_BASE_URL (shared/router URL).
+
+    Note: Anthropic provider does NOT fallback to LLM_BASE_URL, as it should
+    use the direct Anthropic API unless ANTHROPIC_BASE_URL is explicitly set.
     """
     config = _load_config()
     provider_cfg = config.get("provider_config", {}).get(provider, {})
     env_base_url = provider_cfg.get("env_base_url", "")
     base_url = os.environ.get(env_base_url, "") if env_base_url else ""
 
-    # Fallback to shared LLM_BASE_URL (e.g. LiteLLM/OpenRouter endpoint)
+    # Anthropic: only use direct API, no fallback to LLM_BASE_URL
+    if provider == "anthropic":
+        return base_url or None
+
+    # Other providers: fallback to shared LLM_BASE_URL (e.g. LiteLLM/OpenRouter endpoint)
     if not base_url:
         llm_cfg = config.get("provider_config", {}).get("llm", {})
         llm_base = llm_cfg.get("env_base_url", "")
@@ -161,6 +184,19 @@ def _create_llm(provider: str, model: str) -> BaseLLM:
     elif provider == "openai":
         from .llm.openai import OpenAILLM
         return OpenAILLM(api_key=api_key, model=model, base_url=base_url)
+    elif provider == "google":
+        # If a custom base_url is present, use OpenAILLM (e.g. for LiteLLM routing)
+        if base_url:
+            from .llm.openai import OpenAILLM
+            return OpenAILLM(api_key=api_key, model=model, base_url=base_url)
+        else:
+            from .llm.gemini import GeminiLLM
+            return GeminiLLM(api_key=api_key, model=model)
+    elif provider == "deepseek":
+        from .llm.openai import OpenAILLM
+        # Use DeepSeek API URL if no custom base_url is provided
+        ds_base_url = base_url or "https://api.deepseek.com"
+        return OpenAILLM(api_key=api_key, model=model, base_url=ds_base_url)
     else:
         raise ValueError(f"Unknown provider: {provider}")
 

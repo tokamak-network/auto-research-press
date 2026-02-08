@@ -3,7 +3,7 @@
 import json
 from typing import List
 
-from ..model_config import create_llm_for_role
+from ..model_config import create_llm_for_role, get_role_config
 from ..models.expert import ExpertProposal
 
 
@@ -18,6 +18,11 @@ class TeamComposerAgent:
         """
         self.llm = create_llm_for_role(role)
         self.model = self.llm.model
+
+        # Get configured reviewer model to ensure proposals match infrastructure
+        reviewer_config = get_role_config("reviewer")
+        self.reviewer_model = reviewer_config.primary.model
+        self.reviewer_provider = reviewer_config.primary.provider
 
     async def propose_team(
         self,
@@ -47,13 +52,18 @@ class TeamComposerAgent:
 
         # Parse JSON response
         content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
+
+        # Try to extract JSON from markdown code blocks
+        import re
+        json_match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
+        if json_match:
+            content = json_match.group(1)
+        else:
+            # Fallback: find the first { and last }
+            start = content.find("{")
+            end = content.rfind("}")
+            if start != -1 and end != -1:
+                content = content[start : end + 1]
 
         try:
             proposals_data = json.loads(content)
@@ -68,16 +78,20 @@ class TeamComposerAgent:
         # Convert to ExpertProposal objects
         proposals = []
         for p in proposals_data["experts"]:
-            # Normalize model name (fix common AI mistakes like claude-opus-4-5 -> claude-opus-4.5)
-            model = p.get("suggested_model", "claude-opus-4.5")
-            model = model.replace("opus-4-5", "opus-4.5").replace("sonnet-4-5", "sonnet-4.5")
+            # Use configured model if suggestion is missing or generic
+            model = p.get("suggested_model", self.reviewer_model)
+
+            # If the model matches our configured model (ignoring minor formatting diffs),
+            # force it to the exact configured string to ensure compatibility
+            if self.reviewer_model.replace("-", "").replace(".", "") in model.replace("-", "").replace(".", ""):
+                model = self.reviewer_model
 
             proposal = ExpertProposal(
                 expert_domain=p["expert_domain"],
                 rationale=p["rationale"],
                 focus_areas=p["focus_areas"],
                 suggested_model=model,
-                suggested_provider=p.get("suggested_provider", "anthropic")
+                suggested_provider=p.get("suggested_provider", self.reviewer_provider)
             )
             proposals.append(proposal)
 
@@ -118,17 +132,17 @@ RESEARCH TOPIC:
         if additional_context:
             prompt += f"\nADDITIONAL CONTEXT:\n{additional_context}\n"
 
-        prompt += """
+        prompt += f"""
 ---
 
 Propose a team of expert reviewers with complementary expertise. Each expert should cover a distinct domain or perspective necessary for comprehensive review.
 
 Respond in the following JSON format:
 
-{
+{{
   "analysis": "<brief analysis of topic and required expertise>",
   "experts": [
-    {
+    {{
       "expert_domain": "<specific domain, e.g., 'Zero-Knowledge Cryptography'>",
       "rationale": "<2-3 sentences: why this expertise is essential for this topic>",
       "focus_areas": [
@@ -136,18 +150,18 @@ Respond in the following JSON format:
         "<specific aspect 2>",
         "<specific aspect 3>"
       ],
-      "suggested_model": "claude-sonnet-4.5",
-      "suggested_provider": "anthropic"
-    }
+      "suggested_model": "{self.reviewer_model}",
+      "suggested_provider": "{self.reviewer_provider}"
+    }}
   ]
-}
+}}
 
 REQUIREMENTS:
 - Exactly {num_experts} experts
 - Each expert should have a DISTINCT domain (no overlap)
 - Focus areas should be SPECIFIC to this research topic
 - Rationale should explain why this expertise is needed for THIS topic
-- Use claude-sonnet-4.5 for reviewers (fast, high-quality reviews)
+- Use {self.reviewer_model} for reviewers (configured standard)
 - Ensure comprehensive coverage of the topic's key technical dimensions
 
 Focus on technical expertise most relevant to the research topic."""
