@@ -306,6 +306,13 @@ code {
     gap: var(--spacing-04);
 }
 
+.nav-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-04);
+}
+
 .nav-link {
     font-size: var(--type-scale-02);
     font-weight: 500;
