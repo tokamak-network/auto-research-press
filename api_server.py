@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from research_cli.agents.team_composer import TeamComposerAgent
-from research_cli.categories import suggest_category_from_topic, suggest_category_llm, get_expert_pool
+from research_cli.categories import suggest_category_from_topic, suggest_category_llm, get_expert_pool, get_category_name
 from research_cli.workflow.orchestrator import WorkflowOrchestrator
 from research_cli.workflow.collaborative_workflow import CollaborativeWorkflowOrchestrator
 from research_cli.models.expert import ExpertConfig
@@ -239,7 +239,7 @@ async def scan_interrupted_workflows():
                         for i, exp in enumerate(checkpoint.get("expert_configs", []))
                     ],
                     "cost_estimate": None,
-                    "start_time": checkpoint.get("checkpoint_time", datetime.now().isoformat()),
+                    "start_time": checkpoint.get("checkpoint_time", _utcnow().isoformat()),
                     "elapsed_time_seconds": 0,
                     "estimated_time_remaining_seconds": (checkpoint.get("max_rounds", 3) - checkpoint.get("current_round", 0)) * 180,
                     "can_resume": True
@@ -247,7 +247,7 @@ async def scan_interrupted_workflows():
 
                 # Initialize activity log
                 activity_logs[project_id] = [{
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": _utcnow().isoformat(),
                     "level": "warning",
                     "message": f"Workflow interrupted at Round {checkpoint.get('current_round', 0)}. Click Resume to continue.",
                     "details": {"checkpoint_time": checkpoint.get("checkpoint_time")}
@@ -509,7 +509,7 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
                 for i, exp in enumerate(request.experts)
             ],
             "cost_estimate": None,
-            "start_time": datetime.now().isoformat(),
+            "start_time": _utcnow().isoformat(),
             "elapsed_time_seconds": 0,
             "estimated_time_remaining_seconds": request.max_rounds * len(request.experts) * 120,
             "research_type": request.research_type or "survey"
@@ -565,8 +565,8 @@ async def get_workflow_status(project_id: str):
     status = workflow_status[project_id]
 
     # Calculate elapsed time
-    start_time = datetime.fromisoformat(status.get("start_time", datetime.now().isoformat()))
-    elapsed_seconds = int((datetime.now() - start_time).total_seconds())
+    start_time = _parse_start_time(status.get("start_time", _utcnow().isoformat()))
+    elapsed_seconds = int((_utcnow() - start_time).total_seconds())
 
     return WorkflowStatusResponse(
         project_id=project_id,
@@ -592,8 +592,8 @@ async def list_workflows(api_key: str = Depends(verify_api_key)):
         # Dynamically calculate elapsed time for active workflows
         if status.get("status") not in ("completed", "failed", "interrupted", "rejected"):
             try:
-                start_time = datetime.fromisoformat(status.get("start_time", datetime.now().isoformat()))
-                entry["elapsed_time_seconds"] = int((datetime.now() - start_time).total_seconds())
+                start_time = _parse_start_time(status.get("start_time", _utcnow().isoformat()))
+                entry["elapsed_time_seconds"] = int((_utcnow() - start_time).total_seconds())
             except (ValueError, TypeError):
                 pass
         results.append(entry)
@@ -648,7 +648,7 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             "error": None,
             "expert_status": [],
             "cost_estimate": None,
-            "start_time": datetime.now().isoformat(),
+            "start_time": _utcnow().isoformat(),
             "elapsed_time_seconds": 0,
             "estimated_time_remaining_seconds": (checkpoint["max_rounds"] - checkpoint["current_round"]) * 180
         }
@@ -718,13 +718,26 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
         raise HTTPException(status_code=500, detail=f"Failed to resume workflow: {str(e)}")
 
 
+def _utcnow() -> datetime:
+    """Return current time as timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
+def _parse_start_time(iso_str: str) -> datetime:
+    """Parse a start_time string, assuming UTC if no timezone info (backward compat)."""
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def add_activity_log(project_id: str, level: str, message: str, details: dict = None):
     """Add entry to activity log."""
     if project_id not in activity_logs:
         activity_logs[project_id] = []
 
     entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": _utcnow().isoformat(),
         "level": level,
         "message": message,
         "details": details or {}
@@ -757,6 +770,10 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
     try:
         from research_cli.workflow.orchestrator import WorkflowOrchestrator
         import json
+
+        # Reset start_time to actual work start (excludes queue wait time)
+        if project_id in workflow_status:
+            workflow_status[project_id]["start_time"] = _utcnow().isoformat()
 
         # Load checkpoint to get max_rounds
         checkpoint_file = project_dir / "workflow_checkpoint.json"
@@ -836,43 +853,100 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
                 workflow_status[project_id]["error_stage"] = stage_label
 
 
-def _generate_reviewers_from_category(category: dict, topic: str) -> List[ExpertConfig]:
-    """Generate reviewer ExpertConfigs from category expert pool.
+async def _generate_reviewers_from_category(category: dict, topic: str) -> List[ExpertConfig]:
+    """Generate reviewer ExpertConfigs using LLM based on topic and category.
+
+    The LLM creates 3 reviewers with expertise tailored to the specific
+    research topic, rather than using a fixed expert pool per category.
 
     Args:
         category: Dict with 'major' and 'subfield' keys.
-        topic: Research topic (for context in domain description).
+        topic: Research topic for reviewer specialization.
 
     Returns:
-        List of up to 3 ExpertConfig reviewer objects.
+        List of 3 ExpertConfig reviewer objects.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     if not category or not category.get("major") or not category.get("subfield"):
         return []
 
+    category_name = get_category_name(category["major"], category["subfield"])
+    reviewer_model_list = get_reviewer_models()
+
+    # Try LLM-based generation
+    try:
+        from research_cli.utils.json_repair import repair_json
+
+        llm = create_llm_for_role("categorizer")
+        prompt = f"""You are assembling a peer review panel for an academic paper.
+
+TOPIC: {topic}
+CATEGORY: {category_name}
+
+Propose exactly 3 reviewers, each with a distinct area of expertise relevant to this specific topic.
+Each reviewer should bring a different perspective (e.g., theoretical, methodological, applied).
+
+Respond with ONLY valid JSON in this exact format:
+{{"reviewers": [
+  {{"name": "Dr. [Realistic full name]", "domain": "[Specific expertise area]", "focus_areas": ["[area1]", "[area2]", "[area3]"]}},
+  {{"name": "Dr. [Realistic full name]", "domain": "[Specific expertise area]", "focus_areas": ["[area1]", "[area2]", "[area3]"]}},
+  {{"name": "Dr. [Realistic full name]", "domain": "[Specific expertise area]", "focus_areas": ["[area1]", "[area2]", "[area3]"]}}
+]}}"""
+
+        response = await llm.generate(
+            prompt=prompt,
+            system="You propose academic peer reviewers. Respond with ONLY JSON, no markdown, no explanation.",
+            temperature=0.7,
+            max_tokens=1024,
+        )
+
+        data = repair_json(response.content)
+        reviewer_list = data.get("reviewers", [])
+
+        if len(reviewer_list) < 3:
+            raise ValueError(f"LLM returned {len(reviewer_list)} reviewers, expected 3")
+
+        reviewers = []
+        for i, rev in enumerate(reviewer_list[:3]):
+            rm = reviewer_model_list[i % len(reviewer_model_list)]
+            config = ExpertConfig(
+                id=f"reviewer-{i+1}",
+                name=rev.get("name", f"Reviewer {i+1}"),
+                domain=rev.get("domain", "General Research"),
+                focus_areas=rev.get("focus_areas", []),
+                system_prompt="",
+                provider=rm["provider"],
+                model=rm["model"],
+            )
+            reviewers.append(config)
+
+        logger.info(f"LLM generated reviewers for '{topic}': {[r.name for r in reviewers]}")
+        return reviewers
+
+    except Exception as e:
+        logger.warning(f"LLM reviewer generation failed: {e}, falling back to expert pool")
+
+    # Fallback: use category expert pool (original behavior)
     pool = get_expert_pool(category["major"], category["subfield"])
     if not pool:
         return []
 
-    # Cross-assign reviewer models across providers for rate limit distribution
-    reviewer_model_list = get_reviewer_models()
-
     reviewers = []
     for i, expert_id in enumerate(pool):
-        # Convert snake_case ID to human-readable name
         name = expert_id.replace("_expert", "").replace("_", " ").title() + " Expert"
         domain = expert_id.replace("_expert", "").replace("_", " ").title()
 
         rm = reviewer_model_list[i % len(reviewer_model_list)]
-        provider, model = rm["provider"], rm["model"]
-
         config = ExpertConfig(
             id=f"reviewer-{i+1}",
             name=name,
             domain=domain,
             focus_areas=[],
-            system_prompt="",  # SpecialistFactory will auto-generate
-            provider=provider,
-            model=model,
+            system_prompt="",
+            provider=rm["provider"],
+            model=rm["model"],
         )
         reviewers.append(config)
 
@@ -894,6 +968,10 @@ async def run_workflow_background(
 ):
     """Run workflow in background and update status."""
     try:
+        # Reset start_time to actual work start (excludes queue wait time)
+        if project_id in workflow_status:
+            workflow_status[project_id]["start_time"] = _utcnow().isoformat()
+
         # Update status: composing team
         workflow_status[project_id].update({
             "status": "composing_team",
@@ -968,7 +1046,7 @@ async def run_workflow_background(
                 add_activity_log(project_id, "info", f"Co-author: {ca.name}")
 
             # Generate reviewers from category expert pool
-            reviewer_configs = _generate_reviewers_from_category(category, topic)
+            reviewer_configs = await _generate_reviewers_from_category(category, topic)
             if not reviewer_configs:
                 add_activity_log(project_id, "warning", "No category reviewers found, using default reviewers")
                 # Fallback: use first 2 expert configs as reviewers
@@ -1183,8 +1261,8 @@ def update_workflow_status(project_id: str, status: str, round_num: int, total_r
         add_activity_log(project_id, "info", message)
 
     # Update estimated time remaining
-    start_time = datetime.fromisoformat(workflow_status[project_id].get("start_time", datetime.now().isoformat()))
-    elapsed = (datetime.now() - start_time).total_seconds()
+    start_time = _parse_start_time(workflow_status[project_id].get("start_time", _utcnow().isoformat()))
+    elapsed = (_utcnow() - start_time).total_seconds()
 
     if progress > 5 and progress < 100:  # Only estimate if we have meaningful progress
         estimated_total = (elapsed / progress) * 100
@@ -1709,7 +1787,7 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
             "status": "completed",
             "total_rounds": 0,
             "rounds": [],
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _utcnow().isoformat(),
             "data_file": None,
             "elapsed_time_seconds": 0,
             "final_decision": "DIRECT_SUBMISSION",
@@ -2056,7 +2134,7 @@ async def run_submission_review_background(
 
         # Generate reviewers from category
         category = {"major": sub["category_major"], "subfield": sub["category_subfield"]}
-        reviewer_configs = _generate_reviewers_from_category(category, sub["title"])
+        reviewer_configs = await _generate_reviewers_from_category(category, sub["title"])
 
         if not reviewer_configs:
             # Fallback: generate generic reviewers
@@ -2604,7 +2682,7 @@ async def upload_report(request: UploadReportRequest, api_key: str = Depends(ver
             "total_tokens": 0,
             "estimated_cost": 0,
         },
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": _utcnow().isoformat(),
         "uploaded": True,
     }
 

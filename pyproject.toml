@@ -23,6 +23,12 @@ gunicorn = ">=22.0.0"
 [tool.poetry.scripts]
 ai-research = "research_cli.cli:cli"
 
+[tool.pytest.ini_options]
+markers = [
+    "llm: tests that make real LLM API calls (may be slow and require API keys)",
+]
+asyncio_mode = "auto"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
