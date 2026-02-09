@@ -373,6 +373,37 @@ _(to be filled after completion)_
 
 ---
 
+## Report Download (MD) + Admin External Report Upload
+
+### Part A: Report Download
+- [x] **A1**: `GET /api/projects/{project_id}/report` — combines manuscript + full peer review into single .md download
+- [x] **A2**: Download button on `web/article.html` — Carbon-styled, in article-meta section
+- [x] **A3**: Download button on `web/review.html` — in version-tabs next to "Read Article"
+
+### Part B: Admin Upload
+- [x] **B1**: `POST /api/admin/upload-report` — admin-only, creates project from external .md file
+- [x] **B2**: Upload Report UI on `web/research-queue.html` — admin-only button + modal with title/topic/type/category/file drop
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `api_server.py` | `Response` import, `GET /api/projects/{id}/report`, `POST /api/admin/upload-report` |
+| `web/article.html` | Download button CSS + button in header + `downloadReport()` JS |
+| `web/review.html` | Download button CSS + button in version-tabs + `downloadReport()` JS |
+| `web/research-queue.html` | Upload modal CSS + admin upload button + modal HTML + upload JS functions |
+
+### Verification
+- [x] Python syntax check passes
+- [x] Both new routes registered in FastAPI
+- [x] Report download tested: 109K chars, all sections present (manuscript + 3 rounds reviews + author responses)
+- [x] Upload tested: creates project dir + manuscript_final_v1.md + workflow_complete.json with correct metadata
+- [ ] Visual: article.html download button renders correctly (needs server restart)
+- [ ] Visual: review.html download button renders correctly (needs server restart)
+- [ ] Visual: research-queue.html upload modal renders correctly with admin key (needs server restart)
+- [ ] E2E: upload report → appears in project list → renders in article.html
+
+---
+
 ## External Manuscript Submission + AI Peer Review Cycle
 
 ### Summary

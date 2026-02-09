@@ -35,7 +35,8 @@ async def generate_review(
     previous_manuscript: Optional[str] = None,
     author_response: Optional[str] = None,
     article_length: str = "full",
-    audience_level: str = "professional"
+    audience_level: str = "professional",
+    research_type: str = "survey",
 ) -> dict:
     """Generate review from a specialist.
 
@@ -50,6 +51,7 @@ async def generate_review(
         author_response: Author's response to previous reviews
         article_length: "full" or "short" — adjusts reviewer expectations
         audience_level: "beginner", "intermediate", or "professional"
+        research_type: "survey" or "research" — adjusts review criteria
 
     Returns:
         Review data dictionary
@@ -137,9 +139,22 @@ IMPORTANT: Consider the author's response when evaluating this revision:
 
 """
 
+    # Research type context
+    research_type_note = ""
+    if research_type == "survey":
+        research_type_note = """NOTE: This is a SURVEY / LITERATURE REVIEW paper. Evaluate accordingly:
+- Breadth of coverage: Does it comprehensively cover the field?
+- Taxonomy/categorization: Are the surveyed works well-organized?
+- Gap identification: Does it clearly identify research gaps and future directions?
+- Do NOT penalize for lack of novel experimental results
+- Do NOT expect original hypotheses or experimental methodology
+- Evaluate the quality of synthesis, comparison, and critical analysis of existing work
+
+"""
+
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
 
-{short_paper_note}{audience_note}{previous_context}
+{short_paper_note}{audience_note}{research_type_note}{previous_context}
 {response_context}
 MANUSCRIPT:
 {manuscript}
@@ -256,7 +271,9 @@ Be honest and constructive. Focus on your domain of expertise.
         "weaknesses": review_data["weaknesses"],
         "suggestions": review_data["suggestions"],
         "detailed_feedback": review_data["detailed_feedback"],
-        "tokens": response.total_tokens
+        "tokens": response.total_tokens,
+        "input_tokens": response.input_tokens or 0,
+        "output_tokens": response.output_tokens or 0,
     }
 
 
@@ -269,7 +286,8 @@ async def run_review_round(
     previous_manuscript: Optional[str] = None,
     author_response: Optional[str] = None,
     article_length: str = "full",
-    audience_level: str = "professional"
+    audience_level: str = "professional",
+    research_type: str = "survey",
 ) -> tuple[List[Dict], float]:
     """Run one round of peer review.
 
@@ -283,6 +301,7 @@ async def run_review_round(
         author_response: Author's response to previous reviews
         article_length: "full" or "short" — adjusts reviewer expectations
         audience_level: "beginner", "intermediate", or "professional"
+        research_type: "survey" or "research" — adjusts review criteria
 
     Returns:
         (reviews, overall_average)
@@ -305,7 +324,7 @@ async def run_review_round(
 
         # Generate reviews concurrently
         review_tasks = [
-            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript, author_response, article_length, audience_level)
+            generate_review(specialist_id, specialist, manuscript, round_number, tracker, previous_reviews, previous_manuscript, author_response, article_length, audience_level, research_type)
             for specialist_id, specialist in specialists.items()
         ]
 
@@ -345,11 +364,90 @@ async def run_review_round(
     console.print(table)
     console.print(f"\n[bold]Overall Average: {overall_average:.1f}/10[/bold]\n")
 
-    # Record round tokens
+    # Record round tokens (total + per-model breakdown)
     round_tokens = sum(r.get("tokens", 0) for r in reviews)
     tracker.record_round_tokens(round_tokens)
+    for r in reviews:
+        tracker._track_model_tokens(
+            r.get("model", ""),
+            r.get("input_tokens", 0),
+            r.get("output_tokens", 0),
+        )
 
     return reviews, overall_average
+
+
+def _detect_reviewer_outliers(reviews: List[Dict]) -> Optional[str]:
+    """Detect if any reviewer gave a significantly harsher score than others.
+
+    Returns a string describing outlier reviewers, or None if scores are consistent.
+    """
+    if len(reviews) < 2:
+        return None
+
+    scores = [r["average"] for r in reviews]
+    avg = sum(scores) / len(scores)
+
+    outliers = []
+    for r in reviews:
+        deviation = avg - r["average"]
+        # Flag reviewers scoring 1.5+ points below average
+        if deviation >= 1.5:
+            outliers.append(
+                f"Reviewer '{r['specialist_name']}' scored {r['average']:.1f} "
+                f"(avg: {avg:.1f}, deviation: -{deviation:.1f})"
+            )
+
+    if not outliers:
+        return None
+
+    # Compute what the average would be without the outlier(s)
+    non_outlier_scores = [r["average"] for r in reviews if (avg - r["average"]) < 1.5]
+    adjusted_avg = sum(non_outlier_scores) / len(non_outlier_scores) if non_outlier_scores else avg
+
+    return (
+        "REVIEWER OUTLIER DETECTED:\n"
+        + "\n".join(f"- {o}" for o in outliers)
+        + f"\nAdjusted average (excluding outliers): {adjusted_avg:.1f}/10\n"
+        "Consider whether the outlier reviewer applied disproportionately harsh standards."
+    )
+
+
+def _build_auto_accept_decision(
+    reviews: List[Dict], overall_average: float, round_number: int, threshold: float
+) -> Dict:
+    """Build a synthetic ACCEPT decision when score meets threshold automatically."""
+    strengths = []
+    for r in reviews:
+        strengths.extend(r.get("strengths", [])[:2])
+    # Deduplicate and limit
+    seen = set()
+    unique_strengths = []
+    for s in strengths:
+        if s not in seen:
+            seen.add(s)
+            unique_strengths.append(s)
+            if len(unique_strengths) >= 3:
+                break
+
+    return {
+        "decision": "ACCEPT",
+        "confidence": 5,
+        "meta_review": (
+            f"The manuscript achieved an average reviewer score of {overall_average:.1f}/10, "
+            f"meeting the acceptance threshold of {threshold}/10. "
+            f"All structural completeness checks passed. "
+            f"Auto-accepted based on reviewer consensus."
+        ),
+        "key_strengths": unique_strengths or ["Meets quality threshold"],
+        "key_weaknesses": [],
+        "required_changes": [],
+        "recommendation": f"Accepted — score {overall_average:.1f} meets threshold {threshold}.",
+        "round": round_number,
+        "overall_average": round(overall_average, 1),
+        "tokens": 0,
+        "auto_accepted": True,
+    }
 
 
 class WorkflowOrchestrator:
@@ -360,12 +458,13 @@ class WorkflowOrchestrator:
         expert_configs: List[ExpertConfig],
         topic: str,
         max_rounds: int = 3,
-        threshold: float = 7.5,
+        threshold: float = 7.0,
         output_dir: Optional[Path] = None,
         status_callback = None,
         category: Optional[dict] = None,
         article_length: str = "full",
         audience_level: str = "professional",
+        research_type: str = "survey",
     ):
         """Initialize workflow orchestrator.
 
@@ -379,6 +478,7 @@ class WorkflowOrchestrator:
             category: Optional dict with 'major' and 'subfield' keys for domain detection
             article_length: "full" (3,000-5,000 words) or "short" (1,500-2,500 words)
             audience_level: "beginner", "intermediate", or "professional"
+            research_type: "survey" or "research" — determines writing/review approach
         """
         self.expert_configs = expert_configs
         self.topic = topic
@@ -390,6 +490,8 @@ class WorkflowOrchestrator:
         self.category = category
         self.article_length = article_length
         self.audience_level = audience_level
+        self.research_type = research_type
+        self._current_stage = "initializing"  # Track current pipeline stage for error context
 
         # Compute domain description from category
         if category and category.get("major"):
@@ -424,6 +526,14 @@ class WorkflowOrchestrator:
         Returns:
             Workflow results dictionary
         """
+        try:
+            return await self._run_impl(initial_manuscript)
+        except Exception as e:
+            stage = getattr(self, '_current_stage', 'unknown')
+            raise type(e)(f"[Stage: {stage}] {e}") from e
+
+    async def _run_impl(self, initial_manuscript: Optional[str] = None) -> dict:
+        """Internal implementation of the workflow run."""
         self.tracker.start_workflow()
 
         console.print(Panel.fit(
@@ -436,6 +546,7 @@ class WorkflowOrchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate or use provided manuscript
+        self._current_stage = "writing initial manuscript"
         if initial_manuscript is None:
             if self.status_callback:
                 self.status_callback("writing", 0, "Generating initial manuscript...")
@@ -485,6 +596,7 @@ class WorkflowOrchestrator:
         previous_manuscript = None
 
         # Desk screening - quick editor check before expensive peer review
+        self._current_stage = "desk screening"
         if self.status_callback:
             self.status_callback("desk_screening", 0, "Editor screening manuscript...")
 
@@ -496,7 +608,13 @@ class WorkflowOrchestrator:
         ) as progress:
             task = progress.add_task("[cyan]Desk editor screening...", total=None)
             desk_result = await self.desk_editor.screen(current_manuscript, self.topic)
-            self.tracker.record_desk_editor(tokens=desk_result.get("tokens", 0))
+            self._desk_result = desk_result
+            self.tracker.record_desk_editor(
+                tokens=desk_result.get("tokens", 0),
+                input_tokens=desk_result.get("input_tokens", 0),
+                output_tokens=desk_result.get("output_tokens", 0),
+                model=desk_result.get("model", ""),
+            )
             progress.update(task, completed=True)
 
         if desk_result["decision"] == "DESK_REJECT":
@@ -543,6 +661,7 @@ class WorkflowOrchestrator:
             console.print("\n" + "="*80 + "\n")
 
             # Run review
+            self._current_stage = f"peer review (round {round_num}/{self.max_rounds})"
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Expert reviews in progress...")
 
@@ -559,7 +678,8 @@ class WorkflowOrchestrator:
                 previous_manuscript,
                 prev_response,  # Pass author response to reviewers
                 self.article_length,
-                self.audience_level
+                self.audience_level,
+                self.research_type,
             )
 
             # Update status after reviews complete
@@ -576,29 +696,47 @@ class WorkflowOrchestrator:
                 )
                 console.print(f"[yellow]⚠ {completeness_warning}[/yellow]")
 
-            # Moderator decision first
-            console.print("\n[cyan]Moderator evaluating...[/cyan]")
-
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                task = progress.add_task("[cyan]Moderator evaluating...", total=None)
-                self.tracker.start_operation("moderator")
-                moderator_decision = await self.moderator.make_decision(
-                    current_manuscript,
-                    reviews,
-                    round_num,
-                    self.max_rounds,
-                    previous_rounds=all_rounds,
-                    domain=self.domain_desc,
-                    completeness_warning=completeness_warning,
+            # Auto-accept if score >= threshold and manuscript is complete
+            self._current_stage = f"moderator evaluation (round {round_num})"
+            if overall_average >= self.threshold and (completeness_warning is None):
+                console.print(f"\n[bold green]✓ AUTO-ACCEPT: Score {overall_average:.1f} >= {self.threshold} threshold[/bold green]")
+                moderator_decision = _build_auto_accept_decision(
+                    reviews, overall_average, round_num, self.threshold
                 )
-                moderator_time = self.tracker.end_operation("moderator")
-                self.tracker.record_moderator_time(moderator_time)
-                self.tracker.record_moderator(tokens=moderator_decision.get("tokens", 0))
-                progress.update(task, completed=True)
+                self.tracker.record_moderator_time(0)
+            else:
+                # Detect outlier reviewers for moderator context
+                outlier_info = _detect_reviewer_outliers(reviews)
+
+                # Moderator decision
+                console.print("\n[cyan]Moderator evaluating...[/cyan]")
+
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console
+                ) as progress:
+                    task = progress.add_task("[cyan]Moderator evaluating...", total=None)
+                    self.tracker.start_operation("moderator")
+                    moderator_decision = await self.moderator.make_decision(
+                        current_manuscript,
+                        reviews,
+                        round_num,
+                        self.max_rounds,
+                        previous_rounds=all_rounds,
+                        domain=self.domain_desc,
+                        completeness_warning=completeness_warning,
+                        outlier_info=outlier_info,
+                    )
+                    moderator_time = self.tracker.end_operation("moderator")
+                    self.tracker.record_moderator_time(moderator_time)
+                    self.tracker.record_moderator(
+                        tokens=moderator_decision.get("tokens", 0),
+                        input_tokens=moderator_decision.get("input_tokens", 0),
+                        output_tokens=moderator_decision.get("output_tokens", 0),
+                        model=moderator_decision.get("model", ""),
+                    )
+                    progress.update(task, completed=True)
 
             # Report score + decision via status callback for activity log
             if self.status_callback:
@@ -734,6 +872,7 @@ class WorkflowOrchestrator:
             previous_manuscript = current_manuscript
 
             # Generate revision
+            self._current_stage = f"manuscript revision (round {round_num})"
             if self.status_callback:
                 self.status_callback("revising", round_num, f"Round {round_num}: Revising manuscript based on feedback...")
 
@@ -752,6 +891,7 @@ class WorkflowOrchestrator:
                     domain=self.domain_desc,
                     article_length=self.article_length,
                     audience_level=self.audience_level,
+                    research_type=self.research_type,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
@@ -857,6 +997,7 @@ class WorkflowOrchestrator:
                 domain=self.domain_desc,
                 article_length=self.article_length,
                 audience_level=self.audience_level,
+                research_type=self.research_type,
             )
             duration = self.tracker.end_operation("initial_draft")
             self.tracker.record_initial_draft(duration, **self.writer.get_last_token_usage())
@@ -927,6 +1068,8 @@ class WorkflowOrchestrator:
             "threshold": self.threshold,
             "category": self.category,
             "audience_level": self.audience_level,
+            "research_type": self.research_type,
+            "desk_screening": getattr(self, '_desk_result', {}),
             "expert_team": [config.to_dict() for config in self.expert_configs],
             "rounds": all_rounds,
             "final_score": all_rounds[-1]["overall_average"],
@@ -967,6 +1110,7 @@ class WorkflowOrchestrator:
             "expert_configs": [config.to_dict() for config in self.expert_configs],
             "category": self.category,
             "audience_level": self.audience_level,
+            "research_type": self.research_type,
             "checkpoint_time": datetime.now().isoformat(),
             "status": "in_progress"
         }
@@ -1015,6 +1159,7 @@ class WorkflowOrchestrator:
             status_callback=status_callback,
             category=checkpoint.get("category"),
             audience_level=checkpoint.get("audience_level", "professional"),
+            research_type=checkpoint.get("research_type", "survey"),
         )
 
         # Restore state
@@ -1038,7 +1183,20 @@ class WorkflowOrchestrator:
         current_manuscript: str,
         all_rounds: List[dict]
     ) -> dict:
-        """Continue workflow from a specific round.
+        """Continue workflow from a specific round."""
+        try:
+            return await self._resume_workflow_impl(start_round, current_manuscript, all_rounds)
+        except Exception as e:
+            stage = getattr(self, '_current_stage', 'unknown')
+            raise type(e)(f"[Stage: {stage}] {e}") from e
+
+    async def _resume_workflow_impl(
+        self,
+        start_round: int,
+        current_manuscript: str,
+        all_rounds: List[dict]
+    ) -> dict:
+        """Internal implementation of resume workflow.
 
         Args:
             start_round: Round number to resume from
@@ -1067,8 +1225,10 @@ class WorkflowOrchestrator:
             return await self._finalize_workflow(all_rounds)
 
         # Check if revision was interrupted: last decision needed revision but revised manuscript missing
+        self._current_stage = f"resuming from round {start_round}"
         revised_path = self.output_dir / f"manuscript_v{start_round + 1}.md"
         if last_decision in ("MINOR_REVISION", "MAJOR_REVISION") and not revised_path.exists():
+            self._current_stage = f"re-running interrupted revision (round {start_round})"
             console.print(f"[yellow]Revision for round {start_round} was interrupted — re-running revision...[/yellow]")
 
             if self.status_callback:
@@ -1093,6 +1253,7 @@ class WorkflowOrchestrator:
                     article_length=self.article_length,
                     author_response=prev_author_response,
                     audience_level=self.audience_level,
+                    research_type=self.research_type,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)
@@ -1123,6 +1284,7 @@ class WorkflowOrchestrator:
             console.print("\n" + "="*80 + "\n")
 
             # Run review
+            self._current_stage = f"peer review (round {round_num}/{self.max_rounds})"
             if self.status_callback:
                 self.status_callback("reviewing", round_num, f"Round {round_num}/{self.max_rounds}: Expert reviews in progress...")
 
@@ -1139,7 +1301,8 @@ class WorkflowOrchestrator:
                 previous_manuscript,
                 prev_response,
                 self.article_length,
-                self.audience_level
+                self.audience_level,
+                self.research_type,
             )
 
             if self.status_callback:
@@ -1155,47 +1318,66 @@ class WorkflowOrchestrator:
                 )
                 console.print(f"[yellow]⚠ {completeness_warning}[/yellow]")
 
-            # Moderator decision + author response in parallel (same as main run())
-            console.print("\n[cyan]Moderator evaluating + Author preparing response (parallel)...[/cyan]")
-
-            async def _run_moderator_resume():
-                self.tracker.start_operation("moderator")
-                result = await self.moderator.make_decision(
-                    current_manuscript,
-                    reviews,
-                    round_num,
-                    self.max_rounds,
-                    previous_rounds=all_rounds,
-                    domain=self.domain_desc,
-                    completeness_warning=completeness_warning,
+            # Auto-accept if score >= threshold and manuscript is complete
+            self._current_stage = f"moderator evaluation (round {round_num})"
+            if overall_average >= self.threshold and (completeness_warning is None):
+                console.print(f"\n[bold green]✓ AUTO-ACCEPT: Score {overall_average:.1f} >= {self.threshold} threshold[/bold green]")
+                moderator_decision = _build_auto_accept_decision(
+                    reviews, overall_average, round_num, self.threshold
                 )
-                moderator_time = self.tracker.end_operation("moderator")
-                self.tracker.record_moderator_time(moderator_time)
-                self.tracker.record_moderator(tokens=result.get("tokens", 0))
-                return result
+                self.tracker.record_moderator_time(0)
+                speculative_author_response = None
+            else:
+                # Detect outlier reviewers for moderator context
+                outlier_info = _detect_reviewer_outliers(reviews)
 
-            async def _run_author_response_resume():
-                self.tracker.start_operation("author_response")
-                result = await self.author_response_agent.write_author_response(
-                    current_manuscript,
-                    reviews,
-                    round_num
-                )
-                response_time = self.tracker.end_operation("author_response")
-                self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
-                return result
+                # Moderator decision + author response in parallel
+                console.print("\n[cyan]Moderator evaluating + Author preparing response (parallel)...[/cyan]")
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                task = progress.add_task("[cyan]Moderator + Author response (parallel)...", total=None)
-                moderator_decision, speculative_author_response = await asyncio.gather(
-                    _run_moderator_resume(),
-                    _run_author_response_resume()
-                )
-                progress.update(task, completed=True)
+                async def _run_moderator_resume():
+                    self.tracker.start_operation("moderator")
+                    result = await self.moderator.make_decision(
+                        current_manuscript,
+                        reviews,
+                        round_num,
+                        self.max_rounds,
+                        previous_rounds=all_rounds,
+                        domain=self.domain_desc,
+                        completeness_warning=completeness_warning,
+                        outlier_info=outlier_info,
+                    )
+                    moderator_time = self.tracker.end_operation("moderator")
+                    self.tracker.record_moderator_time(moderator_time)
+                    self.tracker.record_moderator(
+                        tokens=result.get("tokens", 0),
+                        input_tokens=result.get("input_tokens", 0),
+                        output_tokens=result.get("output_tokens", 0),
+                        model=result.get("model", ""),
+                    )
+                    return result
+
+                async def _run_author_response_resume():
+                    self.tracker.start_operation("author_response")
+                    result = await self.author_response_agent.write_author_response(
+                        current_manuscript,
+                        reviews,
+                        round_num
+                    )
+                    response_time = self.tracker.end_operation("author_response")
+                    self.tracker.record_author_response(**self.author_response_agent.get_last_token_usage())
+                    return result
+
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console
+                ) as progress:
+                    task = progress.add_task("[cyan]Moderator + Author response (parallel)...", total=None)
+                    moderator_decision, speculative_author_response = await asyncio.gather(
+                        _run_moderator_resume(),
+                        _run_author_response_resume()
+                    )
+                    progress.update(task, completed=True)
 
             # Report score + decision via status callback for activity log
             if self.status_callback:
@@ -1311,6 +1493,7 @@ class WorkflowOrchestrator:
             previous_manuscript = current_manuscript
 
             # Generate revision
+            self._current_stage = f"manuscript revision (round {round_num})"
             if self.status_callback:
                 self.status_callback("revising", round_num, f"Round {round_num}: Revising manuscript based on feedback...")
 
@@ -1329,6 +1512,7 @@ class WorkflowOrchestrator:
                     domain=self.domain_desc,
                     article_length=self.article_length,
                     audience_level=self.audience_level,
+                    research_type=self.research_type,
                 )
                 revision_time = self.tracker.end_operation("revision")
                 self.tracker.record_revision_time(revision_time)

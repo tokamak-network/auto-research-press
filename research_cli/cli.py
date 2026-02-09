@@ -271,7 +271,7 @@ async def _test_providers():
 @click.option("--num-experts", type=int, default=3, help="Number of expert reviewers")
 @click.option("--auto-accept-team", is_flag=True, help="Skip interactive team editing")
 @click.option("--max-rounds", type=int, default=3, help="Maximum review rounds")
-@click.option("--threshold", type=float, default=7.5, help="Score threshold for acceptance")
+@click.option("--threshold", type=float, default=7.0, help="Score threshold for acceptance")
 @click.option("--manuscript", type=click.Path(exists=True), help="Path to existing manuscript (skip generation)")
 @click.option("--article-length", type=click.Choice(["short", "full"]), default="full", help="Article length: short (1,500-2,500 words) or full (3,000-5,000 words)")
 def run(
@@ -457,7 +457,7 @@ async def _run_workflow(
 @click.option("--subfield", default="security", help="Subfield")
 @click.option("--num-coauthors", default=2, help="Number of co-authors (0-3)")
 @click.option("--max-rounds", default=3, help="Maximum review rounds")
-@click.option("--threshold", default=7.5, help="Acceptance threshold")
+@click.option("--threshold", default=7.0, help="Acceptance threshold")
 @click.option("--target-length", default=4000, help="Target manuscript length in words")
 def collaborate(
     topic: str,

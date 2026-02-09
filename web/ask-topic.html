@@ -1518,6 +1518,7 @@
                 const articleLength = document.querySelector('#article-length-selector .research-type-option.selected')?.dataset.length || 'full';
                 const workflowMode = document.querySelector('#workflow-mode-selector .research-type-option.selected')?.dataset.mode || 'standard';
                 const audienceLevel = document.querySelector('.audience-option.selected')?.dataset.level || 'professional';
+                const researchType = document.querySelector('.research-type-option[data-type].selected')?.dataset.type || 'survey';
 
                 const response = await fetch(`${API_BASE}/api/start-workflow`, {
                     method: 'POST',
@@ -1531,7 +1532,8 @@
                         category: selectedCategory,
                         article_length: articleLength,
                         workflow_mode: workflowMode,
-                        audience_level: audienceLevel
+                        audience_level: audienceLevel,
+                        research_type: researchType
                     })
                 });
 

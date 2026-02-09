@@ -29,6 +29,7 @@ class ModeratorAgent:
         previous_rounds: List[Dict] = None,
         domain: str = "interdisciplinary research",
         completeness_warning: str = None,
+        outlier_info: str = None,
     ) -> Dict:
         """Make accept/reject decision based on peer reviews.
 
@@ -39,6 +40,8 @@ class ModeratorAgent:
             max_rounds: Maximum rounds allowed
             previous_rounds: Previous round data for trajectory analysis
             domain: Domain description for editorial context
+            completeness_warning: Warning about manuscript completeness issues
+            outlier_info: Description of outlier reviewers detected
 
         Returns:
             Dictionary with decision, reasoning, and meta-review
@@ -106,6 +109,22 @@ Think like a real editor who cares about publishing valuable work, not a score c
 An incomplete or truncated manuscript MUST receive MAJOR_REVISION (or REJECT), never ACCEPT.
 """
 
+        # Build outlier warning block
+        outlier_block = ""
+        if outlier_info:
+            outlier_block = f"""
+⚠ {outlier_info}
+
+EDITORIAL GUIDANCE ON OUTLIER REVIEWERS:
+When one reviewer scores significantly lower than others, consider:
+- Was the reviewer applying standards beyond the scope of this venue?
+- Do the other reviewers (who scored higher) agree the paper has merit?
+- If the adjusted average (excluding outlier) meets the threshold, you MAY accept.
+- If the article makes a notable contribution to the field, lean toward acceptance
+  even if the overall average is slightly below threshold.
+- If you decide to accept despite the outlier, explain your reasoning clearly.
+"""
+
         prompt = f"""You are reviewing a manuscript submission. Exercise your editorial judgment.
 
 SUBMISSION STATUS:
@@ -116,7 +135,7 @@ SUBMISSION STATUS:
 
 PEER REVIEWS:
 {reviews_summary}
-{completeness_block}
+{completeness_block}{outlier_block}
 ---
 
 EDITORIAL ANALYSIS REQUIRED:
@@ -162,14 +181,15 @@ Make your decision in JSON format:
 }}
 
 {f"FINAL ROUND — Binary decision only: ACCEPT or REJECT. No more revisions possible. If the paper has shown improvement and remaining issues are minor, ACCEPT. If fundamental problems persist, REJECT." if round_number >= max_rounds else "DECISION GUIDANCE (not strict rules):"}
-{f"" if round_number >= max_rounds else "- ACCEPT: Contribution is valuable, major issues resolved (often 7.5+, but use judgment)"}
+{f"" if round_number >= max_rounds else "- ACCEPT: Contribution is valuable, major issues resolved (7.0+ or notable contribution with outlier reviewer)"}
 {f"" if round_number >= max_rounds else "- MINOR_REVISION: Specific small fixes needed"}
 {f"" if round_number >= max_rounds else "- MAJOR_REVISION: Substantial problems remain"}
 {f"" if round_number >= max_rounds else "- REJECT: Fundamental flaws or insufficient contribution"}
 
 Remember: You are an EDITOR, not a score calculator. The average score is advisory, not binding.
-A paper at 7.5 with strong improvement trajectory and substantive contribution may merit acceptance.
-A paper at 8.0 with valid unresolved fundamental concerns may need revision.
+A paper near 7.0 with strong improvement trajectory and substantive contribution SHOULD be accepted.
+A paper well below 7.0 but with a harsh outlier reviewer may still merit acceptance if other reviewers are positive.
+If an article makes a clear contribution to the field, err on the side of acceptance.
 
 Exercise your judgment now."""
 
@@ -225,6 +245,9 @@ Exercise your judgment now."""
         decision_data["round"] = round_number
         decision_data["overall_average"] = round(overall_avg, 1)
         decision_data["tokens"] = response.total_tokens
+        decision_data["input_tokens"] = response.input_tokens or 0
+        decision_data["output_tokens"] = response.output_tokens or 0
+        decision_data["model"] = self.model
 
         return decision_data
 

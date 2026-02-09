@@ -3,7 +3,7 @@
 from typing import AsyncIterator, Optional
 from openai import AsyncOpenAI
 
-from .base import BaseLLM, LLMResponse
+from .base import BaseLLM, LLMResponse, retry_llm_call
 
 
 class OpenAILLM(BaseLLM):
@@ -55,22 +55,24 @@ class OpenAILLM(BaseLLM):
         # gpt-5 models only support temperature=1
         api_temp = 1.0 if "gpt-5" in self.model else temperature
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=api_temp,
-            max_tokens=max_tokens,
-            **kwargs
-        )
+        async def _call():
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=api_temp,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+            return LLMResponse(
+                content=response.choices[0].message.content,
+                model=response.model,
+                provider="openai",
+                input_tokens=response.usage.prompt_tokens if response.usage else None,
+                output_tokens=response.usage.completion_tokens if response.usage else None,
+                stop_reason=response.choices[0].finish_reason,
+            )
 
-        return LLMResponse(
-            content=response.choices[0].message.content,
-            model=response.model,
-            provider="openai",
-            input_tokens=response.usage.prompt_tokens if response.usage else None,
-            output_tokens=response.usage.completion_tokens if response.usage else None,
-            stop_reason=response.choices[0].finish_reason,
-        )
+        return await retry_llm_call(_call)
 
     async def generate_streaming(
         self,
@@ -94,42 +96,42 @@ class OpenAILLM(BaseLLM):
         # gpt-5 models only support temperature=1
         api_temp = 1.0 if "gpt-5" in self.model else temperature
 
-        stream = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=api_temp,
-            max_tokens=max_tokens,
-            stream=True,
-            **kwargs
-        )
+        async def _call():
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=api_temp,
+                max_tokens=max_tokens,
+                stream=True,
+                **kwargs
+            )
 
-        full_content = []
-        finish_reason = None
+            full_content = []
+            finish_reason = None
+            input_tokens = None
+            output_tokens = None
 
-        # Initialize token counters if supported by stream options
-        input_tokens = None
-        output_tokens = None
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    full_content.append(chunk.choices[0].delta.content)
 
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                full_content.append(chunk.choices[0].delta.content)
+                if chunk.choices and chunk.choices[0].finish_reason:
+                    finish_reason = chunk.choices[0].finish_reason
 
-            if chunk.choices and chunk.choices[0].finish_reason:
-                finish_reason = chunk.choices[0].finish_reason
+                if hasattr(chunk, "usage") and chunk.usage:
+                    input_tokens = chunk.usage.prompt_tokens
+                    output_tokens = chunk.usage.completion_tokens
 
-            # Some providers/proxies return usage in the final chunk
-            if hasattr(chunk, "usage") and chunk.usage:
-                input_tokens = chunk.usage.prompt_tokens
-                output_tokens = chunk.usage.completion_tokens
+            return LLMResponse(
+                content="".join(full_content),
+                model=self.model,
+                provider="openai",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                stop_reason=finish_reason,
+            )
 
-        return LLMResponse(
-            content="".join(full_content),
-            model=self.model,
-            provider="openai",
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            stop_reason=finish_reason,
-        )
+        return await retry_llm_call(_call)
 
     async def stream(
         self,

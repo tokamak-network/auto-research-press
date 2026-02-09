@@ -1,9 +1,14 @@
 """Google Gemini LLM provider implementation."""
 
+import warnings
 from typing import AsyncIterator, Optional
-import google.generativeai as genai
 
-from .base import BaseLLM, LLMResponse
+# Suppress FutureWarning from deprecated google.generativeai package on import
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    import google.generativeai as genai
+
+from .base import BaseLLM, LLMResponse, retry_llm_call
 
 
 class GeminiLLM(BaseLLM):
@@ -55,34 +60,37 @@ class GeminiLLM(BaseLLM):
             **kwargs
         )
 
-        response = await self.client.generate_content_async(
-            full_prompt,
-            generation_config=generation_config,
-        )
+        async def _call():
+            response = await self.client.generate_content_async(
+                full_prompt,
+                generation_config=generation_config,
+            )
 
-        # Extract token counts if available
-        input_tokens = None
-        output_tokens = None
-        if hasattr(response, 'usage_metadata'):
-            input_tokens = response.usage_metadata.prompt_token_count
-            output_tokens = response.usage_metadata.candidates_token_count
+            # Extract token counts if available
+            input_tokens = None
+            output_tokens = None
+            if hasattr(response, 'usage_metadata'):
+                input_tokens = response.usage_metadata.prompt_token_count
+                output_tokens = response.usage_metadata.candidates_token_count
 
-        # Extract stop reason if available
-        stop_reason = None
-        if hasattr(response, 'candidates') and response.candidates:
-            finish_reason = response.candidates[0].finish_reason
-            # Gemini uses enum: 1=STOP (normal), 2=MAX_TOKENS, 3=SAFETY, etc.
-            if finish_reason is not None:
-                stop_reason = finish_reason.name if hasattr(finish_reason, 'name') else str(finish_reason)
+            # Extract stop reason if available
+            stop_reason = None
+            if hasattr(response, 'candidates') and response.candidates:
+                finish_reason = response.candidates[0].finish_reason
+                # Gemini uses enum: 1=STOP (normal), 2=MAX_TOKENS, 3=SAFETY, etc.
+                if finish_reason is not None:
+                    stop_reason = finish_reason.name if hasattr(finish_reason, 'name') else str(finish_reason)
 
-        return LLMResponse(
-            content=response.text,
-            model=self.model,
-            provider="google",
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            stop_reason=stop_reason,
-        )
+            return LLMResponse(
+                content=response.text,
+                model=self.model,
+                provider="google",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                stop_reason=stop_reason,
+            )
+
+        return await retry_llm_call(_call)
 
     async def stream(
         self,

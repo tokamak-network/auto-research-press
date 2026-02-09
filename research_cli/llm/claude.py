@@ -3,7 +3,7 @@
 from typing import AsyncIterator, Optional
 from anthropic import AsyncAnthropic
 
-from .base import BaseLLM, LLMResponse
+from .base import BaseLLM, LLMResponse, retry_llm_call
 
 
 class ClaudeLLM(BaseLLM):
@@ -49,23 +49,25 @@ class ClaudeLLM(BaseLLM):
         """
         messages = [{"role": "user", "content": prompt}]
 
-        response = await self.client.messages.create(
-            model=self.model,
-            messages=messages,
-            system=[{"type": "text", "text": system}] if system else None,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs
-        )
+        async def _call():
+            response = await self.client.messages.create(
+                model=self.model,
+                messages=messages,
+                system=[{"type": "text", "text": system}] if system else None,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+            return LLMResponse(
+                content=response.content[0].text,
+                model=response.model,
+                provider="anthropic",
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                stop_reason=response.stop_reason,
+            )
 
-        return LLMResponse(
-            content=response.content[0].text,
-            model=response.model,
-            provider="anthropic",
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
-            stop_reason=response.stop_reason,
-        )
+        return await retry_llm_call(_call)
 
     async def generate_streaming(
         self,
@@ -83,26 +85,29 @@ class ClaudeLLM(BaseLLM):
         """
         messages = [{"role": "user", "content": prompt}]
 
-        async with self.client.messages.stream(
-            model=self.model,
-            messages=messages,
-            system=[{"type": "text", "text": system}] if system else None,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs
-        ) as stream:
-            async for _chunk in stream.text_stream:
-                pass  # drain the stream to keep connection alive
-            message = await stream.get_final_message()
+        async def _call():
+            async with self.client.messages.stream(
+                model=self.model,
+                messages=messages,
+                system=[{"type": "text", "text": system}] if system else None,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            ) as stream:
+                async for _chunk in stream.text_stream:
+                    pass  # drain the stream to keep connection alive
+                message = await stream.get_final_message()
 
-        return LLMResponse(
-            content=message.content[0].text,
-            model=message.model,
-            provider="anthropic",
-            input_tokens=message.usage.input_tokens,
-            output_tokens=message.usage.output_tokens,
-            stop_reason=message.stop_reason,
-        )
+            return LLMResponse(
+                content=message.content[0].text,
+                model=message.model,
+                provider="anthropic",
+                input_tokens=message.usage.input_tokens,
+                output_tokens=message.usage.output_tokens,
+                stop_reason=message.stop_reason,
+            )
+
+        return await retry_llm_call(_call)
 
     async def stream(
         self,

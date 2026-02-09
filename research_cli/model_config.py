@@ -151,8 +151,8 @@ def _get_base_url(provider: str) -> Optional[str]:
     env_base_url = provider_cfg.get("env_base_url", "")
     base_url = os.environ.get(env_base_url, "") if env_base_url else ""
 
-    # Anthropic: only use direct API, no fallback to LLM_BASE_URL
-    if provider == "anthropic":
+    # Anthropic & Google: only use direct API, no fallback to LLM_BASE_URL
+    if provider in ("anthropic", "google"):
         return base_url or None
 
     # Other providers: fallback to shared LLM_BASE_URL (e.g. LiteLLM/OpenRouter endpoint)

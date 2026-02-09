@@ -219,6 +219,7 @@ class WriterAgent:
         domain: str = "interdisciplinary research",
         article_length: str = "full",
         audience_level: str = "professional",
+        research_type: str = "survey",
     ) -> str:
         """Write initial research manuscript.
 
@@ -229,6 +230,7 @@ class WriterAgent:
             domain: Domain description for specialization context
             article_length: "full" (3,000-5,000 words) or "short" (1,500-2,500 words)
             audience_level: "beginner", "intermediate", or "professional"
+            research_type: "survey" or "research" — determines paper structure
 
         Returns:
             Manuscript text in markdown format
@@ -251,8 +253,17 @@ TARGET AUDIENCE: Intermediate readers (basic domain knowledge assumed)
 - Balance theoretical depth with practical applicability
 - Include both conceptual explanations and technical details"""
 
+        # Research type guidance
+        research_type_guidance = ""
+        if research_type == "survey":
+            research_type_guidance = """
+PAPER TYPE: Survey / Literature Review
+Your task is to SYNTHESIZE existing research, NOT propose new experiments.
+Focus on: comprehensive coverage, taxonomy, comparison tables, gap identification.
+Structure should include: background, methodology of survey, thematic analysis, comparison, future directions."""
+
         system_prompt = f"""You are an expert research writer specializing in {domain}.
-{audience_guidance}
+{audience_guidance}{research_type_guidance}
 Your writing style:
 - Write in flowing academic prose with well-developed paragraphs
 - Each paragraph should have a topic sentence, supporting evidence, and analysis
@@ -295,6 +306,28 @@ CITATION RULES:
             length_requirement = "- 3,000-5,000 words"
             length_guidance = ""
 
+        # Survey-specific required sections
+        if research_type == "survey":
+            sections_guidance = """
+Required sections for survey paper:
+## TL;DR (2-3 sentence summary of key findings — no citations, plain language)
+## Executive Summary (scope & motivation)
+## Introduction (scope, motivation, and survey methodology including search criteria)
+## Thematic Analysis / Taxonomy (organized review of literature)
+## Comparative Analysis (with tables if applicable)
+## Open Challenges & Future Directions
+## Conclusion
+## References"""
+        else:
+            sections_guidance = """
+- Start with ## TL;DR (2-3 sentence summary of key findings — no citations, plain language)
+- Include executive summary
+- Structured sections with clear headings
+- Technical depth appropriate for experts
+- Cite specific examples, protocols, and data
+- Include practical implications
+- Forward-looking analysis of trends"""
+
         prompt = f"""Write a comprehensive research report on the following topic:
 
 TOPIC: {topic}
@@ -303,12 +336,7 @@ PROFILE: {profile}
 {refs_block}
 Requirements:
 {length_requirement}
-- Include executive summary
-- Structured sections with clear headings
-- Technical depth appropriate for experts
-- Cite specific examples, protocols, and data
-- Include practical implications
-- Forward-looking analysis of trends{length_guidance}
+{sections_guidance}{length_guidance}
 {"- Include inline citations [1], [2] and a References section at the end" if references else ""}
 
 Format: Markdown with proper headings (##, ###). Write in flowing academic prose paragraphs.
@@ -434,6 +462,7 @@ Write the complete author response now."""
         article_length: str = "full",
         author_response: Optional[str] = None,
         audience_level: str = "professional",
+        research_type: str = "survey",
     ) -> str:
         """Revise manuscript based on specialist feedback.
 
@@ -446,6 +475,7 @@ Write the complete author response now."""
             article_length: "full" or "short" — controls revision length constraints
             author_response: Author's response/rebuttal from this round (for revision accountability)
             audience_level: "beginner", "intermediate", or "professional"
+            research_type: "survey" or "research" — adjusts revision focus
 
         Returns:
             Revised manuscript text
@@ -474,8 +504,19 @@ AUDIENCE: Intermediate (basic domain knowledge assumed)
 - Balance theoretical depth with practical applicability
 """
 
+        # Research type revision guidance
+        research_type_revision_note = ""
+        if research_type == "survey":
+            research_type_revision_note = """
+PAPER TYPE: Survey / Literature Review
+- Focus revisions on breadth of coverage and synthesis quality
+- Strengthen taxonomy and categorization of surveyed works
+- Improve comparison tables and gap identification
+- Do NOT add novel experiments — maintain survey/review focus
+"""
+
         system_prompt = f"""You are an expert research writer revising a manuscript based on peer review feedback.
-{audience_revision_note}
+{audience_revision_note}{research_type_revision_note}
 Your revision approach:
 - Address all substantive criticisms — EVERY item in the revision checklist must be handled
 - Maintain the manuscript's core structure and arguments where valid

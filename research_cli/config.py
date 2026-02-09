@@ -22,7 +22,7 @@ class WorkflowConfig:
     """Configuration for research workflow."""
 
     max_review_rounds: int = 3
-    score_threshold: float = 7.5
+    score_threshold: float = 7.0
     results_dir: Path = Path("results")
 
 
@@ -103,7 +103,7 @@ class Config:
 
         # Workflow settings
         self.max_review_rounds = int(os.getenv("MAX_REVIEW_ROUNDS", "3"))
-        self.score_threshold = float(os.getenv("SCORE_THRESHOLD", "7.5"))
+        self.score_threshold = float(os.getenv("SCORE_THRESHOLD", "7.0"))
         self.results_dir = Path(os.getenv("RESULTS_DIR", "results"))
 
     def get_llm_config(

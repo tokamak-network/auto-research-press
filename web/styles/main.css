@@ -887,8 +887,15 @@ code {
         gap: var(--spacing-02);
     }
 
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-02);
+    }
+
     .site-nav {
         gap: var(--spacing-03);
+        flex-wrap: wrap;
     }
 
     .nav-link,
@@ -907,13 +914,17 @@ code {
 }
 
 @media (max-width: 480px) {
-    .header-content {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
     .site-nav {
         width: 100%;
         justify-content: space-between;
+        gap: var(--spacing-02);
+    }
+
+    .hero-title {
+        font-size: var(--type-scale-06);
+    }
+
+    .hero-subtitle {
+        font-size: var(--type-scale-03);
     }
 }

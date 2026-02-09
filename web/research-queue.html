@@ -804,6 +804,489 @@
             font-size: 12px;
             font-weight: 600;
         }
+
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 1.5rem;
+            gap: 0;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: var(--background-hover);
+        }
+
+        .tab-btn.active {
+            color: var(--link-primary);
+            border-bottom-color: var(--link-primary);
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--layer-01);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            color: var(--text-secondary);
+        }
+
+        .tab-btn.active .tab-badge {
+            background: var(--link-primary);
+            border-color: var(--link-primary);
+            color: white;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            margin-bottom: 1rem;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--background);
+            color: var(--text);
+            font-size: 0.875rem;
+            font-family: var(--font-sans);
+            transition: border-color 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--link-primary);
+            box-shadow: 0 0 0 1px var(--link-primary);
+        }
+
+        .search-bar input::placeholder {
+            color: var(--text-placeholder);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: 0.5rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            color: var(--text);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--background-hover);
+            border-color: var(--border-strong);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            padding: 0 0.5rem;
+        }
+
+        /* Admin Toggle */
+        .admin-bar {
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-sans);
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+        }
+
+        .admin-toggle:hover {
+            background: var(--background-hover);
+            border-color: var(--border-strong);
+            color: var(--text);
+        }
+
+        .admin-toggle svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .admin-toggle .chevron {
+            width: 12px;
+            height: 12px;
+            transition: transform 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+        }
+
+        .admin-toggle.expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .auth-badge {
+            display: none;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10b981;
+            color: #065f46;
+            border-radius: 0;
+        }
+
+        .auth-badge.visible {
+            display: inline-flex;
+        }
+
+        /* API Key Panel */
+        .api-key-panel {
+            display: none;
+            margin-bottom: 1rem;
+        }
+
+        .api-key-panel.open {
+            display: block;
+        }
+
+        /* API Key Bar */
+        .api-key-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .api-key-bar label {
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 0.875rem;
+        }
+
+        .api-key-bar input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--background);
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+
+        .api-key-bar .btn {
+            font-size: 0.75rem;
+            padding: 0.5rem 0.75rem;
+        }
+
+        .api-key-bar .api-key-status {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .queue-container {
+                padding: 1.5rem 1rem;
+            }
+
+            .queue-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .queue-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .workflow-header {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .workflow-status {
+                align-items: flex-start;
+                flex-direction: row;
+            }
+
+            .workflow-steps {
+                display: none;
+            }
+
+            .workflow-actions {
+                flex-wrap: wrap;
+            }
+
+            .api-key-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .tab-bar {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .search-bar input {
+                width: 100%;
+            }
+
+            .round-milestones {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .round-connector {
+                display: none;
+            }
+
+            .workflow-stats {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .expert-team-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .pagination {
+                flex-wrap: wrap;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .queue-container {
+                padding: 1rem 0.75rem;
+            }
+
+            .queue-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-card {
+                padding: 1rem;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+
+            .tab-btn {
+                padding: 0.625rem 0.75rem;
+                font-size: 0.8125rem;
+            }
+
+            .workflow-card {
+                padding: 1rem;
+            }
+        }
+
+        /* Upload Report Modal */
+        .upload-btn {
+            display: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-subtle);
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-family: var(--font-sans);
+            border-radius: 0;
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+            gap: 0.375rem;
+            align-items: center;
+        }
+        .upload-btn.visible { display: inline-flex; }
+        .upload-btn:hover {
+            background: var(--background-hover);
+            border-color: var(--text-secondary);
+        }
+        .upload-btn svg { width: 14px; height: 14px; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--surface, #fff);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            width: 560px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .modal h2 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        .modal .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .modal .form-group label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: var(--text-primary);
+        }
+
+        .modal .form-group input,
+        .modal .form-group select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--background);
+            color: var(--text);
+            font-size: 0.875rem;
+            font-family: var(--font-sans);
+            box-sizing: border-box;
+        }
+
+        .modal .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .file-drop {
+            border: 2px dashed var(--border);
+            border-radius: 2px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        .file-drop:hover, .file-drop.dragover {
+            border-color: var(--primary-600, #0f62fe);
+            background: rgba(15, 98, 254, 0.04);
+        }
+        .file-drop.has-file {
+            border-color: #10b981;
+            color: var(--text-primary);
+        }
+        .file-drop input { display: none; }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .modal-actions .btn-cancel {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            font-family: var(--font-sans);
+            border-radius: 0;
+        }
+
+        .modal-actions .btn-upload {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: var(--primary-600, #0f62fe);
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-family: var(--font-sans);
+            border-radius: 0;
+            transition: background 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+        }
+        .modal-actions .btn-upload:hover { background: var(--primary-700, #0043ce); }
+        .modal-actions .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #upload-status {
+            font-size: 0.8125rem;
+            margin-top: 0.5rem;
+        }
+        #upload-status.error { color: #da1e28; }
+        #upload-status.success { color: #198038; }
     </style>
 </head>
 <body>
@@ -846,13 +1329,26 @@
             <p>Monitor the status of all research report generation workflows</p>
         </div>
 
-        <!-- API Key -->
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 1rem 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem;">
-            <label for="api-key" style="font-weight: 600; white-space: nowrap; font-size: 0.875rem;">API Key</label>
-            <input type="password" id="api-key" placeholder="Enter your API key"
-                   style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 2px; background: var(--background); color: var(--text); font-size: 0.875rem;">
-            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.5rem 0.75rem;" onclick="saveApiKey()">Save</button>
-            <span id="api-key-status" style="font-size: 0.75rem; color: var(--text-secondary);"></span>
+        <!-- Admin / API Key -->
+        <div class="admin-bar" style="display:flex;align-items:center;gap:0.75rem;">
+            <button class="admin-toggle" id="admin-toggle" onclick="toggleApiKeyBar()">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a4 4 0 0 0-4 4v3H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V5a4 4 0 0 0-4-4zm2 7H6V5a2 2 0 1 1 4 0v3z"/></svg>
+                Admin
+                <span id="auth-badge" class="auth-badge">Authenticated</span>
+                <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 5.427a.75.75 0 0 1 1.06-.073L8 7.585l2.513-2.231a.75.75 0 1 1 .997 1.122l-3 2.662a.75.75 0 0 1-.997 0l-3-2.662a.75.75 0 0 1-.086-1.049z"/></svg>
+            </button>
+            <button class="upload-btn" id="upload-report-btn" onclick="openUploadModal()">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H2.75z"/><path d="M8.75 8.311V14a.75.75 0 0 1-1.5 0V8.311L5.28 10.28a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25a.749.749 0 1 1-1.06 1.06L8.75 8.311z"/></svg>
+                Upload Report
+            </button>
+        </div>
+        <div id="api-key-panel" class="api-key-panel">
+            <div class="api-key-bar">
+                <label for="api-key">API Key</label>
+                <input type="password" id="api-key" placeholder="Enter your API key">
+                <button class="btn btn-secondary" onclick="saveApiKey()">Save</button>
+                <span id="api-key-status" class="api-key-status"></span>
+            </div>
         </div>
 
         <div class="auto-refresh">
@@ -880,21 +1376,35 @@
             </div>
         </div>
 
-        <div id="workflow-list" class="workflow-list">
-            <!-- Active/Accepted workflows will be inserted here -->
+        <!-- Search -->
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search by topic or project ID...">
         </div>
 
-        <!-- Rejected Papers Section -->
-        <div style="margin-top: 3rem;">
-            <button id="toggle-rejected" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-                <svg id="rejected-arrow" viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; transition: transform 0.3s;">
-                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-                <span>Rejected Papers (<span id="rejected-count">0</span>)</span>
+        <!-- Tabs -->
+        <div class="tab-bar" role="tablist">
+            <button class="tab-btn active" role="tab" data-tab="active" aria-selected="true">
+                Active <span class="tab-badge" id="tab-count-active">0</span>
             </button>
-            <div id="rejected-list" class="workflow-list" style="display: none; margin-top: 1.5rem;">
-                <!-- Rejected workflows will be inserted here -->
-            </div>
+            <button class="tab-btn" role="tab" data-tab="completed" aria-selected="false">
+                Completed <span class="tab-badge" id="tab-count-completed">0</span>
+            </button>
+            <button class="tab-btn" role="tab" data-tab="rejected" aria-selected="false">
+                Rejected <span class="tab-badge" id="tab-count-rejected">0</span>
+            </button>
+        </div>
+
+        <div class="tab-panel active" id="panel-active" role="tabpanel">
+            <div id="workflow-list-active" class="workflow-list"></div>
+            <div id="pagination-active" class="pagination" style="display: none;"></div>
+        </div>
+        <div class="tab-panel" id="panel-completed" role="tabpanel">
+            <div id="workflow-list-completed" class="workflow-list"></div>
+            <div id="pagination-completed" class="pagination" style="display: none;"></div>
+        </div>
+        <div class="tab-panel" id="panel-rejected" role="tabpanel">
+            <div id="workflow-list-rejected" class="workflow-list"></div>
+            <div id="pagination-rejected" class="pagination" style="display: none;"></div>
         </div>
 
         <div id="empty-state" class="empty-state" style="display: none;">
@@ -910,6 +1420,64 @@
         </div>
     </main>
 
+    <!-- Upload Report Modal -->
+    <div class="modal-overlay" id="upload-modal">
+        <div class="modal">
+            <h2>Upload External Report</h2>
+            <div class="form-group">
+                <label for="upload-title">Title</label>
+                <input type="text" id="upload-title" placeholder="Article title">
+            </div>
+            <div class="form-group">
+                <label for="upload-topic">Topic</label>
+                <input type="text" id="upload-topic" placeholder="Research topic">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="upload-research-type">Research Type</label>
+                    <select id="upload-research-type">
+                        <option value="research">Original Research</option>
+                        <option value="survey">Survey / Literature Review</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="upload-audience">Audience Level</label>
+                    <select id="upload-audience">
+                        <option value="professional">Professional</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="beginner">Beginner</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="upload-major-field">Major Field</label>
+                    <select id="upload-major-field" onchange="updateUploadSubfields()">
+                        <option value="">Select field...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="upload-subfield">Subfield</label>
+                    <select id="upload-subfield">
+                        <option value="">Select subfield...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Markdown File</label>
+                <div class="file-drop" id="file-drop" onclick="document.getElementById('upload-file').click()">
+                    <input type="file" id="upload-file" accept=".md,.markdown,.txt" onchange="handleFileSelect(event)">
+                    <span id="file-drop-text">Drop .md file here or click to select</span>
+                </div>
+            </div>
+            <div id="upload-status"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeUploadModal()">Cancel</button>
+                <button class="btn-upload" id="btn-do-upload" onclick="doUploadReport()">Upload</button>
+            </div>
+        </div>
+    </div>
+
     <footer class="site-footer">
         <div class="container">
             <p><strong>Platform:</strong> Autonomous Research Press</p>
@@ -922,20 +1490,40 @@
         const API_BASE = '';
         let autoRefreshInterval = null;
         let isAdmin = false;
-        const expandedPanels = new Map(); // domKey -> projectId for expanded panels
-        let lastDataHash = null; // skip DOM rebuild when data unchanged
+        const expandedPanels = new Map();
+        let lastDataHash = null;
+
+        // Tab, search, pagination state
+        const ACTIVE_STATUSES = ['queued', 'composing_team', 'searching', 'writing', 'desk_screening', 'reviewing', 'revising', 'research', 'writing_sections', 'interrupted', 'failed'];
+        let currentTab = 'active';
+        let searchQuery = '';
+        let searchDebounceTimer = null;
+        const PAGE_SIZE = 10;
+        const tabPages = { active: 1, completed: 1, rejected: 1 };
+        // Store categorized workflows for rendering
+        let cachedTabs = { active: [], completed: [], rejected: [] };
 
         // --- API Key helpers ---
         function getApiKey() {
             return localStorage.getItem('research_api_key') || '';
+        }
+        function toggleApiKeyBar() {
+            const panel = document.getElementById('api-key-panel');
+            const toggle = document.getElementById('admin-toggle');
+            const isOpen = panel.classList.toggle('open');
+            toggle.classList.toggle('expanded', isOpen);
+        }
+        function updateAuthBadge() {
+            const badge = document.getElementById('auth-badge');
+            badge.classList.toggle('visible', !!getApiKey());
         }
         function saveApiKey() {
             const key = document.getElementById('api-key').value.trim();
             localStorage.setItem('research_api_key', key);
             document.getElementById('api-key-status').textContent = key ? 'Saved' : 'Cleared';
             setTimeout(() => document.getElementById('api-key-status').textContent = '', 2000);
-            checkAdmin();
-            loadWorkflows();
+            updateAuthBadge();
+            checkAdmin().then(() => loadWorkflows());
         }
         function apiHeaders() {
             const headers = {};
@@ -956,6 +1544,338 @@
             } catch {
                 isAdmin = false;
             }
+            // Show/hide upload button based on admin status
+            const uploadBtn = document.getElementById('upload-report-btn');
+            if (uploadBtn) uploadBtn.classList.toggle('visible', isAdmin);
+        }
+
+        // --- Upload Report ---
+        const UPLOAD_CATEGORIES = {
+            "computer_science": {
+                "name": "Computer Science",
+                "subfields": {
+                    "ai_ml": "AI & Machine Learning", "systems": "Systems & Distributed Computing",
+                    "theory": "Theory & Algorithms", "security": "Security & Cryptography",
+                    "software_eng": "Software Engineering", "hci": "Human-Computer Interaction"
+                }
+            },
+            "engineering": {
+                "name": "Engineering & Technology",
+                "subfields": {
+                    "electrical": "Electrical & Electronics Engineering", "mechanical": "Mechanical Engineering",
+                    "civil": "Civil & Structural Engineering", "materials": "Materials Science"
+                }
+            },
+            "natural_sciences": {
+                "name": "Natural Sciences",
+                "subfields": {
+                    "physics": "Physics & Astronomy", "chemistry": "Chemistry",
+                    "biology": "Biology & Life Sciences", "earth_science": "Earth & Environmental Sciences",
+                    "mathematics": "Pure Mathematics"
+                }
+            },
+            "social_sciences": {
+                "name": "Social Sciences",
+                "subfields": {
+                    "economics": "Economics", "sociology": "Sociology",
+                    "political_science": "Political Science", "psychology": "Psychology",
+                    "anthropology": "Anthropology"
+                }
+            },
+            "humanities": {
+                "name": "Humanities",
+                "subfields": {
+                    "philosophy": "Philosophy", "history": "History",
+                    "literature": "Literature & Literary Studies", "linguistics": "Linguistics"
+                }
+            },
+            "business_economics": {
+                "name": "Business & Economics",
+                "subfields": {
+                    "finance": "Finance & Accounting", "management": "Management & Strategy",
+                    "marketing": "Marketing"
+                }
+            },
+            "medicine_health": {
+                "name": "Medicine & Health Sciences",
+                "subfields": {
+                    "clinical": "Clinical Medicine", "public_health": "Public Health & Epidemiology",
+                    "pharmacology": "Pharmacology"
+                }
+            },
+            "law_policy": {
+                "name": "Law & Public Policy",
+                "subfields": {
+                    "law": "Law & Legal Studies", "policy": "Public Policy & Administration"
+                }
+            }
+        };
+
+        let uploadFileContent = null;
+
+        function initUploadCategoryDropdowns() {
+            const majorSel = document.getElementById('upload-major-field');
+            majorSel.innerHTML = '<option value="">Select field...</option>';
+            for (const [key, data] of Object.entries(UPLOAD_CATEGORIES)) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = data.name;
+                majorSel.appendChild(opt);
+            }
+        }
+
+        function updateUploadSubfields() {
+            const major = document.getElementById('upload-major-field').value;
+            const subSel = document.getElementById('upload-subfield');
+            subSel.innerHTML = '<option value="">Select subfield...</option>';
+            if (major && UPLOAD_CATEGORIES[major]) {
+                for (const [key, name] of Object.entries(UPLOAD_CATEGORIES[major].subfields)) {
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.textContent = name;
+                    subSel.appendChild(opt);
+                }
+            }
+        }
+
+        function openUploadModal() {
+            document.getElementById('upload-modal').classList.add('open');
+            initUploadCategoryDropdowns();
+            // Reset form
+            document.getElementById('upload-title').value = '';
+            document.getElementById('upload-topic').value = '';
+            document.getElementById('upload-research-type').value = 'research';
+            document.getElementById('upload-audience').value = 'professional';
+            document.getElementById('upload-status').textContent = '';
+            document.getElementById('upload-status').className = '';
+            document.getElementById('file-drop-text').textContent = 'Drop .md file here or click to select';
+            document.getElementById('file-drop').classList.remove('has-file');
+            uploadFileContent = null;
+        }
+
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.remove('open');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            readUploadFile(file);
+        }
+
+        function readUploadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadFileContent = e.target.result;
+                document.getElementById('file-drop-text').textContent = file.name;
+                document.getElementById('file-drop').classList.add('has-file');
+                // Auto-fill title from first H1 if empty
+                const titleInput = document.getElementById('upload-title');
+                if (!titleInput.value) {
+                    const m = uploadFileContent.match(/^#\s+(.+)/m);
+                    if (m) titleInput.value = m[1].trim();
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Drag and drop
+        document.addEventListener('DOMContentLoaded', () => {
+            const drop = document.getElementById('file-drop');
+            if (!drop) return;
+            drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+            drop.addEventListener('dragleave', () => { drop.classList.remove('dragover'); });
+            drop.addEventListener('drop', (e) => {
+                e.preventDefault();
+                drop.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) readUploadFile(file);
+            });
+        });
+
+        // Close modal on overlay click
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'upload-modal') closeUploadModal();
+        });
+
+        async function doUploadReport() {
+            const title = document.getElementById('upload-title').value.trim();
+            const topic = document.getElementById('upload-topic').value.trim();
+            const researchType = document.getElementById('upload-research-type').value;
+            const audience = document.getElementById('upload-audience').value;
+            const major = document.getElementById('upload-major-field').value;
+            const subfield = document.getElementById('upload-subfield').value;
+            const statusEl = document.getElementById('upload-status');
+
+            if (!title) { statusEl.textContent = 'Title is required'; statusEl.className = 'error'; return; }
+            if (!topic) { statusEl.textContent = 'Topic is required'; statusEl.className = 'error'; return; }
+            if (!uploadFileContent) { statusEl.textContent = 'Please select a .md file'; statusEl.className = 'error'; return; }
+
+            const btn = document.getElementById('btn-do-upload');
+            btn.disabled = true;
+            statusEl.textContent = 'Uploading...';
+            statusEl.className = '';
+
+            try {
+                const body = {
+                    title,
+                    topic,
+                    content: uploadFileContent,
+                    research_type: researchType,
+                    audience_level: audience,
+                };
+                if (major && subfield) {
+                    body.category = { major, subfield };
+                }
+
+                const resp = await fetch(`${API_BASE}/api/admin/upload-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+                    body: JSON.stringify(body),
+                });
+
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Upload failed');
+                }
+
+                const result = await resp.json();
+                statusEl.textContent = `Uploaded: ${result.project_id}`;
+                statusEl.className = 'success';
+                setTimeout(() => {
+                    closeUploadModal();
+                    loadWorkflows();
+                }, 1000);
+            } catch (e) {
+                statusEl.textContent = e.message;
+                statusEl.className = 'error';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- Tab handling ---
+        function initTabs() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    switchTab(btn.dataset.tab);
+                });
+            });
+            // Restore tab from URL hash
+            const hash = window.location.hash.replace('#', '');
+            if (['active', 'completed', 'rejected'].includes(hash)) {
+                switchTab(hash);
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            window.location.hash = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isActive = btn.dataset.tab === tab;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive);
+            });
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === `panel-${tab}`);
+            });
+            renderCurrentTab();
+        }
+
+        // --- Search ---
+        function initSearch() {
+            const input = document.getElementById('search-input');
+            input.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => {
+                    searchQuery = input.value.trim().toLowerCase();
+                    // Reset all tab pages on search
+                    tabPages.active = 1;
+                    tabPages.completed = 1;
+                    tabPages.rejected = 1;
+                    renderAllTabs();
+                }, 300);
+            });
+        }
+
+        function filterWorkflows(workflows) {
+            if (!searchQuery) return workflows;
+            return workflows.filter(wf => {
+                const topic = (wf.topic || extractTopicFromId(wf.project_id)).toLowerCase();
+                const pid = (wf.project_id || '').toLowerCase();
+                return topic.includes(searchQuery) || pid.includes(searchQuery);
+            });
+        }
+
+        // --- Pagination ---
+        function renderPagination(tabName, totalItems) {
+            const el = document.getElementById(`pagination-${tabName}`);
+            const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+            const page = tabPages[tabName];
+
+            if (totalItems <= PAGE_SIZE) {
+                el.style.display = 'none';
+                return;
+            }
+
+            el.style.display = 'flex';
+            el.innerHTML = `
+                <button onclick="changePage('${tabName}', ${page - 1})" ${page <= 1 ? 'disabled' : ''}>Prev</button>
+                <span class="page-info">Page ${page} of ${totalPages}</span>
+                <button onclick="changePage('${tabName}', ${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next</button>
+            `;
+        }
+
+        function changePage(tabName, newPage) {
+            const filtered = filterWorkflows(cachedTabs[tabName]);
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            if (newPage < 1 || newPage > totalPages) return;
+            tabPages[tabName] = newPage;
+            renderTab(tabName);
+        }
+
+        // --- Rendering ---
+        function renderAllTabs() {
+            renderTab('active');
+            renderTab('completed');
+            renderTab('rejected');
+        }
+
+        function renderCurrentTab() {
+            renderTab(currentTab);
+        }
+
+        function renderTab(tabName) {
+            const filtered = filterWorkflows(cachedTabs[tabName]);
+            const page = tabPages[tabName];
+            const start = (page - 1) * PAGE_SIZE;
+            const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+            const listEl = document.getElementById(`workflow-list-${tabName}`);
+            if (pageItems.length === 0) {
+                const msg = searchQuery ? 'No matching workflows' : (tabName === 'active' ? 'No active workflows' : tabName === 'completed' ? 'No completed workflows' : 'No rejected workflows');
+                listEl.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">${msg}</div>`;
+            } else {
+                listEl.innerHTML = pageItems.map(wf => createWorkflowCard(wf)).join('');
+            }
+
+            renderPagination(tabName, filtered.length);
+
+            // Update tab badge counts (filtered)
+            document.getElementById(`tab-count-${tabName}`).textContent = filtered.length;
+
+            // Restore expanded panels
+            for (const [panelId, projectId] of expandedPanels) {
+                const el = document.getElementById(panelId);
+                if (el) {
+                    el.style.display = 'block';
+                    if (panelId.startsWith('detailed-log-')) {
+                        loadDetailedLog(projectId);
+                    } else if (panelId.startsWith('activity-feed-')) {
+                        loadActivityLog(projectId);
+                    }
+                }
+            }
         }
 
         // Load saved key on page load
@@ -965,12 +1885,16 @@
                 document.getElementById('api-key').value = saved;
                 document.getElementById('api-key-status').textContent = 'Loaded from saved';
             }
+            updateAuthBadge();
+            initTabs();
+            initSearch();
             await checkAdmin();
+            loadWorkflows();
+            startAutoRefresh();
         });
 
         async function loadWorkflows() {
             try {
-                // Fetch both sources in parallel: active workflows + completed projects
                 const [wfResponse, projResponse] = await Promise.all([
                     fetch(`${API_BASE}/api/workflows`, { headers: apiHeaders() }).catch(() => null),
                     fetch(`${API_BASE}/api/projects`).catch(() => null)
@@ -978,7 +1902,6 @@
 
                 let allWorkflows = [];
 
-                // Active/in-memory workflows from /api/workflows
                 if (wfResponse && wfResponse.ok) {
                     const wfData = await wfResponse.json();
                     if (wfData && wfData.workflows) {
@@ -986,14 +1909,12 @@
                     }
                 }
 
-                // Completed projects from /api/projects (disk-based)
                 const activeIds = new Set(allWorkflows.map(w => w.project_id));
                 if (projResponse && projResponse.ok) {
                     const projData = await projResponse.json();
                     if (projData && projData.projects) {
                         for (const wf of projData.projects) {
                             if (activeIds.has(wf.id)) {
-                                // Merge disk data into in-memory entry (enrich score/rounds)
                                 const existing = allWorkflows.find(w => w.project_id === wf.id);
                                 if (existing) {
                                     if (!existing.final_score && wf.final_score) existing.final_score = wf.final_score;
@@ -1025,22 +1946,31 @@
                                 final_decision: wf.final_decision,
                                 topic: wf.topic,
                                 category: wf.category,
+                                research_type: wf.research_type,
+                                total_tokens: wf.total_tokens || 0,
+                                estimated_cost: wf.estimated_cost || 0,
+                                word_count: wf.word_count || 0,
+                                expert_team: wf.expert_team || [],
+                                start_time: wf.start_time,
                                 data_file: wf.data_file
                             });
                         }
                     }
                 }
 
+                const emptyDiv = document.getElementById('empty-state');
                 if (allWorkflows.length === 0) {
-                    displayWorkflows([], []);
+                    emptyDiv.style.display = 'block';
+                    cachedTabs = { active: [], completed: [], rejected: [] };
+                    renderAllTabs();
                     updateStats([]);
                     return;
                 }
+                emptyDiv.style.display = 'none';
 
-                // Build a lightweight hash to detect changes (status + progress + round for each workflow)
+                // Hash check to skip DOM rebuild when data unchanged
                 const dataHash = allWorkflows.map(w => `${w.project_id}:${w.status}:${w.progress_percentage}:${w.current_round}`).join('|');
                 if (dataHash === lastDataHash) {
-                    // No change — only refresh expanded activity feeds (they stream live data)
                     for (const [panelId, projectId] of expandedPanels) {
                         if (panelId.startsWith('activity-feed-')) {
                             loadActivityLog(projectId);
@@ -1050,120 +1980,70 @@
                 }
                 lastDataHash = dataHash;
 
-                const accepted = allWorkflows.filter(wf =>
-                    wf.status === 'completed' ||
-                    wf.status === 'interrupted' ||
-                    wf.status === 'failed' ||  // errors stay in main list (not rejected)
-                    ['queued', 'composing_team', 'searching', 'writing', 'desk_screening', 'reviewing', 'revising', 'research', 'writing_sections'].includes(wf.status)
-                );
-                const rejected = allWorkflows.filter(wf =>
-                    wf.status === 'rejected'
-                );
+                // Categorize into tabs
+                const active = allWorkflows.filter(wf => ACTIVE_STATUSES.includes(wf.status));
+                const completed = allWorkflows.filter(wf => wf.status === 'completed');
+                const rejected = allWorkflows.filter(wf => wf.status === 'rejected');
 
-                displayWorkflows(accepted, rejected);
+                // Sort active: interrupted/failed first, then by timestamp desc
+                active.sort((a, b) => {
+                    const aUrgent = a.status === 'interrupted' || a.status === 'failed';
+                    const bUrgent = b.status === 'interrupted' || b.status === 'failed';
+                    if (aUrgent && !bUrgent) return -1;
+                    if (!aUrgent && bUrgent) return 1;
+                    const ta = a.timestamp || a.start_time || '';
+                    const tb = b.timestamp || b.start_time || '';
+                    return tb.localeCompare(ta);
+                });
+
+                // Sort completed/rejected by timestamp desc
+                completed.sort((a, b) => {
+                    const ta = a.timestamp || a.start_time || '';
+                    const tb = b.timestamp || b.start_time || '';
+                    return tb.localeCompare(ta);
+                });
+                rejected.sort((a, b) => {
+                    const ta = a.timestamp || a.start_time || '';
+                    const tb = b.timestamp || b.start_time || '';
+                    return tb.localeCompare(ta);
+                });
+
+                cachedTabs = { active, completed, rejected };
+                renderAllTabs();
                 updateStats(allWorkflows);
+
+                // Scroll to highlighted workflow
+                const urlParams = new URLSearchParams(window.location.search);
+                const highlightId = urlParams.get('highlight');
+                if (highlightId) {
+                    // Find which tab the highlighted workflow is in
+                    for (const [tab, workflows] of Object.entries(cachedTabs)) {
+                        if (workflows.some(w => w.project_id === highlightId)) {
+                            if (currentTab !== tab) switchTab(tab);
+                            break;
+                        }
+                    }
+                    setTimeout(() => {
+                        const element = document.getElementById(`wf-${sanitizeDomId(highlightId)}`);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 100);
+                }
 
             } catch (error) {
                 console.error('Error loading workflows:', error);
                 document.getElementById('refresh-status').innerHTML =
                     '<span style="color: var(--error);">Connection error</span>';
-                displayWorkflows([], []);
+                cachedTabs = { active: [], completed: [], rejected: [] };
+                renderAllTabs();
                 updateStats([]);
             }
         }
 
-        function displayWorkflows(acceptedWorkflows, rejectedWorkflows) {
-            console.log('displayWorkflows called:', {
-                accepted: acceptedWorkflows?.length,
-                rejected: rejectedWorkflows?.length
-            });
-
-            const listDiv = document.getElementById('workflow-list');
-            const rejectedListDiv = document.getElementById('rejected-list');
-            const emptyDiv = document.getElementById('empty-state');
-            const rejectedCountSpan = document.getElementById('rejected-count');
-
-            const allWorkflows = [...(acceptedWorkflows || []), ...(rejectedWorkflows || [])];
-
-            if (allWorkflows.length === 0) {
-                listDiv.innerHTML = '';
-                rejectedListDiv.innerHTML = '';
-                emptyDiv.style.display = 'block';
-                document.getElementById('toggle-rejected').style.display = 'none';
-                return;
-            }
-
-            emptyDiv.style.display = 'none';
-
-            // Sort accepted workflows: interrupted/failed first, then active, then by project_id desc
-            acceptedWorkflows.sort((a, b) => {
-                const activeStatuses = ['queued', 'composing_team', 'searching', 'writing', 'desk_screening', 'reviewing', 'revising', 'interrupted', 'failed', 'research', 'writing_sections'];
-                const aInterrupted = a.status === 'interrupted' || a.status === 'failed';
-                const bInterrupted = b.status === 'interrupted' || b.status === 'failed';
-                const aActive = activeStatuses.includes(a.status);
-                const bActive = activeStatuses.includes(b.status);
-
-                // Interrupted/failed workflows come first
-                if (aInterrupted && !bInterrupted) return -1;
-                if (!aInterrupted && bInterrupted) return 1;
-
-                if (aActive && !bActive) return -1;
-                if (!aActive && bActive) return 1;
-                const ta = a.timestamp || a.start_time || '';
-                const tb = b.timestamp || b.start_time || '';
-                return tb.localeCompare(ta);
-            });
-
-            // Sort rejected workflows by timestamp desc (newest first)
-            rejectedWorkflows.sort((a, b) => {
-                const ta = a.timestamp || a.start_time || '';
-                const tb = b.timestamp || b.start_time || '';
-                return tb.localeCompare(ta);
-            });
-
-            listDiv.innerHTML = acceptedWorkflows.map(wf => createWorkflowCard(wf)).join('');
-            rejectedListDiv.innerHTML = rejectedWorkflows.map(wf => createWorkflowCard(wf)).join('');
-
-            // Restore expanded panels after DOM rebuild
-            for (const [panelId, projectId] of expandedPanels) {
-                const el = document.getElementById(panelId);
-                if (el) {
-                    el.style.display = 'block';
-                    if (panelId.startsWith('detailed-log-')) {
-                        loadDetailedLog(projectId);
-                    } else if (panelId.startsWith('activity-feed-')) {
-                        loadActivityLog(projectId);
-                    }
-                }
-            }
-
-            // Update rejected count
-            const rejectedCount = rejectedWorkflows?.length || 0;
-            rejectedCountSpan.textContent = rejectedCount;
-            const toggleBtn = document.getElementById('toggle-rejected');
-            if (toggleBtn) {
-                toggleBtn.style.display = rejectedCount > 0 ? 'flex' : 'none';
-                console.log('Rejected button display:', rejectedCount > 0 ? 'flex' : 'none', 'Count:', rejectedCount);
-            }
-
-            // Scroll to highlighted workflow
-            const urlParams = new URLSearchParams(window.location.search);
-            const highlightId = urlParams.get('highlight');
-            if (highlightId) {
-                setTimeout(() => {
-                    const element = document.getElementById(`wf-${sanitizeDomId(highlightId)}`);
-                    if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 100);
-            }
-        }
-
         function createWorkflowCard(wf) {
-            // Escape project_id for safe use in onclick attributes
             const pid = escapeJsStr(wf.project_id);
             const domId = sanitizeDomId(wf.project_id);
-            // Use topic from data if available, otherwise extract from project_id
             const topic = wf.topic || extractTopicFromId(wf.project_id);
             const isActive = ['queued', 'composing_team', 'searching', 'writing', 'desk_screening', 'reviewing', 'revising', 'research', 'writing_sections'].includes(wf.status);
             const isInterrupted = wf.status === 'interrupted';
@@ -1173,10 +2053,8 @@
             const isDone = isCompleted || isRejected;
             const progressClass = isCompleted ? 'completed' :
                                  (isRejected || isFailed) ? 'failed' : '';
-            // Ensure progress is 100% for completed/rejected workflows; failed keeps its last progress
             const progressPercentage = isDone ? 100 : (wf.progress_percentage || 0);
 
-            // Check if this workflow should be highlighted
             const urlParams = new URLSearchParams(window.location.search);
             const highlightId = urlParams.get('highlight');
             const isHighlighted = highlightId === wf.project_id;
@@ -1206,7 +2084,6 @@
                 `;
             }).join('');
 
-            // Reviewer inline tags (if available)
             let expertStatusHtml = '';
             if (wf.expert_status && wf.expert_status.length > 0 && (isActive || isInterrupted || isFailed)) {
                 expertStatusHtml = `
@@ -1217,15 +2094,14 @@
                 `;
             }
 
-            // Timeline
             let timelineHtml = '';
             if (wf.elapsed_time_seconds !== undefined) {
                 const elapsed = formatTime(wf.elapsed_time_seconds);
                 const remaining = wf.estimated_time_remaining_seconds ? formatTime(wf.estimated_time_remaining_seconds) : 'calculating...';
                 timelineHtml = `
                     <div class="timeline-indicator">
-                        <span>⏱️ Elapsed: ${elapsed}</span>
-                        <span>⏳ Remaining: ~${remaining}</span>
+                        <span>Elapsed: ${elapsed}</span>
+                        <span>Remaining: ~${remaining}</span>
                     </div>
                 `;
             }
@@ -1247,14 +2123,16 @@
                     ${deleteBtn}
                 `;
             } else if (isFailed) {
+                const retryBtn = isAdmin ? `<button class="btn btn-primary" onclick="resumeWorkflow('${pid}')">Retry Workflow</button>` : '';
                 actions = `
-                    <button class="btn btn-primary" onclick="resumeWorkflow('${pid}')">▶ Retry Workflow</button>
+                    ${retryBtn}
                     <button class="btn btn-secondary" onclick="toggleActivityFeed('${pid}')">View Activity Log</button>
                     ${deleteBtn}
                 `;
             } else if (wf.status === 'interrupted') {
+                const resumeBtn = isAdmin ? `<button class="btn btn-primary" onclick="resumeWorkflow('${pid}')">Resume Workflow</button>` : '';
                 actions = `
-                    <button class="btn btn-primary" onclick="resumeWorkflow('${pid}')">▶ Resume Workflow</button>
+                    ${resumeBtn}
                     <button class="btn btn-secondary" onclick="toggleActivityFeed('${pid}')">View Activity Log</button>
                     ${deleteBtn}
                 `;
@@ -1262,9 +2140,9 @@
                 actions = `<button class="btn btn-secondary" onclick="toggleActivityFeed('${pid}')">View Activity Log</button>`;
             }
 
-            const errorHtml = wf.error ? `<div class="error-message">Error: ${escapeHtml(wf.error)}</div>` : '';
+            const errorStage = wf.error_stage ? `<strong>Stage:</strong> ${escapeHtml(wf.error_stage)}<br>` : '';
+            const errorHtml = wf.error ? `<div class="error-message">${errorStage}<strong>Error:</strong> ${escapeHtml(wf.error)}</div>` : '';
 
-            // Round indicators for active workflows
             let roundIndicatorsHtml = '';
             if ((isActive || isInterrupted) && wf.total_rounds > 0) {
                 const indicators = [];
@@ -1282,7 +2160,6 @@
                 `;
             }
 
-            // Round milestones for completed/rejected workflows
             let roundMilestonesHtml = '';
             if (isDone && wf.rounds && wf.rounds.length > 0) {
                 const milestones = wf.rounds.map((round, idx) => {
@@ -1294,7 +2171,6 @@
                     else if (decision.includes('reject')) boxClass = 'reject';
 
                     const scoreColor = round.score >= 8 ? 'var(--success)' : round.score >= 7 ? 'var(--warning)' : 'var(--error)';
-
                     const connector = idx < wf.rounds.length - 1 ? '<div class="round-connector done"></div>' : '';
 
                     return `
@@ -1311,40 +2187,33 @@
                 roundMilestonesHtml = `<div class="round-milestones">${milestones}</div>`;
             }
 
-            // Workflow stats for completed/rejected workflows
             let workflowStatsHtml = '';
             if (isDone) {
                 const statsItems = [];
 
-                // Request time (start_time from API, or parse from project_id)
                 const startTime = wf.start_time ? new Date(wf.start_time) : null;
                 if (startTime && !isNaN(startTime)) {
                     const startStr = startTime.toLocaleString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false});
                     statsItems.push(`<div class="stat-item"><span class="stat-label">Requested</span><span class="stat-value">${startStr}</span></div>`);
                 }
 
-                // Total elapsed time
                 if (wf.elapsed_time_seconds > 0) {
                     statsItems.push(`<div class="stat-item"><span class="stat-label">Duration</span><span class="stat-value">${formatTime(wf.elapsed_time_seconds)}</span></div>`);
                 }
 
-                // Total tokens
                 if (wf.total_tokens > 0) {
                     const tokenStr = wf.total_tokens >= 1000 ? `${(wf.total_tokens / 1000).toFixed(1)}k` : wf.total_tokens;
                     statsItems.push(`<div class="stat-item"><span class="stat-label">Tokens</span><span class="stat-value">${tokenStr}</span></div>`);
                 }
 
-                // Estimated cost
                 if (wf.estimated_cost > 0) {
                     statsItems.push(`<div class="stat-item"><span class="stat-label">Cost</span><span class="stat-value">$${wf.estimated_cost.toFixed(2)}</span></div>`);
                 }
 
-                // Word count
                 if (wf.word_count > 0) {
                     statsItems.push(`<div class="stat-item"><span class="stat-label">Words</span><span class="stat-value">${wf.word_count.toLocaleString()}</span></div>`);
                 }
 
-                // Expert team / authors
                 const team = wf.expert_team || [];
                 let teamHtml = '';
                 if (team.length > 0) {
@@ -1357,7 +2226,6 @@
                 }
             }
 
-            // Dashboard (only for active or interrupted workflows)
             let dashboardHtml = '';
             if (isActive || isInterrupted) {
                 dashboardHtml = `
@@ -1372,7 +2240,6 @@
                 `;
             }
 
-            // Activity feed placeholder
             const activityFeedHtml = `
                 <div id="activity-feed-${domId}" class="activity-feed" style="display: none;">
                     <div class="activity-feed-header">
@@ -1400,6 +2267,7 @@
                             <div class="project-id">${escapeHtml(wf.project_id)}</div>
                         </div>
                         <div class="workflow-status">
+                            ${wf.research_type ? `<span class="status-badge" style="background:none;border:1px solid ${wf.research_type === 'survey' ? '#d4bbff' : '#a6c8ff'};color:${wf.research_type === 'survey' ? '#8a3ffc' : '#0f62fe'};">${wf.research_type === 'survey' ? 'SURVEY' : 'ORIGINAL'}</span>` : ''}
                             <span class="status-badge ${wf.status}">${wf.status.replace('_', ' ').toUpperCase()}</span>
                             ${isActive ? '<div class="spinner-inline"></div>' : ''}
                         </div>
@@ -1419,9 +2287,9 @@
                     ${isDone ? `
                         <div style="margin-top: 1rem;">
                             <button class="btn btn-secondary" style="width: 100%; font-size: 0.875rem;" onclick="toggleDetailedLog('${pid}')">
-                                📋 View Detailed Log
+                                View Detailed Log
                             </button>
-                            <div id="detailed-log-${domId}" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem;">
+                            <div id="detailed-log-${domId}" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 2px; font-size: 0.75rem;">
                                 <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Workflow Timeline</div>
                                 <div id="timeline-${domId}">Loading...</div>
                             </div>
@@ -1487,17 +2355,11 @@
             }
 
             const getIcon = (level) => {
-                const icons = {
-                    info: 'ℹ',
-                    success: '✓',
-                    warning: '⚠',
-                    error: '✕'
-                };
-                return icons[level] || 'ℹ';
+                const icons = { info: 'i', success: '✓', warning: '!', error: '✕' };
+                return icons[level] || 'i';
             };
 
             container.innerHTML = activities.map(activity => {
-                // Detect score/decision entries (e.g. "Round 1/3: Score 5.1/10 — MAJOR_REVISION")
                 const scoreMatch = activity.message.match(/Score\s+([\d.]+)\/10\s*[—–-]\s*(\w+)/);
                 let badge = '';
                 if (scoreMatch) {
@@ -1521,21 +2383,15 @@
                 </div>
             `;}).join('');
 
-            // Add filter listeners
             const filters = document.querySelectorAll(`#activity-feed-${domId} .activity-filter`);
             filters.forEach(filter => {
                 filter.addEventListener('click', () => {
                     filters.forEach(f => f.classList.remove('active'));
                     filter.classList.add('active');
-
                     const level = filter.dataset.level;
                     const entries = container.querySelectorAll('.activity-entry');
                     entries.forEach(entry => {
-                        if (level === 'all' || entry.dataset.level === level) {
-                            entry.style.display = 'flex';
-                        } else {
-                            entry.style.display = 'none';
-                        }
+                        entry.style.display = (level === 'all' || entry.dataset.level === level) ? 'flex' : 'none';
                     });
                 });
             });
@@ -1550,7 +2406,6 @@
             const rejected = workflows.filter(w => w.status === 'rejected').length;
 
             document.getElementById('stat-total').textContent = total;
-            // Show interrupted/failed counts in active stat if any
             const pausedParts = [];
             if (interrupted > 0) pausedParts.push(`${interrupted} paused`);
             if (failed > 0) pausedParts.push(`${failed} error`);
@@ -1560,9 +2415,7 @@
         }
 
         function extractTopicFromId(projectId) {
-            // Remove timestamp suffix and convert dashes to spaces
             const parts = projectId.split('-');
-            // Remove last 2 parts (date and time)
             if (parts.length > 2) {
                 parts.splice(-2);
             }
@@ -1612,33 +2465,26 @@
                     return;
                 }
 
-                const workflowStart = new Date(performance.workflow_start);
-
                 let timeline = [];
                 timeline.push({
                     time: formatTimestamp(performance.workflow_start),
-                    event: '🚀 Workflow Started',
+                    event: 'Workflow Started',
                     duration: null
                 });
 
-                // Add rounds
                 if (performance.rounds && performance.rounds.length > 0) {
                     performance.rounds.forEach(round => {
-                        const roundStart = new Date(round.review_start);
-                        const roundEnd = new Date(round.review_end);
-
                         timeline.push({
                             time: formatTimestamp(round.review_start),
-                            event: `📝 Round ${round.round_number} - Review Started`,
+                            event: `Round ${round.round_number} - Review Started`,
                             duration: null
                         });
 
-                        // Add reviewer times
                         if (round.reviewer_times) {
                             Object.entries(round.reviewer_times).forEach(([reviewer, time]) => {
                                 timeline.push({
                                     time: '',
-                                    event: `  └ ${reviewer}: ${time.toFixed(1)}s`,
+                                    event: `  ${reviewer}: ${time.toFixed(1)}s`,
                                     duration: null
                                 });
                             });
@@ -1647,7 +2493,7 @@
                         if (round.moderator_time) {
                             timeline.push({
                                 time: '',
-                                event: `  └ Moderator Decision: ${round.moderator_time.toFixed(1)}s`,
+                                event: `  Moderator Decision: ${round.moderator_time.toFixed(1)}s`,
                                 duration: null
                             });
                         }
@@ -1655,14 +2501,14 @@
                         if (round.revision_time) {
                             timeline.push({
                                 time: '',
-                                event: `  └ Revision: ${round.revision_time.toFixed(1)}s`,
+                                event: `  Revision: ${round.revision_time.toFixed(1)}s`,
                                 duration: null
                             });
                         }
 
                         timeline.push({
                             time: formatTimestamp(round.review_end),
-                            event: `✓ Round ${round.round_number} Complete`,
+                            event: `Round ${round.round_number} Complete`,
                             duration: `${round.review_duration.toFixed(1)}s`
                         });
                     });
@@ -1670,7 +2516,7 @@
 
                 timeline.push({
                     time: formatTimestamp(performance.workflow_end),
-                    event: '🎉 Workflow Completed',
+                    event: 'Workflow Completed',
                     duration: `Total: ${performance.total_duration.toFixed(1)}s`
                 });
 
@@ -1694,10 +2540,6 @@
             return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        function retryWorkflow(projectId) {
-            alert('Retry functionality coming soon');
-        }
-
         async function resumeWorkflow(projectId) {
             try {
                 const btn = event.target;
@@ -1717,15 +2559,19 @@
                 const result = await response.json();
                 console.log('Resume result:', result);
 
-                // Reload workflows to update the UI
                 await loadWorkflows();
 
-                // Show success notification with queue info
-                if (result.has_active_workflow) {
-                    btn.textContent = `⏳ Queued (#${result.queue_position})`;
-                    btn.title = 'Waiting for active workflow to finish';
+                if (result.checkpoint) {
+                    const cp = result.checkpoint;
+                    const detail = `Round ${cp.round}/${cp.max_rounds} · Score ${cp.last_score}/10`;
+                    if (result.has_active_workflow) {
+                        btn.textContent = `Queued (#${result.queue_position})`;
+                        btn.title = `Resume: ${detail} — waiting for active workflow`;
+                    } else {
+                        btn.textContent = `Resuming (${detail})`;
+                    }
                 } else {
-                    btn.textContent = '✓ Resumed!';
+                    btn.textContent = result.has_active_workflow ? `Queued (#${result.queue_position})` : 'Resumed!';
                 }
                 setTimeout(() => loadWorkflows(), 2000);
 
@@ -1733,7 +2579,7 @@
                 console.error('Error resuming workflow:', error);
                 alert(`Failed to resume workflow: ${error.message}`);
                 event.target.disabled = false;
-                event.target.textContent = '▶ Resume Workflow';
+                event.target.textContent = 'Resume Workflow';
             }
         }
 
@@ -1748,6 +2594,7 @@
                     const error = await resp.json();
                     throw new Error(error.detail || 'Failed to delete workflow');
                 }
+                lastDataHash = null; // Force refresh
                 await loadWorkflows();
             } catch (error) {
                 alert(`Failed to delete: ${error.message}`);
@@ -1779,24 +2626,6 @@
                 document.getElementById('refresh-status').textContent = '';
             }
         }
-
-        // Toggle rejected section
-        document.getElementById('toggle-rejected').addEventListener('click', () => {
-            const rejectedList = document.getElementById('rejected-list');
-            const arrow = document.getElementById('rejected-arrow');
-
-            if (rejectedList.style.display === 'none') {
-                rejectedList.style.display = 'flex';
-                arrow.style.transform = 'rotate(180deg)';
-            } else {
-                rejectedList.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
-            }
-        });
-
-        // Initial load
-        loadWorkflows();
-        startAutoRefresh();
     </script>
 </body>
 </html>

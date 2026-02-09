@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Callable
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -307,12 +307,13 @@ class StartWorkflowRequest(BaseModel):
     topic: str
     experts: List[dict]
     max_rounds: int = 3
-    threshold: float = 7.5
+    threshold: float = 7.0
     research_cycles: int = 1  # Number of research note iterations
     category: Optional[CategoryInfo] = None  # Academic category
     article_length: Optional[str] = "full"  # "full" or "short"
     workflow_mode: Optional[str] = "standard"  # "standard" or "collaborative"
     audience_level: Optional[str] = "professional"  # "beginner", "intermediate", "professional"
+    research_type: Optional[str] = "survey"  # "survey" or "research"
 
 
 class SubmitArticleRequest(BaseModel):
@@ -510,7 +511,8 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
             "cost_estimate": None,
             "start_time": datetime.now().isoformat(),
             "elapsed_time_seconds": 0,
-            "estimated_time_remaining_seconds": request.max_rounds * len(request.experts) * 120
+            "estimated_time_remaining_seconds": request.max_rounds * len(request.experts) * 120,
+            "research_type": request.research_type or "survey"
         }
 
         # Initialize activity log
@@ -530,6 +532,7 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
             "article_length": request.article_length or "full",
             "workflow_mode": request.workflow_mode or "standard",
             "audience_level": request.audience_level or "professional",
+            "research_type": request.research_type or "survey",
         }
         try:
             appdb.enqueue_job(db_job_id, project_id, "workflow", job_payload)
@@ -641,7 +644,7 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             "current_round": checkpoint["current_round"],
             "total_rounds": checkpoint["max_rounds"],
             "progress_percentage": int((checkpoint["current_round"] / checkpoint["max_rounds"]) * 100),
-            "message": f"Resuming from Round {checkpoint['current_round']}...",
+            "message": f"Resuming from Round {checkpoint['current_round']}/{checkpoint['max_rounds']}...",
             "error": None,
             "expert_status": [],
             "cost_estimate": None,
@@ -661,7 +664,15 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             if s["status"] in active_statuses and pid != project_id
         ]
 
-        add_activity_log(project_id, "info", f"Resuming workflow from Round {checkpoint['current_round']}")
+        # Detailed resume info
+        cp_round = checkpoint['current_round']
+        cp_max = checkpoint['max_rounds']
+        last_rounds = checkpoint.get("all_rounds", [])
+        last_score = last_rounds[-1].get("overall_average", 0) if last_rounds else 0
+        last_decision = last_rounds[-1].get("moderator_decision", {}).get("decision", "N/A") if last_rounds else "N/A"
+        resume_detail = f"Resuming from Round {cp_round}/{cp_max} (last score: {last_score:.1f}/10, decision: {last_decision})"
+
+        add_activity_log(project_id, "info", resume_detail)
 
         if active_workflows:
             queue_msg = f"Queued to resume from Round {checkpoint['current_round']} (waiting for active workflow to finish)"
@@ -689,10 +700,16 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
         return {
             "project_id": project_id,
             "status": "queued",
-            "message": f"Workflow resumed from Round {checkpoint['current_round']}",
+            "message": resume_detail,
             "queue_position": queue_position,
             "has_active_workflow": len(active_workflows) > 0,
             "active_workflow_id": active_workflows[0] if active_workflows else None,
+            "checkpoint": {
+                "round": cp_round,
+                "max_rounds": cp_max,
+                "last_score": round(last_score, 1),
+                "last_decision": last_decision,
+            },
         }
 
     except HTTPException:
@@ -747,6 +764,17 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
             checkpoint = json.load(f)
 
         max_rounds = checkpoint.get("max_rounds", 3)
+        cp_round = checkpoint.get("current_round", 0)
+        cp_all_rounds = checkpoint.get("all_rounds", [])
+        cp_last_score = cp_all_rounds[-1].get("overall_average", 0) if cp_all_rounds else 0
+        cp_last_decision = cp_all_rounds[-1].get("moderator_decision", {}).get("decision", "N/A") if cp_all_rounds else "N/A"
+
+        add_activity_log(project_id, "info", f"Resume started: Round {cp_round}/{max_rounds}, last score {cp_last_score:.1f}/10, decision: {cp_last_decision}")
+        if project_id in workflow_status:
+            workflow_status[project_id].update({
+                "status": "reviewing",
+                "message": f"Resuming from Round {cp_round}/{max_rounds} (score {cp_last_score:.1f}/10)",
+            })
 
         # Status callback
         def status_update(status: str, round_num: int, message: str):
@@ -765,7 +793,13 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
         add_activity_log(project_id, "success", f"Workflow completed with score {result['final_score']}/10")
 
     except Exception as e:
-        error_msg = f"Workflow error: {str(e)}"
+        error_str = str(e)
+
+        # Extract stage info
+        import re as _re
+        stage_match = _re.match(r'\[Stage: (.+?)\]', error_str)
+        stage_label = stage_match.group(1) if stage_match else ""
+        clean_error = _re.sub(r'^\[Stage: .+?\]\s*', '', error_str) if stage_match else error_str
 
         # Checkpoint still exists (resume didn't finish) → mark as interrupted
         checkpoint_file = project_dir / "workflow_checkpoint.json"
@@ -778,23 +812,28 @@ async def resume_workflow_background(project_id: str, project_dir: Path):
             except Exception:
                 cp_round, cp_max = 0, 3
 
+            display_msg = f"Resume failed during {stage_label} — Resume available" if stage_label else f"Error at Round {cp_round} — Resume available"
+
             if project_id in workflow_status:
                 workflow_status[project_id].update({
                     "status": "interrupted",
                     "current_round": cp_round,
                     "total_rounds": cp_max,
                     "progress_percentage": int((cp_round / cp_max) * 100) if cp_max else 0,
-                    "message": f"Error at Round {cp_round} — Resume available",
-                    "error": str(e),
+                    "message": display_msg,
+                    "error": clean_error,
+                    "error_stage": stage_label,
                     "estimated_time_remaining_seconds": (cp_max - cp_round) * 180,
                     "can_resume": True,
                 })
-            add_activity_log(project_id, "warning", f"Resume interrupted by error: {str(e)}. Checkpoint preserved — try again.")
+            add_activity_log(project_id, "warning", f"Resume interrupted during {stage_label or f'round {cp_round}'}: {clean_error}. Checkpoint preserved — try again.")
         else:
+            error_msg = f"Failed during {stage_label}: {clean_error}" if stage_label else f"Workflow error: {clean_error}"
             update_workflow_status(project_id, "failed", 0, 0, error_msg)
-            add_activity_log(project_id, "error", error_msg, {"error": str(e)})
+            add_activity_log(project_id, "error", error_msg)
             if project_id in workflow_status:
-                workflow_status[project_id]["error"] = error_msg
+                workflow_status[project_id]["error"] = clean_error
+                workflow_status[project_id]["error_stage"] = stage_label
 
 
 def _generate_reviewers_from_category(category: dict, topic: str) -> List[ExpertConfig]:
@@ -851,6 +890,7 @@ async def run_workflow_background(
     article_length: str = "full",
     workflow_mode: str = "standard",
     audience_level: str = "professional",
+    research_type: str = "survey",
 ):
     """Run workflow in background and update status."""
     try:
@@ -957,6 +997,7 @@ async def run_workflow_background(
                 research_cycles=research_cycles,
                 status_callback=status_callback,
                 article_length=article_length,
+                research_type=research_type,
             )
 
             add_activity_log(project_id, "info", "Starting collaborative workflow execution")
@@ -975,18 +1016,28 @@ async def run_workflow_background(
                 category=category,
                 article_length=article_length,
                 audience_level=audience_level,
+                research_type=research_type,
             )
 
             add_activity_log(project_id, "info", "Starting standard workflow execution")
             await orchestrator.run()
             add_activity_log(project_id, "success", "Workflow execution completed")
 
-        # Calculate final cost estimate
-        # TODO: Get actual token counts from orchestrator
-        total_input = len(experts) * max_rounds * 5000  # Rough estimate
-        total_output = len(experts) * max_rounds * 2000
-        cost_info = calculate_cost_estimate(total_input, total_output, experts[0].get("suggested_model", "claude-opus-4.5"))
-        workflow_status[project_id]["cost_estimate"] = cost_info
+        # Read actual cost from workflow_complete.json (written by orchestrator)
+        try:
+            complete_file = Path(f"results/{project_id}/workflow_complete.json")
+            if complete_file.exists():
+                with open(complete_file) as f:
+                    wf_data = json.load(f)
+                perf = wf_data.get("performance", {})
+                cost_info = {
+                    "total_tokens": perf.get("total_tokens", 0),
+                    "estimated_cost_usd": perf.get("estimated_cost", 0),
+                    "tokens_by_model": perf.get("tokens_by_model", {}),
+                }
+                workflow_status[project_id]["cost_estimate"] = cost_info
+        except Exception:
+            pass  # Non-critical
 
         # Update status based on actual result (completed vs rejected)
         _enrich_completed_status(project_id)
@@ -1012,26 +1063,49 @@ async def run_workflow_background(
             except Exception:
                 cp_round, cp_max = 0, 3
 
+            # Extract stage info from error message if available
+            error_str = str(e)
+            stage_label = ""
+            import re as _re
+            stage_match = _re.match(r'\[Stage: (.+?)\]', error_str)
+            if stage_match:
+                stage_label = stage_match.group(1)
+                # Clean the stage prefix from stored error for readability
+                clean_error = _re.sub(r'^\[Stage: .+?\]\s*', '', error_str)
+            else:
+                clean_error = error_str
+
+            display_msg = f"Error during {stage_label} — Resume available" if stage_label else f"Error at Round {cp_round} — Resume available"
+
             workflow_status[project_id].update({
                 "status": "interrupted",
                 "current_round": cp_round,
                 "total_rounds": cp_max,
                 "progress_percentage": int((cp_round / cp_max) * 100) if cp_max else 0,
-                "message": f"Error at Round {cp_round} — Resume available",
-                "error": str(e),
+                "message": display_msg,
+                "error": clean_error,
+                "error_stage": stage_label,
                 "estimated_time_remaining_seconds": (cp_max - cp_round) * 180,
                 "can_resume": True,
             })
-            add_activity_log(project_id, "warning", f"Workflow interrupted by error: {str(e)}. Checkpoint saved — resume available.")
+            add_activity_log(project_id, "warning", f"Workflow interrupted during {stage_label or f'round {cp_round}'}: {clean_error}. Checkpoint saved — resume available.")
         else:
+            error_str = str(e)
+            import re as _re
+            stage_match = _re.match(r'\[Stage: (.+?)\]', error_str)
+            stage_label = stage_match.group(1) if stage_match else ""
+            clean_error = _re.sub(r'^\[Stage: .+?\]\s*', '', error_str) if stage_match else error_str
+            display_msg = f"Failed during {stage_label}" if stage_label else "Workflow failed"
+
             workflow_status[project_id].update({
                 "status": "failed",
                 "progress_percentage": 0,
-                "message": "Workflow failed",
-                "error": str(e),
+                "message": display_msg,
+                "error": clean_error,
+                "error_stage": stage_label,
                 "estimated_time_remaining_seconds": 0,
             })
-            add_activity_log(project_id, "error", f"Workflow failed: {str(e)}")
+            add_activity_log(project_id, "error", f"Workflow failed during {stage_label or 'execution'}: {clean_error}")
 
 
 def _enrich_completed_status(project_id: str):
@@ -1045,13 +1119,15 @@ def _enrich_completed_status(project_id: str):
 
         rounds_summary = []
         for r in data.get("rounds", []):
+            mod_decision = r.get("moderator_decision", {})
             rounds_summary.append({
-                "round": r.get("round_number", 0),
+                "round": r.get("round", r.get("round_number", 0)),
                 "score": r.get("overall_average", 0),
-                "decision": r.get("final_decision", ""),
+                "decision": mod_decision.get("decision", "") if isinstance(mod_decision, dict) else "",
             })
 
         passed = data.get("passed", False)
+        perf = data.get("performance", {})
         workflow_status[project_id].update({
             "status": "completed" if passed else "rejected",
             "progress_percentage": 100,
@@ -1063,6 +1139,9 @@ def _enrich_completed_status(project_id: str):
                 rounds_summary[-1]["decision"] if rounds_summary else "UNKNOWN"
             ),
             "total_rounds": data.get("total_rounds", len(rounds_summary)),
+            "total_tokens": perf.get("total_tokens", 0),
+            "estimated_cost": perf.get("estimated_cost", 0),
+            "research_type": data.get("research_type", workflow_status[project_id].get("research_type", "research")),
         })
     except Exception:
         pass  # Non-critical: don't break workflow on enrichment failure
@@ -1259,6 +1338,7 @@ def _build_project_summary(project_dir: Path) -> Optional[dict]:
         "estimated_cost": round(performance.get("estimated_cost", 0), 4),
         "expert_team": data.get("expert_team", []),
         "audience_level": data.get("audience_level", "professional"),
+        "research_type": data.get("research_type", None),
     }
 
 
@@ -2322,6 +2402,216 @@ async def revoke_key(key_prefix: str, api_key: str = Depends(verify_admin_key)):
     if not revoked:
         raise HTTPException(status_code=404, detail="No active key found with this prefix")
     return {"message": "Key revoked", "revoked": revoked}
+
+
+# --- Report Download & Upload ---
+
+@app.get("/api/projects/{project_id}/report")
+async def download_report(project_id: str):
+    """Download full report (manuscript + peer review) as a single Markdown file."""
+    project_dir = Path("results") / project_id
+    workflow_file = project_dir / "workflow_complete.json"
+
+    if not workflow_file.exists():
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    try:
+        with open(workflow_file) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        raise HTTPException(status_code=500, detail=f"Error reading project data: {e}")
+
+    # Load latest manuscript
+    manuscript_text, _ = _get_latest_manuscript(project_dir)
+    if not manuscript_text:
+        raise HTTPException(status_code=404, detail="No manuscript found")
+
+    # Extract title from manuscript
+    title = _extract_title(manuscript_text) or data.get("topic", project_id)
+
+    # Build metadata header
+    perf = data.get("performance", {})
+    rounds = data.get("rounds", [])
+    final_score = data.get("final_score", 0)
+    final_decision = "ACCEPT" if data.get("passed") else (
+        rounds[-1].get("moderator_decision", {}).get("decision", "UNKNOWN") if rounds else "UNKNOWN"
+    )
+    total_tokens = perf.get("total_tokens", 0)
+    estimated_cost = perf.get("estimated_cost", 0)
+    research_type = data.get("research_type", "research")
+
+    md_parts = []
+    md_parts.append(f"# {title}\n")
+    md_parts.append(f"**Topic**: {data.get('topic', '')}")
+    md_parts.append(f"**Research Type**: {research_type}")
+    md_parts.append(f"**Date**: {data.get('timestamp', '')}")
+    md_parts.append(f"**Final Score**: {final_score}/10 | **Decision**: {final_decision}")
+    md_parts.append(f"**Total Rounds**: {data.get('total_rounds', 0)} | **Tokens**: {total_tokens:,} | **Cost**: ${estimated_cost:.4f}")
+    md_parts.append("")
+    md_parts.append("---")
+    md_parts.append("")
+
+    # Manuscript content
+    md_parts.append(manuscript_text)
+    md_parts.append("")
+    md_parts.append("---")
+    md_parts.append("")
+
+    # Peer Review Report
+    if rounds:
+        md_parts.append("# Peer Review Report\n")
+
+        for rd in rounds:
+            round_num = rd.get("round", rd.get("round_number", 0))
+            md_parts.append(f"## Round {round_num}\n")
+
+            # Reviews
+            for review in rd.get("reviews", []):
+                specialist_name = review.get("specialist_name", review.get("specialist", "Reviewer"))
+                model = review.get("model", "")
+                avg = review.get("average", 0)
+                scores = review.get("scores", {})
+
+                md_parts.append(f"### Reviewer: {specialist_name}")
+                md_parts.append(f"**Score**: {avg}/10 | **Model**: {model}")
+
+                if scores:
+                    score_items = ", ".join(f"{k.title()} {v}/10" for k, v in scores.items())
+                    md_parts.append(f"**Scores**: {score_items}")
+
+                md_parts.append("")
+
+                if review.get("summary"):
+                    md_parts.append(f"**Summary**: {review['summary']}")
+                    md_parts.append("")
+
+                if review.get("strengths"):
+                    md_parts.append("**Strengths**:")
+                    for s in review["strengths"]:
+                        md_parts.append(f"- {s}")
+                    md_parts.append("")
+
+                if review.get("weaknesses"):
+                    md_parts.append("**Weaknesses**:")
+                    for w in review["weaknesses"]:
+                        md_parts.append(f"- {w}")
+                    md_parts.append("")
+
+                if review.get("suggestions"):
+                    md_parts.append("**Suggestions**:")
+                    for s in review["suggestions"]:
+                        md_parts.append(f"- {s}")
+                    md_parts.append("")
+
+            # Moderator decision
+            mod = rd.get("moderator_decision", {})
+            if mod:
+                decision = mod.get("decision", "")
+                confidence = mod.get("confidence", "")
+                md_parts.append(f"### Moderator Decision: {decision}")
+                md_parts.append(f"**Confidence**: {confidence}/5")
+                md_parts.append("")
+
+                if mod.get("meta_review"):
+                    md_parts.append(mod["meta_review"])
+                    md_parts.append("")
+
+                if mod.get("key_strengths"):
+                    md_parts.append("**Key Strengths**:")
+                    for s in mod["key_strengths"]:
+                        md_parts.append(f"- {s}")
+                    md_parts.append("")
+
+                if mod.get("key_weaknesses"):
+                    md_parts.append("**Key Weaknesses**:")
+                    for w in mod["key_weaknesses"]:
+                        md_parts.append(f"- {w}")
+                    md_parts.append("")
+
+                if mod.get("required_changes"):
+                    md_parts.append("**Required Changes**:")
+                    for c in mod["required_changes"]:
+                        md_parts.append(f"- {c}")
+                    md_parts.append("")
+
+            # Author response
+            author_response_file = project_dir / f"author_response_round_{round_num}.md"
+            if author_response_file.exists():
+                ar_text = author_response_file.read_text(encoding="utf-8")
+                md_parts.append("### Author Response")
+                md_parts.append(ar_text)
+                md_parts.append("")
+
+    report_md = "\n".join(md_parts)
+
+    return Response(
+        content=report_md,
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": f'attachment; filename="{project_id}-report.md"'
+        }
+    )
+
+
+class UploadReportRequest(BaseModel):
+    title: str
+    topic: str
+    content: str  # markdown content
+    research_type: Optional[str] = "research"
+    category: Optional[CategoryInfo] = None
+    audience_level: Optional[str] = "professional"
+
+
+@app.post("/api/admin/upload-report")
+async def upload_report(request: UploadReportRequest, api_key: str = Depends(verify_admin_key)):
+    """Upload an external markdown report as a completed article (admin only)."""
+    if not request.title or not request.title.strip():
+        raise HTTPException(status_code=400, detail="Title is required")
+    if not request.content or not request.content.strip():
+        raise HTTPException(status_code=400, detail="Content is required")
+
+    # Generate project ID
+    project_id = re.sub(r'[^a-z0-9\-]', '-', request.topic.lower().replace(" ", "-"))
+    project_id = re.sub(r'-{2,}', '-', project_id).strip('-')
+    project_id = f"{project_id[:80]}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    # Create project directory
+    project_dir = Path(f"results/{project_id}")
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save manuscript
+    (project_dir / "manuscript_final_v1.md").write_text(request.content, encoding="utf-8")
+
+    # Build workflow_complete.json (minimal metadata)
+    workflow_data = {
+        "topic": request.topic,
+        "output_directory": f"results/{project_id}",
+        "research_type": request.research_type or "research",
+        "category": request.category.dict() if request.category else None,
+        "audience_level": request.audience_level or "professional",
+        "expert_team": [],
+        "rounds": [],
+        "final_score": 10.0,
+        "passed": True,
+        "total_rounds": 0,
+        "max_rounds": 0,
+        "threshold": 0,
+        "performance": {
+            "total_tokens": 0,
+            "estimated_cost": 0,
+        },
+        "timestamp": datetime.now().isoformat(),
+        "uploaded": True,
+    }
+
+    with open(project_dir / "workflow_complete.json", "w") as f:
+        json.dump(workflow_data, f, indent=2)
+
+    return {
+        "project_id": project_id,
+        "status": "completed",
+        "message": "Report uploaded successfully",
+    }
 
 
 # Serve web/ directory as static files (must be last — catches all unmatched routes)

@@ -1,8 +1,62 @@
 """Abstract base class for LLM providers."""
 
+import asyncio
+import logging
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+# Retry configuration
+LLM_MAX_RETRIES = 3
+LLM_BASE_DELAY = 10  # seconds
+LLM_MAX_DELAY = 60   # seconds
+
+
+async def retry_llm_call(coro_factory, max_retries=LLM_MAX_RETRIES, base_delay=LLM_BASE_DELAY, max_delay=LLM_MAX_DELAY):
+    """Retry an async LLM call with exponential backoff.
+
+    Args:
+        coro_factory: Callable that returns a coroutine (called fresh each retry)
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds before first retry
+        max_delay: Maximum delay cap in seconds
+
+    Returns:
+        The result of the coroutine
+
+    Raises:
+        The last exception if all retries are exhausted
+    """
+    last_exception = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except Exception as e:
+            last_exception = e
+            error_name = type(e).__name__
+            error_str = str(e)[:200]
+
+            # Don't retry on clearly non-transient errors
+            non_retryable = ("invalid_api_key", "authentication", "permission", "not_found")
+            if any(keyword in error_str.lower() for keyword in non_retryable):
+                logger.warning(f"LLM call failed with non-retryable error: {error_name}: {error_str}")
+                raise
+
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                logger.warning(
+                    f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): "
+                    f"{error_name}: {error_str}. Retrying in {delay}s..."
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    f"LLM call failed after {max_retries + 1} attempts: "
+                    f"{error_name}: {error_str}"
+                )
+    raise last_exception
 
 
 @dataclass

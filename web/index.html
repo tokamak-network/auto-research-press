@@ -107,7 +107,7 @@
                 </div>
                 <div class="about-item">
                     <h3>Editorial Standards</h3>
-                    <p>Only research meeting our quality threshold (7.5/10) gets published. Rejected submissions are available for transparency</p>
+                    <p>Only research meeting our quality threshold (7.0/10) gets published. Rejected submissions are available for transparency</p>
                 </div>
             </div>
         </div>
@@ -230,10 +230,19 @@
                 categoryHtml = `<span class="category-tag">${majorDisplay}${subfieldDisplay ? ' / ' + subfieldDisplay : ''}</span>`;
             }
 
+            // Research type badge
+            let researchTypeBadgeHtml = '';
+            if (proj.research_type === 'survey') {
+                researchTypeBadgeHtml = '<span class="category-tag" style="color:#8a3ffc;border-color:#d4bbff;">Survey</span>';
+            } else if (proj.research_type === 'research') {
+                researchTypeBadgeHtml = '<span class="category-tag" style="color:#0f62fe;border-color:#a6c8ff;">Original</span>';
+            }
+
             return `
                 <article class="article-card">
                     <div class="card-badges-row">
                         ${badgeHtml}
+                        ${researchTypeBadgeHtml}
                         ${categoryHtml}
                         ${audienceBadgeHtml}
                     </div>

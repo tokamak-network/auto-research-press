@@ -92,5 +92,8 @@ Respond in JSON:
         return {
             "decision": decision,
             "reason": result.get("reason", ""),
-            "tokens": response.total_tokens
+            "tokens": response.total_tokens,
+            "input_tokens": response.input_tokens or 0,
+            "output_tokens": response.output_tokens or 0,
+            "model": self.model,
         }

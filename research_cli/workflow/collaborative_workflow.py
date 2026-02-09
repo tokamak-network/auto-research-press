@@ -33,11 +33,12 @@ class CollaborativeWorkflowOrchestrator:
         reviewer_configs: list,
         output_dir: Path,
         max_rounds: int = 3,
-        threshold: float = 7.5,
+        threshold: float = 7.0,
         target_manuscript_length: int = 4000,
         research_cycles: int = 1,
         status_callback: Optional[Callable] = None,
-        article_length: str = "full"
+        article_length: str = "full",
+        research_type: str = "survey",
     ):
         """Initialize collaborative workflow.
 
@@ -54,6 +55,7 @@ class CollaborativeWorkflowOrchestrator:
             research_cycles: Number of research note iterations (default 1)
             status_callback: Status update callback
             article_length: "full" or "short" — passed to reviewers for adjusted expectations
+            research_type: "survey" or "research" — determines writing/review approach
         """
         self.topic = topic
         self.major_field = major_field
@@ -67,6 +69,7 @@ class CollaborativeWorkflowOrchestrator:
         self.research_cycles = research_cycles
         self.status_callback = status_callback
         self.article_length = article_length
+        self.research_type = research_type
 
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -137,7 +140,8 @@ class CollaborativeWorkflowOrchestrator:
             threshold=self.threshold,
             status_callback=self.status_callback,
             category={"major": self.major_field, "subfield": self.subfield},
-            article_length=self.article_length
+            article_length=self.article_length,
+            research_type=self.research_type,
         )
 
         # Run review workflow with pre-written manuscript
