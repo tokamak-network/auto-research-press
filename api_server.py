@@ -1254,6 +1254,10 @@ def _build_project_summary(project_dir: Path) -> Optional[dict]:
         final_decision = rounds[-1].get("moderator_decision", {}).get("decision", "PENDING")
     if final_decision in ("ACCEPT", "MINOR_REVISION"):
         status = "completed"
+    elif data.get("uploaded") and data.get("passed"):
+        # Uploaded external reports bypass review — treat as completed
+        status = "completed"
+        final_decision = "UPLOADED"
     else:
         # REJECT, MAJOR_REVISION → editorial rejection
         status = "rejected"
