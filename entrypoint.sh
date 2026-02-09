@@ -4,6 +4,7 @@
 # This ensures SQLite DB, results, and published articles survive redeployments.
 
 if [ -d "/app/persistent" ]; then
+  echo "[volume] Using persistent volume at /app/persistent"
   mkdir -p /app/persistent/data
   mkdir -p /app/persistent/results
   mkdir -p /app/persistent/results/submissions
@@ -40,6 +41,23 @@ if [ -d "/app/persistent" ]; then
   ln -sf /app/persistent/results /app/results
   ln -sf /app/persistent/web-data /app/web/data
   ln -sf /app/persistent/web-articles /app/web/articles
+else
+  # No persistent volume - fallback to ephemeral storage with seed data
+  echo "[WARNING] No persistent volume found at /app/persistent"
+  echo "[WARNING] Data will be lost on redeployment!"
+  echo "[fallback] Using ephemeral storage with seed-data..."
+
+  if [ -d "/app/seed-data" ]; then
+    # Copy seed data to working directories (ephemeral)
+    mkdir -p /app/data /app/results /app/web/data /app/web/articles
+    cp -rn /app/seed-data/results/* /app/results/ 2>/dev/null || true
+    cp -rn /app/seed-data/web-articles/* /app/web/articles/ 2>/dev/null || true
+    cp -rn /app/seed-data/web-data/* /app/web/data/ 2>/dev/null || true
+    if [ -f /app/seed-data/data/research.db ]; then
+      cp /app/seed-data/data/research.db /app/data/ 2>/dev/null || true
+    fi
+    echo "[fallback] Seed data loaded (ephemeral mode)"
+  fi
 fi
 
 exec "$@"
