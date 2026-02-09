@@ -2275,7 +2275,7 @@
                             <div class="project-id">${escapeHtml(wf.project_id)}</div>
                         </div>
                         <div class="workflow-status">
-                            ${wf.research_type ? `<span class="status-badge" style="background:none;border:1px solid ${wf.research_type === 'survey' ? '#d4bbff' : '#a6c8ff'};color:${wf.research_type === 'survey' ? '#8a3ffc' : '#0f62fe'};">${wf.research_type === 'survey' ? 'SURVEY' : 'ORIGINAL'}</span>` : ''}
+                            ${wf.research_type ? `<span class="status-badge" style="background:none;border:1px solid ${wf.research_type === 'survey' ? '#d4bbff' : wf.research_type === 'explainer' ? '#a7f0ba' : '#a6c8ff'};color:${wf.research_type === 'survey' ? '#8a3ffc' : wf.research_type === 'explainer' ? '#198038' : '#0f62fe'};">${wf.research_type === 'survey' ? 'SURVEY' : wf.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
                             <span class="status-badge ${wf.status}">${wf.status.replace('_', ' ').toUpperCase()}</span>
                             ${isActive ? '<div class="spinner-inline"></div>' : ''}
                         </div>

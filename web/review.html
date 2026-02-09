@@ -1211,7 +1211,7 @@
                     <div class="project-header">
                         <h1 class="project-title">${data.topic}</h1>
                         <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0;">
-                            ${data.research_type ? `<span class="review-status-badge" style="color:${data.research_type === 'survey' ? '#8a3ffc' : '#0f62fe'};border-color:${data.research_type === 'survey' ? '#d4bbff' : '#a6c8ff'};">${data.research_type === 'survey' ? 'SURVEY' : 'ORIGINAL'}</span>` : ''}
+                            ${data.research_type ? `<span class="review-status-badge" style="color:${data.research_type === 'survey' ? '#8a3ffc' : data.research_type === 'explainer' ? '#198038' : '#0f62fe'};border-color:${data.research_type === 'survey' ? '#d4bbff' : data.research_type === 'explainer' ? '#a7f0ba' : '#a6c8ff'};">${data.research_type === 'survey' ? 'SURVEY' : data.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
                             <span class="review-status-badge">${finalDecision}</span>
                         </div>
                     </div>

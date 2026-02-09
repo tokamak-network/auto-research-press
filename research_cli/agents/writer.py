@@ -261,6 +261,12 @@ PAPER TYPE: Survey / Literature Review
 Your task is to SYNTHESIZE existing research, NOT propose new experiments.
 Focus on: comprehensive coverage, taxonomy, comparison tables, gap identification.
 Structure should include: background, methodology of survey, thematic analysis, comparison, future directions."""
+        elif research_type == "explainer":
+            research_type_guidance = """
+PAPER TYPE: Explainer / Tutorial
+Your task is to EXPLAIN concepts clearly, NOT propose new research or survey all literature.
+Focus on: clear concept introduction, intuitive analogies, step-by-step explanations, real-world examples.
+Assume the reader wants to UNDERSTAND the topic, not review the state-of-the-art."""
 
         system_prompt = f"""You are an expert research writer specializing in {domain}.
 {audience_guidance}{research_type_guidance}
@@ -306,7 +312,7 @@ CITATION RULES:
             length_requirement = "- 3,000-5,000 words"
             length_guidance = ""
 
-        # Survey-specific required sections
+        # Type-specific required sections
         if research_type == "survey":
             sections_guidance = """
 Required sections for survey paper:
@@ -317,6 +323,17 @@ Required sections for survey paper:
 ## Comparative Analysis (with tables if applicable)
 ## Open Challenges & Future Directions
 ## Conclusion
+## References"""
+        elif research_type == "explainer":
+            sections_guidance = """
+Required sections for explainer article:
+## TL;DR (2-3 sentence plain language summary)
+## Introduction (what this topic is and why it matters)
+## Core Concepts (main ideas explained step-by-step)
+## How It Works (detailed mechanism/process explanation with examples)
+## Practical Applications (real-world use cases)
+## Key Takeaways
+## Further Reading
 ## References"""
         else:
             sections_guidance = """
@@ -513,6 +530,14 @@ PAPER TYPE: Survey / Literature Review
 - Strengthen taxonomy and categorization of surveyed works
 - Improve comparison tables and gap identification
 - Do NOT add novel experiments — maintain survey/review focus
+"""
+        elif research_type == "explainer":
+            research_type_revision_note = """
+PAPER TYPE: Explainer / Tutorial
+- Focus revisions on clarity, accessibility, and correctness of explanations
+- Add more examples or analogies where reviewers note confusion
+- Ensure step-by-step progression from simple to complex
+- Do NOT add academic rigor beyond what aids understanding
 """
 
         system_prompt = f"""You are an expert research writer revising a manuscript based on peer review feedback.

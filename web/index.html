@@ -237,6 +237,8 @@
             let researchTypeBadgeHtml = '';
             if (proj.research_type === 'survey') {
                 researchTypeBadgeHtml = '<span class="category-tag" style="color:#8a3ffc;border-color:#d4bbff;">Survey</span>';
+            } else if (proj.research_type === 'explainer') {
+                researchTypeBadgeHtml = '<span class="category-tag" style="color:#198038;border-color:#a7f0ba;">Explainer</span>';
             } else if (proj.research_type === 'research') {
                 researchTypeBadgeHtml = '<span class="category-tag" style="color:#0f62fe;border-color:#a6c8ff;">Original</span>';
             }

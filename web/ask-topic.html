@@ -551,6 +551,10 @@
             gap: 1rem;
         }
 
+        #research-type-selector {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
         .research-type-option {
             border: 2px solid var(--border);
             border-radius: 2px;
@@ -567,6 +571,12 @@
         .research-type-option.selected {
             border-color: var(--primary-600);
             background: rgba(59, 130, 246, 0.05);
+        }
+
+        .research-type-option.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .type-title {
@@ -691,10 +701,14 @@
             <!-- Research Type -->
             <div class="form-group">
                 <label>Research Type</label>
-                <div class="research-type-selector">
+                <div class="research-type-selector" id="research-type-selector">
                     <div class="research-type-option selected" data-type="survey" onclick="selectResearchType('survey')">
                         <div class="type-title">Survey / Literature Review</div>
                         <div class="type-description">Comprehensive review of existing research and state-of-the-art</div>
+                    </div>
+                    <div class="research-type-option" data-type="explainer" onclick="selectResearchType('explainer')">
+                        <div class="type-title">Explainer / Tutorial</div>
+                        <div class="type-description">Concept introduction with clear explanations and examples</div>
                     </div>
                     <div class="research-type-option" data-type="research" onclick="selectResearchType('research')">
                         <div class="type-title">Original Research</div>
@@ -1242,10 +1256,36 @@
                 selectArticleLength('full');
                 selectWorkflowMode('collaborative');
             }
+
+            // Auto-map research type based on audience
+            const researchOption = document.querySelector('.research-type-option[data-type="research"]');
+            if (level === 'beginner') {
+                selectResearchType('explainer');
+                researchOption.classList.add('disabled');
+                researchOption.title = 'Original Research is not available for beginner audience';
+            } else if (level === 'intermediate') {
+                researchOption.classList.remove('disabled');
+                researchOption.title = '';
+                // Keep current selection unless it was forced by beginner
+                const current = document.querySelector('.research-type-option[data-type].selected');
+                if (!current) selectResearchType('survey');
+            } else {
+                researchOption.classList.remove('disabled');
+                researchOption.title = '';
+                const current = document.querySelector('.research-type-option[data-type].selected');
+                if (current && current.dataset.type === 'explainer') {
+                    selectResearchType('survey');
+                }
+            }
         }
 
         // Research type selection
         function selectResearchType(type) {
+            // Block research type for beginner audience
+            if (type === 'research') {
+                const audienceLevel = document.querySelector('.audience-option.selected')?.dataset.level;
+                if (audienceLevel === 'beginner') return;
+            }
             document.querySelectorAll('.research-type-option[data-type]').forEach(opt => {
                 opt.classList.remove('selected');
             });

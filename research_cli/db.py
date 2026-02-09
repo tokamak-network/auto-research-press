@@ -711,6 +711,24 @@ def get_pending_jobs() -> list:
     return [_row_to_dict(r) for r in rows]
 
 
+def get_original_job(project_id: str) -> dict | None:
+    """Get the most recent 'workflow' job for a project (for restart from scratch)."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM job_queue WHERE project_id = ? AND job_type = 'workflow' ORDER BY created_at DESC LIMIT 1",
+        (project_id,),
+    ).fetchone()
+    if not row:
+        return None
+    d = _row_to_dict(row)
+    if "payload_json" in d and isinstance(d["payload_json"], str):
+        try:
+            d["payload"] = json.loads(d["payload_json"])
+        except (json.JSONDecodeError, TypeError):
+            d["payload"] = {}
+    return d
+
+
 # --- Helpers ---
 
 def _row_to_dict(row: sqlite3.Row) -> dict:

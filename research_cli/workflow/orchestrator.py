@@ -152,6 +152,18 @@ IMPORTANT: Consider the author's response when evaluating this revision:
 - Evaluate the quality of synthesis, comparison, and critical analysis of existing work
 
 """
+    elif research_type == "explainer":
+        research_type_note = """NOTE: This is an EXPLAINER / TUTORIAL article. Evaluate accordingly:
+- Clarity: Are concepts explained in an understandable way?
+- Examples: Are there enough real-world examples and analogies?
+- Progression: Does the content build from simple to complex?
+- Accuracy: Are the explanations technically correct (even if simplified)?
+- Do NOT penalize for lack of novel research or comprehensive literature coverage
+- Do NOT expect formal proofs, experimental results, or exhaustive citations
+- Evaluate the quality of pedagogy: would the target audience learn from this?
+- For the "novelty" score, interpret as: how fresh/unique is the explanation approach?
+
+"""
 
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
 

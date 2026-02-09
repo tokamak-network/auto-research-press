@@ -184,12 +184,13 @@ Return JSON:
 
         # Create task objects
         tasks = []
+        fallback_assignee = coauthor_expertises[0]["id"] if coauthor_expertises else "unknown"
         for i, task_data in enumerate(data.get("tasks", [])):
             task = ResearchTask(
                 id=f"task_{i+1}",
-                title=task_data["title"],
-                description=task_data["description"],
-                assigned_to=task_data["assigned_to"]
+                title=task_data.get("title", f"Research task {i+1}"),
+                description=task_data.get("description", ""),
+                assigned_to=task_data.get("assigned_to", fallback_assignee)
             )
             tasks.append(task)
 

@@ -271,7 +271,7 @@ class ExpertContext(BaseModel):
 class ProposeTeamRequest(BaseModel):
     topic: str
     num_experts: Optional[int] = None
-    research_type: Optional[str] = "research"  # "survey" or "research"
+    research_type: Optional[str] = "research"  # "survey", "research", or "explainer"
     expert_context: Optional[ExpertContext] = None
 
 
@@ -313,7 +313,7 @@ class StartWorkflowRequest(BaseModel):
     article_length: Optional[str] = "full"  # "full" or "short"
     workflow_mode: Optional[str] = "standard"  # "standard" or "collaborative"
     audience_level: Optional[str] = "professional"  # "beginner", "intermediate", "professional"
-    research_type: Optional[str] = "survey"  # "survey" or "research"
+    research_type: Optional[str] = "survey"  # "survey", "research", or "explainer"
 
 
 class SubmitArticleRequest(BaseModel):
@@ -392,6 +392,8 @@ async def propose_team(request: ProposeTeamRequest, api_key: str = Depends(verif
         if request.research_type:
             if request.research_type == "survey":
                 additional_context += "Research Type: Survey/Literature Review - Focus on synthesizing existing research, identifying gaps, and providing comprehensive overview.\n\n"
+            elif request.research_type == "explainer":
+                additional_context += "Research Type: Explainer/Tutorial - Focus on clear concept explanation, intuitive examples, and pedagogical structure.\n\n"
             else:
                 additional_context += "Research Type: Original Research - Focus on novel analysis, comparisons, and original insights.\n\n"
 
@@ -629,8 +631,72 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
 
         # Check for checkpoint
         checkpoint_file = project_dir / "workflow_checkpoint.json"
+
+        # Initialize activity log
+        if project_id not in activity_logs:
+            activity_logs[project_id] = []
+
+        # Check if another workflow is actively running
+        active_statuses = {"composing_team", "writing", "desk_screening", "reviewing", "revising", "research", "writing_sections"}
+        active_workflows = [
+            pid for pid, s in workflow_status.items()
+            if s["status"] in active_statuses and pid != project_id
+        ]
+
         if not checkpoint_file.exists():
-            raise HTTPException(status_code=400, detail="No checkpoint found for this workflow")
+            # No checkpoint — restart workflow from scratch using original job payload
+            original_job = appdb.get_original_job(project_id)
+            if not original_job or not original_job.get("payload"):
+                raise HTTPException(status_code=400, detail="No checkpoint and no original job found for this workflow")
+
+            payload = original_job["payload"]
+            restart_detail = f"No checkpoint found — restarting workflow from scratch"
+
+            workflow_status[project_id] = {
+                "project_id": project_id,
+                "topic": payload.get("topic", ""),
+                "status": "queued",
+                "current_round": 0,
+                "total_rounds": payload.get("max_rounds", 3),
+                "progress_percentage": 0,
+                "message": "Restarting workflow from scratch...",
+                "error": None,
+                "expert_status": [],
+                "cost_estimate": None,
+                "start_time": _utcnow().isoformat(),
+                "elapsed_time_seconds": 0,
+                "estimated_time_remaining_seconds": payload.get("max_rounds", 3) * 180,
+                "research_type": payload.get("research_type", "survey"),
+            }
+
+            add_activity_log(project_id, "info", restart_detail)
+
+            if active_workflows:
+                workflow_status[project_id]["message"] = "Queued to restart (waiting for active workflow to finish)"
+                add_activity_log(project_id, "warning", f"Another workflow is running ({active_workflows[0][:40]}...). This restart is queued.")
+
+            # Enqueue as a fresh workflow run
+            db_job_id = str(uuid.uuid4())
+            try:
+                appdb.enqueue_job(db_job_id, project_id, "workflow", payload)
+            except Exception:
+                pass
+            await job_queue.put({
+                "_fn": run_workflow_background,
+                "_db_job_id": db_job_id,
+                **payload,
+            })
+
+            queue_position = job_queue.qsize()
+            return {
+                "project_id": project_id,
+                "status": "queued",
+                "message": restart_detail,
+                "queue_position": queue_position,
+                "has_active_workflow": len(active_workflows) > 0,
+                "active_workflow_id": active_workflows[0] if active_workflows else None,
+                "checkpoint": None,
+            }
 
         # Load checkpoint to get info
         with open(checkpoint_file) as f:
@@ -652,17 +718,6 @@ async def resume_workflow(project_id: str, api_key: str = Depends(verify_api_key
             "elapsed_time_seconds": 0,
             "estimated_time_remaining_seconds": (checkpoint["max_rounds"] - checkpoint["current_round"]) * 180
         }
-
-        # Initialize activity log
-        if project_id not in activity_logs:
-            activity_logs[project_id] = []
-
-        # Check if another workflow is actively running
-        active_statuses = {"composing_team", "writing", "desk_screening", "reviewing", "revising", "research", "writing_sections"}
-        active_workflows = [
-            pid for pid, s in workflow_status.items()
-            if s["status"] in active_statuses and pid != project_id
-        ]
 
         # Detailed resume info
         cp_round = checkpoint['current_round']
@@ -2639,7 +2694,7 @@ class UploadReportRequest(BaseModel):
     title: str
     topic: str
     content: str  # markdown content
-    research_type: Optional[str] = "research"
+    research_type: Optional[str] = "research"  # "survey", "research", or "explainer"
     category: Optional[CategoryInfo] = None
     audience_level: Optional[str] = "professional"
 
