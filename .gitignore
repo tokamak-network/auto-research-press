@@ -53,3 +53,9 @@ web/data/
 
 # Demo reports
 reports/
+
+# Test results (temporary, environment-specific)
+gemini_flash_*.json
+WORKFLOW_TEST_RESULTS.md
+*_results.json
+*_results.md
