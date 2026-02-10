@@ -2886,6 +2886,14 @@ async def upload_report(request: UploadReportRequest, api_key: str = Depends(ver
     }
 
 
+# Explicit route for root path to ensure proper OG meta tags for social media
+@app.get("/")
+async def serve_index():
+    """Serve index.html at root path for proper OG meta tag rendering."""
+    from fastapi.responses import FileResponse
+    return FileResponse("web/index.html")
+
+
 # Serve web/ directory as static files (must be last — catches all unmatched routes)
 app.mount("/", StaticFiles(directory="web", html=True), name="static")
 
