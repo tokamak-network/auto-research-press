@@ -1377,6 +1377,9 @@ def _enrich_completed_status(project_id: str):
             "total_tokens": perf.get("total_tokens", 0),
             "estimated_cost": perf.get("estimated_cost", 0),
             "research_type": data.get("research_type", workflow_status[project_id].get("research_type", "research")),
+            "title": data.get("title"),  # May be None for legacy articles
+            "system_version": data.get("system_version", "legacy"),  # "legacy" for old articles
+            "generated_at": data.get("generated_at"),  # May be None for legacy articles
         })
     except Exception:
         pass  # Non-critical: don't break workflow on enrichment failure
@@ -1507,9 +1510,11 @@ def _build_project_summary(project_dir: Path) -> Optional[dict]:
             "passed": rd.get("passed", False),
         })
 
-    # Extract title from latest manuscript
-    manuscript_text, _ = _get_latest_manuscript(project_dir)
-    title = _extract_title(manuscript_text) if manuscript_text else None
+    # Extract title: prefer workflow_complete.json (new articles), fallback to manuscript H1 (legacy articles)
+    title = data.get("title")
+    if not title:
+        manuscript_text, _ = _get_latest_manuscript(project_dir)
+        title = _extract_title(manuscript_text) if manuscript_text else None
 
     # Word count from last round
     word_count = rounds[-1].get("word_count", 0) if rounds else 0
@@ -1562,6 +1567,8 @@ def _build_project_summary(project_dir: Path) -> Optional[dict]:
         "id": project_id,
         "title": title,
         "topic": data.get("topic", project_id.replace("-", " ").title()),
+        "system_version": data.get("system_version", "legacy"),
+        "generated_at": data.get("generated_at"),
         "final_score": data.get("final_score", 0),
         "passed": data.get("passed", False),
         "status": status,
