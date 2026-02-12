@@ -294,14 +294,27 @@ def get_all_pricing() -> Dict[str, Dict[str, float]]:
     return config.get("pricing", {})
 
 
-def get_reviewer_models() -> List[Dict[str, str]]:
-    """Get reviewer model assignments for cross-provider distribution.
+def get_reviewer_models() -> List[Dict]:
+    """Get reviewer model assignments from reviewer_rotation config.
 
-    Returns list of {"provider": ..., "model": ...} dicts for reviewer assignment.
-    Uses the reviewer role's primary + fallback models cyclically.
+    Returns list of {"provider": ..., "model": ..., "fallback": [...]} dicts.
+    Each entry may include a fallback list for provider failure resilience.
+    Falls back to the reviewer tier's primary+fallback if rotation is not configured.
     """
+    config = _load_config()
+    rotation = config.get("roles", {}).get("reviewer_rotation", [])
+    if rotation:
+        return [
+            {
+                "provider": r["provider"],
+                "model": r["model"],
+                "fallback": r.get("fallback", []),
+            }
+            for r in rotation
+        ]
+    # Fallback: use reviewer tier primary + fallback
     rc = get_role_config("reviewer")
-    models = [{"provider": rc.primary.provider, "model": rc.primary.model}]
+    models = [{"provider": rc.primary.provider, "model": rc.primary.model, "fallback": []}]
     for fb in rc.fallback:
-        models.append({"provider": fb.provider, "model": fb.model})
+        models.append({"provider": fb.provider, "model": fb.model, "fallback": []})
     return models

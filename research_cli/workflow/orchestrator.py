@@ -61,7 +61,22 @@ async def generate_review(
     provider = specialist["provider"]
     model = specialist["model"]
 
-    llm = _create_llm(provider, model)
+    # Try primary model, then fallbacks if API key missing or init fails
+    try:
+        llm = _create_llm(provider, model)
+    except (ValueError, RuntimeError) as init_err:
+        fallbacks = specialist.get("fallback", [])
+        llm = None
+        for fb in fallbacks:
+            try:
+                llm = _create_llm(fb["provider"], fb["model"])
+                provider = fb["provider"]
+                model = fb["model"]
+                break
+            except (ValueError, RuntimeError):
+                continue
+        if llm is None:
+            raise init_err
 
     # Build context from previous reviews
     previous_context = ""

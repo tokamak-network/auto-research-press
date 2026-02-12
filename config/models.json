@@ -31,9 +31,16 @@
     "moderator": { "tier": "light", "temperature": 0.3, "max_tokens": 8192 },
     "reviewer": { "tier": "reasoning", "temperature": 0.3, "max_tokens": 8192 },
     "reviewer_rotation": [
-      {"provider": "google", "model": "gemini-2.5-pro"},
-      {"provider": "anthropic", "model": "claude-sonnet-4-5"},
-      {"provider": "anthropic", "model": "claude-sonnet-4-5"}
+      {"provider": "google", "model": "gemini-2.5-pro", "fallback": [
+        {"provider": "anthropic", "model": "claude-sonnet-4-5"},
+        {"provider": "anthropic", "model": "claude-opus-4-6"}
+      ]},
+      {"provider": "anthropic", "model": "claude-sonnet-4-5", "fallback": [
+        {"provider": "anthropic", "model": "claude-opus-4-6"}
+      ]},
+      {"provider": "anthropic", "model": "claude-sonnet-4-5", "fallback": [
+        {"provider": "anthropic", "model": "claude-opus-4-6"}
+      ]}
     ],
 
     "coauthor": { "tier": "support", "temperature": 0.7, "max_tokens": 4096 },

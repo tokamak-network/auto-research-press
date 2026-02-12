@@ -23,12 +23,15 @@ class SpecialistFactory:
         if not system_prompt:
             system_prompt = SpecialistFactory._generate_system_prompt(config, topic)
 
-        return {
+        spec = {
             "name": config.name,
             "provider": config.provider,
             "model": config.model,
             "system_prompt": system_prompt
         }
+        if config.fallback:
+            spec["fallback"] = config.fallback
+        return spec
 
     @staticmethod
     def _generate_system_prompt(config: ExpertConfig, topic: str = "") -> str:
