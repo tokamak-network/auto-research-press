@@ -526,12 +526,22 @@ async def propose_team(request: ProposeTeamRequest, api_key: str = Depends(verif
         estimated_time = 5 + (len(proposals) * 2 * 2) + 3
         estimated_rounds = 2
 
-        # Calculate cost estimate
+        # Calculate cost estimate using blended rate across all models
+        # Real data: ~8K tokens per team-member per round, blended ~$4.2/M
+        # (mix of flash $0.3/M, pro $2.6/M, sonnet $7.2/M, opus $12.8/M)
         num_experts_final = len(proposals)
-        model = proposals[0].suggested_model if proposals else "claude-opus-4.5"
-        input_tokens = num_experts_final * estimated_rounds * 5000
-        output_tokens = num_experts_final * estimated_rounds * 2000
-        cost_info = calculate_cost_estimate(input_tokens, output_tokens, model)
+        total_team_size = num_experts_final + 3  # authors + ~3 reviewers
+        estimated_total_tokens = total_team_size * estimated_rounds * 8000
+        input_tokens = int(estimated_total_tokens * 0.75)
+        output_tokens = int(estimated_total_tokens * 0.25)
+        blended_cost = (estimated_total_tokens / 1_000_000) * 4.2
+        cost_info = {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": estimated_total_tokens,
+            "estimated_cost_usd": round(blended_cost, 4),
+            "model_breakdown": {"blended": {"input_cost": round(blended_cost * 0.6, 4), "output_cost": round(blended_cost * 0.4, 4)}}
+        }
 
         # Build response with suggested category
         response_data = {
