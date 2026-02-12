@@ -263,6 +263,28 @@ async def scan_interrupted_workflows():
 
                 generated_at = wf_data.get("generated_at") or wf_data.get("timestamp", _utcnow().isoformat())
 
+                # Build round summaries for frontend milestones
+                raw_rounds = wf_data.get("rounds", [])
+                rounds_summary = []
+                final_decision = "PENDING"
+                for rd in raw_rounds:
+                    decision = rd.get("moderator_decision", {}).get("decision", "")
+                    rounds_summary.append({
+                        "round": rd.get("round", 0),
+                        "score": rd.get("overall_average", 0),
+                        "decision": decision,
+                        "passed": rd.get("passed", False),
+                    })
+                    final_decision = decision
+                if not raw_rounds and passed:
+                    final_decision = "UPLOADED" if wf_data.get("uploaded") else "ACCEPT"
+
+                # Word count from last round
+                word_count = raw_rounds[-1].get("word_count", 0) if raw_rounds else 0
+
+                # Total tokens (prefer performance.total_tokens)
+                total_tokens = perf.get("total_tokens", 0)
+
                 workflow_status[project_id] = {
                     "topic": topic,
                     "status": final_status,
@@ -277,6 +299,16 @@ async def scan_interrupted_workflows():
                     "elapsed_time_seconds": int(perf.get("total_duration", 0)),
                     "estimated_time_remaining_seconds": 0,
                     "research_type": wf_data.get("research_type", "survey"),
+                    # Fields required by frontend for score/milestone display
+                    "final_score": final_score,
+                    "final_decision": final_decision,
+                    "passed": passed,
+                    "rounds": rounds_summary,
+                    "category": wf_data.get("category"),
+                    "word_count": word_count,
+                    "total_tokens": total_tokens,
+                    "estimated_cost": round(perf.get("estimated_cost", 0), 4),
+                    "expert_team": expert_team,
                 }
 
                 completed_count += 1
