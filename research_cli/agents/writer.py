@@ -21,21 +21,30 @@ def validate_manuscript_completeness(text: str) -> dict:
     Returns:
         Dict with is_complete (bool), issues (list), word_count (int)
     """
+    import re as _re
     issues = []
 
-    # 1. Ends mid-sentence (last char is not terminal punctuation)
+    # 1. Ends mid-sentence — but ignore if last non-empty line is a URL or reference entry
     stripped = text.rstrip()
-    if stripped and stripped[-1] not in '.!?")\']':
-        issues.append("ends_mid_sentence")
+    if stripped:
+        last_line = stripped.split('\n')[-1].strip()
+        is_ref_line = (
+            last_line.startswith('[')
+            or last_line.startswith('http')
+            or last_line.startswith('Available:')
+            or last_line.startswith('DOI:')
+        )
+        if not is_ref_line and stripped[-1] not in '.!?")\']':
+            issues.append("ends_mid_sentence")
 
     # 2. Missing References/Bibliography section
     lower = text.lower()
-    if "## references" not in lower and "## bibliography" not in lower:
+    if not _re.search(r'##\s+(?:\d+\.?\s+)?(?:references|bibliography)', lower):
         issues.append("missing_references")
 
-    # 3. Missing Conclusion section
-    if "## conclusion" not in lower and "## summary" not in lower:
-        issues.append("missing_conclusion")
+    # 3. Conclusion presence is checked by the moderator via prompt, not regex.
+    #    Heading variants ("Open Problems and Conclusion", "Summary and Outlook", etc.)
+    #    are too diverse for reliable pattern matching.
 
     return {
         "is_complete": len(issues) == 0,
@@ -84,6 +93,20 @@ class WriterAgent:
             "model": self._last_model_used,
         }
 
+    @staticmethod
+    def _clean_manuscript_output(text: str) -> str:
+        """Strip system prompt echo and preamble from LLM output.
+
+        Some models (especially Gemini) may echo the system prompt or
+        revision instructions before the actual manuscript content.
+        This strips everything before the first ## heading.
+        """
+        import re as _re
+        match = _re.search(r'^(## .+)', text, _re.MULTILINE)
+        if match and match.start() > 0:
+            text = text[match.start():]
+        return text.strip()
+
     async def _call_llm_once(
         self,
         prompt: str,
@@ -110,7 +133,8 @@ class WriterAgent:
         except (asyncio.TimeoutError, Exception) as e:
             is_timeout = isinstance(e, asyncio.TimeoutError)
             reason = f"timeout ({timeout}s)" if is_timeout else f"{type(e).__name__}: {e}"
-            logger.warning(f"Primary LLM ({self.model}) failed: {reason} — falling back to Sonnet")
+            fallback_name = self._fallback_llm.model if self._fallback_llm else "same model"
+            logger.warning(f"Primary LLM ({self.model}) failed: {reason} — falling back to {fallback_name}")
 
             # Force-close the primary client to release proxy connections
             try:
@@ -265,27 +289,32 @@ Structure should include: background, methodology of survey, thematic analysis, 
             research_type_guidance = """
 PAPER TYPE: Explainer / Tutorial
 Your task is to EXPLAIN concepts clearly, NOT propose new research or survey all literature.
-Focus on: clear concept introduction, intuitive analogies, step-by-step explanations, real-world examples.
+
+CRITICAL — Concept-first structure:
+- BEFORE any technical detail, dedicate a section to explaining prerequisite/difficult concepts in plain language
+- Use the "simple first, then precise" pattern: give an intuitive analogy or everyday comparison, THEN the formal definition
+- Example: explain "hash function" as "a fingerprint machine for data" before discussing cryptographic properties
+- Each new concept must be grounded in something the reader already understands
+
+Focus on: intuitive analogies, step-by-step build-up, concrete real-world examples, and visual/structural clarity.
 Assume the reader wants to UNDERSTAND the topic, not review the state-of-the-art."""
+        elif research_type == "original":
+            research_type_guidance = """
+PAPER TYPE: Original Research
+Your task is to present NOVEL contributions, analysis, or findings.
+Focus on: clear problem statement, methodology, original analysis or experiments, results, and discussion.
+Structure should include: introduction with research questions, related work, methodology, results/analysis, discussion, conclusion."""
 
         system_prompt = f"""You are an expert research writer specializing in {domain}.
 {audience_guidance}{research_type_guidance}
-Your writing style:
-- Write in flowing academic prose with well-developed paragraphs
-- Each paragraph should have a topic sentence, supporting evidence, and analysis
-- Clear, precise technical language with logical flow between ideas
-- Evidence-based with specific examples and data
-- Balanced perspective considering multiple viewpoints
+Writing rules:
+- Flowing academic prose with well-developed paragraphs (topic sentence → evidence → analysis)
+- Clear, precise technical language with logical flow
+- Evidence-based with specific examples and data; balanced perspective
 - Academic rigor with proper citations
-- NEVER use bullet-point lists for analysis or discussion
-- Reserve lists ONLY for enumerating specific technical specifications, steps, or requirements
-- Never use "..." or ellipsis to abbreviate content
-
-Write comprehensive research reports that are:
-- Factually accurate
-- Technically rigorous
-- {"Accessible to non-specialist readers while maintaining accuracy" if audience_level == "beginner" else "Accessible to readers with basic domain knowledge" if audience_level == "intermediate" else "Accessible to experts in the field"}
-- Grounded in current literature and data"""
+- NEVER use bullet-point lists for analysis/discussion (only for technical specs/requirements)
+- Never use "..." or truncate content
+- {"Accessible to non-specialists while maintaining accuracy" if audience_level == "beginner" else "Accessible with basic domain knowledge" if audience_level == "intermediate" else "Written for domain experts"}"""
 
         # Build references block for injection
         refs_block = ""
@@ -296,12 +325,15 @@ VERIFIED SOURCES (use these as primary citations):
 {refs_text}
 
 CITATION RULES:
-- You MUST cite these sources using [1], [2], etc. inline where relevant
-- Integrate citations naturally into the text (e.g., "Recent work [1] shows...")
-- Every major claim should be backed by at least one citation
-- You may combine citations like [1,3] when multiple sources support a claim
-- At the end of the manuscript, include a "## References" section listing all cited sources
-- You may also add well-known references beyond this list, but prioritize these verified sources
+- Cite sources using sequential [1], [2], [3]... numbered by order of first appearance in text
+- Integrate naturally (e.g., "Recent work [1] shows..."). Combine as [1,3] when appropriate
+- Every major claim needs at least one citation
+- You may ONLY cite sources from the verified list above. Do not invent or recall references from memory — they may be incorrect
+- End with ## References section formatted EXACTLY like this (one blank line between entries):
+
+  [1] Authors (Year). "Title". Venue/Publisher. DOI or URL
+
+  [2] Authors (Year). "Title". Venue/Publisher. DOI or URL
 """
 
         # Length-dependent prompt segments
@@ -330,11 +362,18 @@ Common patterns (but feel free to adapt):
 - Survey papers often use: Introduction, Background, Taxonomy/Classification, Comparative Analysis, Future Directions
 - Explainer papers often use: Introduction, Core Concepts, Technical Details, Applications
 - Research papers often use: Introduction, Related Work, Methodology, Results, Discussion
-End with ## References section."""
+End with ## Conclusion followed by ## References."""
 
         elif audience_level == "intermediate":
             summary_section = """START WITH: ## TL;DR
-Write a 3-5 sentence summary hitting the key points (no citations needed, plain language).
+Write EXACTLY 3-5 bullet points (MUST use bullet format, NOT sentences):
+- [First key finding/point in one line]
+- [Second key finding/point in one line]
+- [Third key finding/point in one line]
+- [Fourth key finding/point - optional]
+- [Fifth key finding/point - optional]
+
+Each bullet should be concise (one line) and hit a major point.
 
 THEN: ## Key Takeaways
 List 3-5 main points as bullet points:
@@ -346,11 +385,18 @@ Design your own section structure appropriate for this {research_type} content.
 Use clear, descriptive section headings that guide readers.
 Focus on practical value and actionable insights.
 Organize content logically for readers with basic domain knowledge.
-End with ## References section."""
+End with ## Conclusion followed by ## References."""
 
         else:  # beginner
             summary_section = """START WITH: ## TL;DR
-Write a 3-5 sentence summary in everyday language (imagine explaining to a friend with no background).
+Write EXACTLY 3-5 bullet points in plain language (MUST use bullet format, NOT sentences):
+- [First key point - explain like to a friend]
+- [Second key point - no jargon]
+- [Third key point - simple terms]
+- [Fourth key point - optional]
+- [Fifth key point - optional]
+
+Each bullet should be one line in everyday language.
 
 THEN: ## Why This Matters
 Write 1-2 paragraphs explaining:
@@ -364,13 +410,11 @@ Design your own section structure that makes this {research_type} content access
 Use question-based or descriptive headings (e.g., "What Is X?", "How Does It Work?", "Real-World Examples").
 Build up from simple concepts to more complex ones.
 Use analogies, examples, and storytelling to make ideas concrete.
-End with ## References section (can call it "Learn More" or "Further Reading" for this audience)."""
+End with ## Conclusion followed by ## References (can call it "Learn More" or "Further Reading")."""
 
         prompt = f"""Write a comprehensive research report on the following topic:
 
 TOPIC: {topic}
-
-PROFILE: {profile}
 {refs_block}
 Requirements:
 {length_requirement}{length_guidance}
@@ -382,10 +426,7 @@ STRUCTURE GUIDANCE:
 {structure_guidance}
 {"- Include inline citations [1], [2] throughout and a References section at the end" if references else ""}
 
-Format: Markdown with proper headings (##, ###). Write in flowing prose paragraphs.
-Do NOT use bullet-point lists for analysis or discussion (except in Key Takeaways section if present).
-Reserve lists only for enumerating specific technical items (e.g., protocol requirements, system specifications).
-Never truncate content with "..." or leave sentences incomplete.
+Format: Markdown with proper headings (##, ###).
 
 Write the complete manuscript now."""
 
@@ -396,7 +437,7 @@ Write the complete manuscript now."""
             max_tokens=16384,
         )
 
-        return response.content
+        return self._clean_manuscript_output(response.content)
 
     async def write_author_response(
         self,
@@ -414,83 +455,41 @@ Write the complete manuscript now."""
         Returns:
             Author response text addressing each reviewer
         """
-        feedback_summary = self._consolidate_feedback(reviews)
+        feedback_summary = self._consolidate_feedback_for_response(reviews)
 
-        system_prompt = """You are the author of a research manuscript responding to peer review feedback.
+        system_prompt = (
+            "You are a research author responding to peer reviews. "
+            "Acknowledge valid criticisms directly. For each concern, state the specific change "
+            "you will make in the revision. If you disagree with a point, explain with evidence. "
+            "Be concise — one sentence per concern."
+        )
 
-Your role:
-- Address each reviewer's concerns directly and professionally
-- Explain what changes you will make (or have made)
-- Clarify misunderstandings or provide additional context
-- Respectfully disagree when reviewer criticism is not applicable
-- Show engagement with feedback and willingness to improve
+        # Build dynamic reviewer template
+        reviewer_template = ""
+        for i, review in enumerate(reviews):
+            name = review.get('specialist_name', review.get('expert_name', f'Expert {i+1}'))
+            reviewer_template += f"\n**Reviewer {i+1} ({name})**:\n- [Main concern] → [Our action in 1 sentence]\n- [Second concern] → [Our action in 1 sentence]\n"
 
-Write a professional author response that demonstrates:
-- Careful reading of all reviews
-- Clear plan for addressing substantive concerns
-- Rationale for decisions (what to change, what to keep)
-- Respect for reviewers' time and expertise"""
-
-        prompt = f"""You have received peer reviews for your manuscript. Write a detailed response addressing each reviewer.
-
-ROUND: {round_number}
-
-MANUSCRIPT SUMMARY:
-[Word count: {len(manuscript.split())} words]
+        prompt = f"""Write a brief, professional response to peer reviews (Round {round_number}).
 
 REVIEWER FEEDBACK:
 {feedback_summary}
 
----
-
-Write a professional author response with the following structure:
+RESPONSE FORMAT (keep it SHORT and FOCUSED):
 
 ## Author Response - Round {round_number}
 
-### Overview
-[1-2 paragraphs: thank reviewers, summarize key themes in feedback, outline revision strategy]
+Thank you for the reviews. Key revisions:
+{reviewer_template}
+**Summary**: [1-2 sentences on overall revision approach]
 
-### Response to Reviewer 1 ([Reviewer Name])
-**Overall Assessment**: [Acknowledge their score and main concerns]
-
-**Major Points**:
-1. [Reviewer concern 1]
-   - **Our response**: [What you will change/clarify/explain]
-   - **Action taken**: [Specific changes made or planned]
-
-2. [Reviewer concern 2]
-   - **Our response**: ...
-   - **Action taken**: ...
-
-**Minor Points**: [Address smaller suggestions collectively]
-
-### Response to Reviewer 2 ([Reviewer Name])
-[Same structure]
-
-### Response to Reviewer 3 ([Reviewer Name])
-[Same structure]
-
-### Summary of Changes
-- [List major revisions planned/made]
-- [Clarifications added]
-- [New analysis/data included]
-
----
-
-Guidelines:
-- Be specific about what you will change
-- Provide rationale for disagreements (respectfully)
-- Show you understand the criticism even if you disagree
-- Keep tone professional and collaborative
-- Focus on substantive issues, not minor wording
-
-Write the complete author response now."""
+Keep each point to ONE sentence. Address the most important concerns from each reviewer."""
 
         response = await self._generate_with_fallback(
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=4096
+            max_tokens=1024
         )
 
         return response.content
@@ -523,8 +522,8 @@ Write the complete author response now."""
         Returns:
             Revised manuscript text
         """
-        # Consolidate feedback from all reviewers
-        feedback_summary = self._consolidate_feedback(reviews)
+        # Compact review summaries (scores + feedback); details go in checklist
+        feedback_summary = self._consolidate_feedback_compact(reviews)
 
         # Build structured revision checklist from reviewer weaknesses/suggestions
         checklist = self._build_revision_checklist(reviews)
@@ -561,32 +560,30 @@ PAPER TYPE: Survey / Literature Review
             research_type_revision_note = """
 PAPER TYPE: Explainer / Tutorial
 - Focus revisions on clarity, accessibility, and correctness of explanations
-- Add more examples or analogies where reviewers note confusion
-- Ensure step-by-step progression from simple to complex
+- If reviewers note confusion, add a plain-language explanation BEFORE the technical detail (not after)
+- Ensure prerequisite concepts are explained in their own section before being used elsewhere
+- Add more analogies, concrete examples, or visual descriptions where concepts are abstract
+- Ensure step-by-step progression: never reference a concept before defining it
 - Do NOT add academic rigor beyond what aids understanding
+"""
+        elif research_type == "original":
+            research_type_revision_note = """
+PAPER TYPE: Original Research
+- Strengthen methodology description and justification
+- Add missing experimental details or analysis where reviewers note gaps
+- Ensure results are clearly presented with proper evidence
+- Clarify novel contributions and differentiation from prior work
 """
 
         system_prompt = f"""You are an expert research writer revising a manuscript based on peer review feedback.
 {audience_revision_note}{research_type_revision_note}
-Your revision approach:
-- Address all substantive criticisms — EVERY item in the revision checklist must be handled
-- Maintain the manuscript's core structure and arguments where valid
+Revision rules:
+- Address EVERY item in the revision checklist
+- Maintain core structure and arguments where valid
 - Add missing analysis and evidence as requested
-- Improve clarity and precision
-- Keep revisions focused and coherent
-
-CRITICAL RULE: You must implement every change you commit to. Reviewers will check whether promised changes were actually made. Failing to follow through on stated revisions is worse than not making them at all.
-
-Do not:
-- Ignore valid criticism
-- Add fluff or filler content
-- Change topics or scope dramatically
-- Lose valuable existing content unnecessarily
-- Convert flowing prose into bullet-point lists
-- Use "..." or ellipsis to truncate content
-- Promise changes in response but fail to implement them in the manuscript
-
-Maintain flowing academic prose style throughout the revision."""
+- Implement every change you commit to — reviewers will verify
+- Flowing academic prose only (no bullet-point lists for analysis, no "..." truncation)
+- Do not add fluff, change scope, or lose valuable existing content"""
 
         # Build references block for revision
         refs_block = ""
@@ -597,9 +594,9 @@ VERIFIED SOURCES (available for citation):
 {refs_text}
 
 CITATION RULES FOR REVISION:
-- Use [1], [2], etc. to cite these sources inline
+- Use sequential [1], [2], [3]... numbered by order of first appearance
 - If reviewers noted weak/missing citations, add more from this list
-- Ensure the References section at the end is complete and accurate
+- Ensure ## References section is complete, with one blank line between entries
 """
 
         # Build accountability block from author response
@@ -613,6 +610,7 @@ ACCOUNTABILITY: The above is YOUR response to reviewers. You MUST implement ever
 Reviewers will verify each promise. Any unimplemented commitment will be flagged as a serious issue.
 """
 
+        current_words = len(manuscript.split())
         length_constraint = ""
         if article_length == "short":
             length_constraint = (
@@ -621,13 +619,61 @@ Reviewers will verify each promise. Any unimplemented commitment will be flagged
                 "   - Do not expand sections unnecessarily\n"
                 "   - Prioritize quality and depth over breadth\n"
             )
+        else:
+            min_words = max(int(current_words * 0.75), 2000)
+            max_words = int(current_words * 1.25)
+            length_constraint = (
+                "5. Length constraint:\n"
+                f"   - Keep between {min_words:,}-{max_words:,} words (current: {current_words:,})\n"
+                "   - Do NOT inflate the manuscript — improve quality, not add bulk\n"
+                "   - If you add content in one area, trim elsewhere to stay within limits\n"
+            )
+
+        summary_heading = "## Abstract" if audience_level == "professional" else "## TL;DR"
+        structure_requirements = (
+            "6. Structural requirements (MANDATORY — never remove these sections):\n"
+            f"   - The manuscript MUST start with {summary_heading}\n"
+            "   - The manuscript MUST end with ## Conclusion followed by ## References\n"
+            "   - Use inline citations [1], [2], [3] — sequential numbering by order of first appearance\n"
+            "   - ## References format — one blank line between each entry:\n"
+            '     [1] Authors (Year). "Title". Venue. DOI/URL\n'
+            "\n"
+            '     [2] Authors (Year). "Title". Venue. DOI/URL\n'
+            f"   - Preserve structure: {summary_heading.replace('## ', '')} → Body → Conclusion → References\n"
+        )
+
+        # Targeted revision: identify which sections need changes
+        sections = self._parse_sections(manuscript)
+        affected = self._identify_affected_sections(checklist, sections)
+        use_targeted = len(affected) < len(sections) * 0.7 and len(sections) > 3
+
+        # Build manuscript block (possibly with [NO CHANGES NEEDED] tags)
+        targeted_instruction = ""
+        if use_targeted:
+            tagged_parts = []
+            for i, sec in enumerate(sections):
+                if i in affected:
+                    tagged_parts.append(sec["content"])
+                else:
+                    tagged_parts.append(
+                        f"## {sec['title']} [NO CHANGES NEEDED]\n"
+                        f"[Content preserved — {len(sec['content'].split())} words]"
+                    )
+            manuscript_block = "\n\n".join(tagged_parts)
+            targeted_instruction = (
+                "\nTARGETED REVISION: Some sections are marked [NO CHANGES NEEDED]. "
+                "For these sections, output ONLY: ## [exact section title] [NO CHANGES]\n"
+                "Focus your revision effort on the unmarked sections.\n"
+            )
+        else:
+            manuscript_block = manuscript
 
         prompt = f"""REVISION ROUND {round_number}
 
 You are revising a research manuscript based on specialist peer reviews.
-
+{targeted_instruction}
 CURRENT MANUSCRIPT:
-{manuscript}
+{manuscript_block}
 
 ---
 
@@ -650,6 +696,8 @@ REVISION INSTRUCTIONS:
    - Missing critical analysis
    - Unclear explanations
    - Minor improvements
+   If you cannot fully address all items, handle the highest-priority ones thoroughly
+   and mark deferred items with [TODO] inline comments.
 
 3. Revise the manuscript to address feedback:
    - Fix factual inaccuracies
@@ -657,14 +705,13 @@ REVISION INSTRUCTIONS:
    - Include requested examples and data
    - Improve clarity and structure
    - Strengthen rigor and citations
-   - Maintain flowing academic prose throughout — do NOT convert paragraphs into bullet lists
-   - Never truncate content with "..."
 
 4. Preserve what works:
    - Keep strengths identified by reviewers
    - Maintain clear structure
    - Retain good examples and data
 {length_constraint}
+{structure_requirements}
 Output the complete revised manuscript in markdown format.
 Focus on substantive improvements that address reviewer concerns."""
 
@@ -675,10 +722,39 @@ Focus on substantive improvements that address reviewer concerns."""
             max_tokens=16384,
         )
 
-        return response.content
+        result = self._clean_manuscript_output(response.content)
+
+        # Post-process: restore unchanged sections if targeted mode was used
+        if use_targeted:
+            result = self._restore_unchanged_sections(result, sections, affected)
+
+        return result
+
+    def _consolidate_feedback_for_response(self, reviews: List[Dict]) -> str:
+        """Slim review format for author response — only actionable items.
+
+        Args:
+            reviews: List of review dictionaries
+
+        Returns:
+            Formatted feedback with weaknesses and suggestions only
+        """
+        parts = []
+        for review in reviews:
+            specialist = review["specialist_name"]
+            avg = review["average"]
+            weaknesses = "\n".join(f"- {w}" for w in review.get("weaknesses", []))
+            suggestions = "\n".join(f"- {s}" for s in review.get("suggestions", []))
+            part = (
+                f"## {specialist} ({avg}/10)\n\n"
+                f"**Weaknesses:**\n{weaknesses}\n\n"
+                f"**Suggestions:**\n{suggestions}"
+            )
+            parts.append(part)
+        return "\n---\n".join(parts)
 
     def _consolidate_feedback(self, reviews: List[Dict]) -> str:
-        """Consolidate reviews into structured feedback.
+        """Consolidate reviews into structured feedback (full format for author response).
 
         Args:
             reviews: List of review dictionaries
@@ -723,26 +799,173 @@ Focus on substantive improvements that address reviewer concerns."""
 
         return "\n---\n".join(feedback_parts)
 
+    def _consolidate_feedback_compact(self, reviews: List[Dict]) -> str:
+        """Compact review format for revision prompt.
+
+        Includes scores + summary only.
+        Weaknesses/suggestions are in the separate revision checklist.
+        """
+        parts = []
+        for review in reviews:
+            specialist = review["specialist_name"]
+            scores = review["scores"]
+            avg = review["average"]
+            cit = f", cit={scores['citations']}" if 'citations' in scores else ""
+            part = (
+                f"## {specialist} ({avg}/10)\n"
+                f"Scores: acc={scores['accuracy']} comp={scores['completeness']} "
+                f"clar={scores['clarity']} nov={scores['novelty']} rig={scores['rigor']}{cit}\n"
+                f"Summary: {review['summary']}"
+            )
+            parts.append(part)
+        return "\n---\n".join(parts)
+
     def _build_revision_checklist(self, reviews: List[Dict]) -> str:
-        """Build a structured revision checklist from reviewer weaknesses and suggestions.
+        """Build deduplicated revision checklist with severity tags.
+
+        Groups similar items by keyword overlap so the same issue raised by
+        multiple reviewers appears once with a priority indicator.
 
         Args:
             reviews: List of review dictionaries
 
         Returns:
-            Numbered checklist string
+            Numbered checklist string with severity tags
         """
-        items = []
-        idx = 1
+        raw_items = []  # (type, reviewer, text)
         for review in reviews:
             reviewer = review["specialist_name"]
             for w in review.get("weaknesses", []):
-                items.append(f"{idx}. [{reviewer}] FIX: {w}")
-                idx += 1
+                raw_items.append(("FIX", reviewer, w))
             for s in review.get("suggestions", []):
-                items.append(f"{idx}. [{reviewer}] ADD: {s}")
-                idx += 1
+                raw_items.append(("ADD", reviewer, s))
+
+        # Group similar items by keyword overlap
+        groups: list = []  # list of [type, [reviewers], representative_text]
+        for item_type, reviewer, text in raw_items:
+            merged = False
+            text_words = set(text.lower().split())
+            for group in groups:
+                g_type, g_reviewers, g_text = group
+                if g_type != item_type:
+                    continue
+                g_words = set(g_text.lower().split())
+                overlap = len(text_words & g_words) / max(len(text_words | g_words), 1)
+                if overlap > 0.35:  # 35% word overlap threshold
+                    g_reviewers.append(reviewer)
+                    # Keep longer text as representative
+                    if len(text) > len(g_text):
+                        group[2] = text
+                    merged = True
+                    break
+            if not merged:
+                groups.append([item_type, [reviewer], text])
+
+        # Sort by number of reviewers (descending) for priority
+        groups.sort(key=lambda g: len(g[1]), reverse=True)
+
+        # Format with severity tags
+        items = []
+        total_reviewers = len(reviews)
+        for idx, (item_type, reviewers, text) in enumerate(groups, 1):
+            n = len(reviewers)
+            if n >= 3:
+                tag = f"[{n}/{total_reviewers} reviewers — HIGH PRIORITY]"
+            elif n >= 2:
+                tag = f"[{n}/{total_reviewers} reviewers]"
+            else:
+                tag = f"[{reviewers[0]}]"
+            items.append(f"{idx}. {tag} {item_type}: {text}")
+
         return "\n".join(items) if items else "(No specific items)"
+
+    @staticmethod
+    def _parse_sections(manuscript: str) -> list:
+        """Split manuscript by ## headings into sections.
+
+        Args:
+            manuscript: Full manuscript text
+
+        Returns:
+            List of dicts with 'title' and 'content' keys
+        """
+        import re
+        sections = []
+        parts = re.split(r'(?=^## )', manuscript, flags=re.MULTILINE)
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            first_line = part.split('\n')[0]
+            title_match = re.match(r'^## (.+)', first_line)
+            title = title_match.group(1) if title_match else "Untitled"
+            sections.append({"title": title, "content": part})
+        return sections
+
+    @staticmethod
+    def _identify_affected_sections(checklist: str, sections: list) -> set:
+        """Identify which sections are referenced in checklist items.
+
+        Args:
+            checklist: Revision checklist text
+            sections: List of section dicts from _parse_sections
+
+        Returns:
+            Set of section indices that need revision
+        """
+        affected = set()
+        checklist_lower = checklist.lower()
+        for i, sec in enumerate(sections):
+            title_lower = sec["title"].lower()
+            # Match by section title words (at least 2-word match)
+            title_words = [w for w in title_lower.split() if len(w) > 2]
+            if any(w in checklist_lower for w in title_words):
+                affected.add(i)
+            # Match by section number (e.g., "Section 3")
+            # Try extracting leading number from title like "3. Methodology"
+            import re
+            num_match = re.match(r'(\d+)', sec["title"].strip())
+            if num_match:
+                num = num_match.group(1)
+                if f"section {num}" in checklist_lower:
+                    affected.add(i)
+
+        # Citation-related feedback: add References section (not all sections)
+        citation_keywords = ["citation", "bibliography", "reference list", "references section"]
+        if any(kw in checklist_lower for kw in citation_keywords):
+            for i, sec in enumerate(sections):
+                if "reference" in sec["title"].lower():
+                    affected.add(i)
+
+        # True cross-cutting feedback affects ALL sections
+        cross_cutting = ["all sections", "throughout", "entire manuscript", "every section"]
+        if any(kw in checklist_lower for kw in cross_cutting):
+            affected = set(range(len(sections)))
+
+        # Safe fallback: if nothing matched, affect all
+        if not affected:
+            affected = set(range(len(sections)))
+        return affected
+
+    @staticmethod
+    def _restore_unchanged_sections(revised: str, original_sections: list, affected: set) -> str:
+        """Replace [NO CHANGES] markers with original section content.
+
+        Args:
+            revised: Revised manuscript output from LLM
+            original_sections: List of section dicts from _parse_sections
+            affected: Set of section indices that were targeted for revision
+
+        Returns:
+            Complete manuscript with markers replaced by originals
+        """
+        import re
+        for i, sec in enumerate(original_sections):
+            if i not in affected:
+                # Match the [NO CHANGES] marker line (flexible whitespace)
+                pattern = re.escape(f"## {sec['title']}") + r'\s*\[NO CHANGES\].*'
+                revised = re.sub(pattern, sec["content"], revised)
+        return revised
 
     async def verify_citations(
         self,

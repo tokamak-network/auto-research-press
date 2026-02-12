@@ -1,9 +1,10 @@
 {
-  "_comment": "Model configuration using 3-tier structure: Reasoning (Opus) > Support (Sonnet) > Light (Haiku).",
+  "_comment": "Model configuration using 3-tier structure: Reasoning (Opus) > Support (Sonnet) > Light (Flash). Gemini models use higher max_tokens due to thinking token overhead.",
   "tiers": {
     "reasoning": {
-      "primary": {"model": "claude-opus-4-6", "provider": "anthropic"},
+      "primary": {"model": "gemini-2.5-pro", "provider": "google"},
       "fallback": [
+        {"model": "claude-opus-4-6", "provider": "anthropic"},
         {"model": "claude-sonnet-4-5", "provider": "anthropic"}
       ]
     },
@@ -16,7 +17,8 @@
     "light": {
       "primary": {"model": "gemini-2.5-flash", "provider": "google"},
       "fallback": [
-        {"model": "claude-haiku-4-5", "provider": "anthropic"}
+        {"model": "claude-haiku-4-5", "provider": "anthropic"},
+        {"model": "claude-sonnet-4-5", "provider": "anthropic"}
       ]
     }
   },
@@ -24,21 +26,25 @@
     "writer": { "tier": "reasoning", "temperature": 0.7, "max_tokens": 16384 },
     "lead_author": { "tier": "reasoning", "temperature": 0.7, "max_tokens": 16384 },
     "paper_writer": { "tier": "reasoning", "temperature": 0.7, "max_tokens": 16384 },
-    "research_planner": { "tier": "reasoning", "temperature": 0.7, "max_tokens": 8192 },
-    "team_composer": { "tier": "reasoning", "temperature": 0.7, "max_tokens": 4096 },
-    "moderator": { "tier": "reasoning", "temperature": 0.3, "max_tokens": 4096 },
+    "research_planner": { "tier": "light", "temperature": 0.7, "max_tokens": 8192 },
+    "team_composer": { "tier": "light", "temperature": 0.7, "max_tokens": 8192 },
+    "moderator": { "tier": "light", "temperature": 0.3, "max_tokens": 8192 },
     "reviewer": { "tier": "reasoning", "temperature": 0.3, "max_tokens": 8192 },
+    "reviewer_rotation": [
+      {"provider": "google", "model": "gemini-2.5-pro"},
+      {"provider": "anthropic", "model": "claude-sonnet-4-5"},
+      {"provider": "anthropic", "model": "claude-sonnet-4-5"}
+    ],
 
-    "coauthor": { "tier": "support", "temperature": 0.7, "max_tokens": 8192 },
-    "integration_editor": { "tier": "support", "temperature": 0.5, "max_tokens": 8192 },
-    "research_notes": { "tier": "support", "temperature": 0.5, "max_tokens": 4096 },
-    "citation_verifier": { "tier": "support", "temperature": 0.5, "max_tokens": 8192 },
+    "coauthor": { "tier": "support", "temperature": 0.7, "max_tokens": 4096 },
+    "integration_editor": { "tier": "light", "temperature": 0.5, "max_tokens": 8192 },
+    "research_notes": { "tier": "light", "temperature": 0.5, "max_tokens": 8192 },
+    "citation_verifier": { "tier": "light", "temperature": 0.5, "max_tokens": 8192 },
 
     "author_response": { "tier": "light", "temperature": 0.7, "max_tokens": 4096 },
-    "propose_reviewers": { "tier": "light", "temperature": 0.7, "max_tokens": 2048 },
-    "desk_editor": { "tier": "light", "temperature": 0.1, "max_tokens": 1024 },
-    "categorizer": { "tier": "light", "temperature": 0.3, "max_tokens": 512 },
-    "title_generator": { "tier": "light", "temperature": 0.7, "max_tokens": 100 }
+    "desk_editor": { "tier": "light", "temperature": 0.1, "max_tokens": 2048 },
+    "categorizer": { "tier": "light", "temperature": 0.3, "max_tokens": 2048 },
+    "title_generator": { "tier": "light", "temperature": 0.7, "max_tokens": 256 }
   },
   "provider_config": {
     "llm": {

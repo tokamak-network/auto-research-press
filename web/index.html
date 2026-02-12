@@ -150,26 +150,16 @@
 
     <script src="js/main.js"></script>
     <script>
-        // Load system version
+        // Load system version (static mode)
         async function loadSystemVersion() {
-            try {
-                const response = await fetch('/api/version');
-                if (response.ok) {
-                    const data = await response.json();
-                    const versionEl = document.getElementById('system-version');
-                    if (versionEl && data.version) {
-                        versionEl.textContent = `v${data.version}`;
-                    }
-                }
-            } catch (e) {
-                console.log('Version info unavailable');
-            }
+            const versionEl = document.getElementById('system-version');
+            if (versionEl) versionEl.textContent = '';
         }
 
         // Load and display articles dynamically from index.json
         async function loadArticles() {
             try {
-                const response = await fetch('/api/projects');
+                const response = await fetch('data/index.json');
                 if (!response.ok) return;
 
                 const data = await response.json();
@@ -228,12 +218,14 @@
                 badgeHtml = '<div class="card-badge">Featured</div>';
             }
 
-            // Audience level badge (only for non-professional)
+            // Audience level badge
             let audienceBadgeHtml = '';
             if (proj.audience_level === 'beginner') {
                 audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#059669;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Beginner-Friendly</span>';
             } else if (proj.audience_level === 'intermediate') {
                 audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Intermediate</span>';
+            } else if (proj.audience_level === 'professional') {
+                audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#6b21a8;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Professional</span>';
             }
 
             // Format date with time (YYYY-MM-DD HH:MM)

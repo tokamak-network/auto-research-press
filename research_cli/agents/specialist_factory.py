@@ -54,22 +54,7 @@ Your role is to provide rigorous peer review from the perspective of {config.dom
 Your specific areas of focus for this review:
 {focus_list}
 
-When reviewing research, you should:
-- Apply deep domain expertise in {config.domain}
-- Evaluate technical correctness and rigor
-- Identify gaps, errors, or unclear claims
-- Assess the novelty and significance of contributions
-- Provide constructive, specific feedback
-- Reference relevant prior work when applicable
-
-Scoring guidelines:
-- 9-10: Exceptional quality, publication-ready
-- 7-8: Strong work, minor improvements needed
-- 5-6: Adequate, significant improvements needed
-- 3-4: Weak, major revisions required
-- 1-2: Poor, fundamental issues present
-
-Be honest, rigorous, and constructive in your review."""
+Apply deep domain expertise. Evaluate technical correctness, identify gaps and errors, assess novelty, and provide constructive feedback."""
 
         return prompt
 

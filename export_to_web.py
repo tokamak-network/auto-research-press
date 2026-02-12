@@ -37,7 +37,7 @@ def extract_headings(markdown_text):
     return headings
 
 
-def generate_article_html(project_id, workflow_data, manuscript_text):
+def generate_article_html(project_id, workflow_data, manuscript_text, audience_level="professional"):
     """Generate static HTML article matching l2-fee-structures.html format."""
     topic = workflow_data.get("topic", project_id.replace("-", " ").title())
     rounds = workflow_data.get("rounds", [])
@@ -49,6 +49,15 @@ def generate_article_html(project_id, workflow_data, manuscript_text):
     # Get expert team if available
     expert_team = workflow_data.get("expert_team", [])
     expert_names = [e.get("name", "Expert") for e in expert_team] if expert_team else []
+
+    # Audience badge HTML
+    audience_badge_html = ""
+    if audience_level == "beginner":
+        audience_badge_html = '<span class="meta-item" style="padding:2px 8px;background:#059669;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Beginner-Friendly</span>'
+    elif audience_level == "intermediate":
+        audience_badge_html = '<span class="meta-item" style="padding:2px 8px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Intermediate</span>'
+    elif audience_level == "professional":
+        audience_badge_html = '<span class="meta-item" style="padding:2px 8px;background:#6b21a8;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Professional</span>'
 
     # Add citation hyperlinks
     manuscript_text = CitationManager.add_citation_hyperlinks(manuscript_text)
@@ -149,6 +158,7 @@ def generate_article_html(project_id, workflow_data, manuscript_text):
                     <span class="meta-item"><strong>Version:</strong> {version}</span>
                     <span class="meta-item"><strong>Review Score:</strong> {final_score:.1f}/10</span>
                     <span class="meta-item"><strong>Status:</strong> {final_decision.replace('_', ' ')}</span>
+                    {audience_badge_html}
                 </div>
             </header>
 
@@ -326,6 +336,155 @@ def generate_article_html(project_id, workflow_data, manuscript_text):
     return html
 
 
+def _build_project_entry(project_dir: Path, project_id: str, web_data_dir: Path, web_articles_dir: Path) -> dict | None:
+    """Process a single project directory: copy data, generate HTML, return index entry.
+
+    Returns the index entry dict, or None if the project has no workflow_complete.json.
+    """
+    workflow_file = project_dir / "workflow_complete.json"
+    if not workflow_file.exists():
+        return None
+
+    with open(workflow_file) as f:
+        workflow_data = json.load(f)
+
+    # Copy workflow file to web/data
+    dest_file = web_data_dir / f"{project_id}.json"
+    shutil.copy(workflow_file, dest_file)
+
+    # Copy manuscript files (all versions)
+    manuscripts = {}
+    for manuscript_file in project_dir.glob("manuscript_*.md"):
+        manuscript_text = manuscript_file.read_text()
+        version = manuscript_file.stem  # e.g., "manuscript_v1"
+        manuscripts[version] = manuscript_text
+
+    # Save manuscripts as separate JSON
+    if manuscripts:
+        manuscripts_file = web_data_dir / f"{project_id}_manuscripts.json"
+        with open(manuscripts_file, "w") as f:
+            json.dump(manuscripts, f, indent=2)
+
+        # Generate static article HTML for latest version
+        # Try to find versioned manuscripts first, then fallback to final
+        versioned = [k for k in manuscripts.keys() if '_v' in k]
+        if versioned:
+            latest_version = max(versioned, key=lambda x: int(x.split('_v')[1]))
+        else:
+            latest_version = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
+        latest_manuscript = manuscripts[latest_version]
+
+        try:
+            article_html = generate_article_html(
+                project_id, workflow_data, latest_manuscript,
+                audience_level=workflow_data.get("audience_level", "professional"),
+            )
+            article_file = web_articles_dir / f"{project_id}.html"
+            with open(article_file, "w", encoding='utf-8') as f:
+                f.write(article_html)
+            print(f"  ✓ Generated: articles/{project_id}.html")
+        except Exception as e:
+            print(f"  ✗ Error generating {project_id}.html: {e}")
+
+    # Get performance metrics
+    performance = workflow_data.get("performance", {})
+    total_duration = performance.get("total_duration", 0)
+
+    # Determine status based on final round decision
+    rounds = workflow_data.get("rounds", [])
+    final_decision = rounds[-1].get("moderator_decision", {}).get("decision", "PENDING") if rounds else "PENDING"
+    if final_decision == "ACCEPT":
+        status = "completed"
+    elif final_decision in ["MAJOR_REVISION", "MINOR_REVISION", "REJECT"]:
+        status = "rejected"
+    elif final_decision == "PENDING" and not rounds:
+        status = "failed"
+    else:
+        status = "failed"
+
+    # Extract round summaries
+    rounds_summary = []
+    for rd in workflow_data.get("rounds", []):
+        rounds_summary.append({
+            "round": rd.get("round", 0),
+            "score": rd.get("overall_average", 0),
+            "decision": rd.get("moderator_decision", {}).get("decision", ""),
+            "passed": rd.get("passed", False)
+        })
+
+    # Extract article title from latest manuscript
+    article_title = None
+    if manuscripts:
+        versioned = [k for k in manuscripts.keys() if '_v' in k]
+        if versioned:
+            latest_key = max(versioned, key=lambda x: int(x.split('_v')[1]))
+        else:
+            latest_key = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
+        article_title = extract_title(manuscripts[latest_key])
+
+    return {
+        "id": project_id,
+        "title": article_title,
+        "topic": workflow_data.get("topic", project_id.replace("-", " ").title()),
+        "final_score": workflow_data.get("final_score", 0),
+        "passed": workflow_data.get("passed", False),
+        "status": status,
+        "total_rounds": workflow_data.get("total_rounds", 0),
+        "rounds": rounds_summary,
+        "timestamp": workflow_data.get("timestamp", ""),
+        "data_file": f"data/{project_id}.json",
+        "elapsed_time_seconds": int(total_duration),
+        "final_decision": final_decision,
+        "audience_level": workflow_data.get("audience_level", "professional"),
+    }
+
+
+def export_single_project(project_dir: Path, project_id: str = None) -> dict | None:
+    """Export a single project to web/data/ + web/articles/ and append to index.json.
+
+    Args:
+        project_dir: Path to the project directory containing workflow_complete.json.
+        project_id: Optional override for the project ID (defaults to dir name).
+
+    Returns:
+        The index entry dict, or None if export failed.
+    """
+    web_data_dir = Path("web/data")
+    web_articles_dir = Path("web/articles")
+    web_data_dir.mkdir(exist_ok=True)
+    web_articles_dir.mkdir(exist_ok=True)
+
+    if project_id is None:
+        project_id = project_dir.name
+
+    entry = _build_project_entry(project_dir, project_id, web_data_dir, web_articles_dir)
+    if entry is None:
+        print(f"  ✗ No workflow_complete.json in {project_dir}")
+        return None
+
+    # Load existing index
+    index_file = web_data_dir / "index.json"
+    if index_file.exists():
+        with open(index_file) as f:
+            index_data = json.load(f)
+    else:
+        index_data = {"projects": []}
+
+    # Remove existing entry with same id, then append
+    index_data["projects"] = [p for p in index_data["projects"] if p["id"] != entry["id"]]
+    index_data["projects"].append(entry)
+
+    # Sort by timestamp (newest first)
+    index_data["projects"].sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    index_data["updated_at"] = datetime.now().isoformat()
+
+    with open(index_file, "w") as f:
+        json.dump(index_data, f, indent=2)
+
+    print(f"  ✓ Exported {project_id} to web/data/ + index.json")
+    return entry
+
+
 def export_results_to_web():
     """Export all research results to web/data directory and generate articles."""
     results_dir = Path("results")
@@ -340,101 +499,10 @@ def export_results_to_web():
         if not project_dir.is_dir():
             continue
 
-        workflow_file = project_dir / "workflow_complete.json"
-        if not workflow_file.exists():
-            continue
-
-        # Read workflow data
-        with open(workflow_file) as f:
-            workflow_data = json.load(f)
-
-        # Generate clean ID
         project_id = project_dir.name
-
-        # Copy workflow file to web/data
-        dest_file = web_data_dir / f"{project_id}.json"
-        shutil.copy(workflow_file, dest_file)
-
-        # Copy manuscript files (all versions)
-        manuscripts = {}
-        for manuscript_file in project_dir.glob("manuscript_*.md"):
-            manuscript_text = manuscript_file.read_text()
-            version = manuscript_file.stem  # e.g., "manuscript_v1"
-            manuscripts[version] = manuscript_text
-
-        # Save manuscripts as separate JSON
-        if manuscripts:
-            manuscripts_file = web_data_dir / f"{project_id}_manuscripts.json"
-            with open(manuscripts_file, "w") as f:
-                json.dump(manuscripts, f, indent=2)
-
-            # Generate static article HTML for latest version
-            # Try to find versioned manuscripts first, then fallback to final
-            versioned = [k for k in manuscripts.keys() if '_v' in k]
-            if versioned:
-                latest_version = max(versioned, key=lambda x: int(x.split('_v')[1]))
-            else:
-                # Use final or any manuscript
-                latest_version = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
-            latest_manuscript = manuscripts[latest_version]
-
-            try:
-                article_html = generate_article_html(project_id, workflow_data, latest_manuscript)
-                article_file = web_articles_dir / f"{project_id}.html"
-                with open(article_file, "w", encoding='utf-8') as f:
-                    f.write(article_html)
-                print(f"  ✓ Generated: articles/{project_id}.html")
-            except Exception as e:
-                print(f"  ✗ Error generating {project_id}.html: {e}")
-
-        # Get performance metrics
-        performance = workflow_data.get("performance", {})
-        total_duration = performance.get("total_duration", 0)
-
-        # Determine status based on final round decision
-        final_decision = workflow_data.get("rounds", [{}])[-1].get("moderator_decision", {}).get("decision", "PENDING")
-        if final_decision == "ACCEPT":
-            status = "completed"
-        elif final_decision in ["MAJOR_REVISION", "MINOR_REVISION"]:
-            status = "rejected"  # Didn't pass threshold
-        else:
-            status = "failed"
-
-        # Extract round summaries
-        rounds_summary = []
-        for rd in workflow_data.get("rounds", []):
-            rounds_summary.append({
-                "round": rd.get("round", 0),
-                "score": rd.get("overall_average", 0),
-                "decision": rd.get("moderator_decision", {}).get("decision", ""),
-                "passed": rd.get("passed", False)
-            })
-
-        # Extract article title from latest manuscript
-        article_title = None
-        if manuscripts:
-            versioned = [k for k in manuscripts.keys() if '_v' in k]
-            if versioned:
-                latest_key = max(versioned, key=lambda x: int(x.split('_v')[1]))
-            else:
-                latest_key = 'manuscript_final' if 'manuscript_final' in manuscripts else list(manuscripts.keys())[0]
-            article_title = extract_title(manuscripts[latest_key])
-
-        # Add to index
-        workflows.append({
-            "id": project_id,
-            "title": article_title,
-            "topic": workflow_data.get("topic", project_id.replace("-", " ").title()),
-            "final_score": workflow_data.get("final_score", 0),
-            "passed": workflow_data.get("passed", False),
-            "status": status,
-            "total_rounds": workflow_data.get("total_rounds", 0),
-            "rounds": rounds_summary,  # Add round summaries
-            "timestamp": workflow_data.get("timestamp", ""),
-            "data_file": f"data/{project_id}.json",
-            "elapsed_time_seconds": int(total_duration),
-            "final_decision": final_decision
-        })
+        entry = _build_project_entry(project_dir, project_id, web_data_dir, web_articles_dir)
+        if entry is not None:
+            workflows.append(entry)
 
     # Sort by timestamp (newest first)
     workflows.sort(key=lambda x: x["timestamp"], reverse=True)

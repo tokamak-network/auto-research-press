@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import click
 from rich.console import Console
@@ -269,11 +269,17 @@ async def _test_providers():
 @cli.command()
 @click.argument("topic")
 @click.option("--num-experts", type=int, default=3, help="Number of expert reviewers")
-@click.option("--auto-accept-team", is_flag=True, help="Skip interactive team editing")
-@click.option("--max-rounds", type=int, default=3, help="Maximum review rounds")
+@click.option("--auto-accept-team/--interactive-team", default=True, help="Auto-accept AI-composed teams (default) or interactively edit")
+@click.option("--max-rounds", type=int, default=2, help="Maximum review rounds")
 @click.option("--threshold", type=float, default=7.0, help="Score threshold for acceptance")
 @click.option("--manuscript", type=click.Path(exists=True), help="Path to existing manuscript (skip generation)")
 @click.option("--article-length", type=click.Choice(["short", "full"]), default="full", help="Article length: short (1,500-2,500 words) or full (3,000-5,000 words)")
+@click.option("--audience-level", type=click.Choice(["beginner", "intermediate", "professional"]), default="professional", help="Target audience expertise level")
+@click.option("--research-type", type=click.Choice(["explainer", "survey", "original"]), default="survey", help="Type of research article")
+@click.option("--category-major", type=str, default=None, help="Major academic category (e.g., computer_science, natural_sciences)")
+@click.option("--category-subfield", type=str, default=None, help="Academic subfield (e.g., security, physics)")
+@click.option("--solo", is_flag=True, default=False, help="Solo writing mode (single writer, no co-authors)")
+@click.option("--num-coauthors", type=int, default=2, help="Number of co-authors in collaborative mode (0-3)")
 def run(
     topic: str,
     num_experts: int,
@@ -282,30 +288,57 @@ def run(
     threshold: float,
     manuscript: Optional[str],
     article_length: str,
+    audience_level: str,
+    research_type: str,
+    category_major: Optional[str],
+    category_subfield: Optional[str],
+    solo: bool,
+    num_coauthors: int,
 ):
     """Run complete research workflow with AI team composition.
 
+    Default mode is collaborative (lead author + co-authors). Use --solo for
+    single-writer mode.
+
     This command:
-    1. Analyzes the topic and proposes an expert review team
-    2. Allows interactive team editing (unless --auto-accept-team)
-    3. Generates or uses provided manuscript
-    4. Runs iterative peer review until quality threshold met
-    5. Tracks performance metrics and exports results
+    1. Analyzes the topic and proposes expert teams (writers + reviewers)
+    2. Generates manuscript via collaborative or solo writing
+    3. Runs iterative peer review until quality threshold met
+    4. Exports results to web viewer
 
     Example:
         ai-research run "Optimistic Rollups Security" --num-experts 4
-        ai-research run "MEV in Ethereum" --auto-accept-team
-        ai-research run "Layer 2 Bridges" --manuscript paper.md --max-rounds 5
+        ai-research run "MEV in Ethereum" --research-type explainer
+        ai-research run "Layer 2 Bridges" --solo --manuscript paper.md
     """
-    asyncio.run(_run_workflow(
-        topic,
-        num_experts,
-        auto_accept_team,
-        max_rounds,
-        threshold,
-        manuscript,
-        article_length,
-    ))
+    if solo:
+        asyncio.run(_run_workflow(
+            topic,
+            num_experts,
+            auto_accept_team,
+            max_rounds,
+            threshold,
+            manuscript,
+            article_length,
+            audience_level,
+            research_type,
+            category_major,
+            category_subfield,
+        ))
+    else:
+        asyncio.run(_run_collaborative_from_run(
+            topic,
+            num_experts,
+            auto_accept_team,
+            max_rounds,
+            threshold,
+            article_length,
+            audience_level,
+            research_type,
+            category_major,
+            category_subfield,
+            num_coauthors,
+        ))
 
 
 async def _run_workflow(
@@ -316,6 +349,10 @@ async def _run_workflow(
     threshold: float,
     manuscript_path: Optional[str],
     article_length: str = "full",
+    audience_level: str = "professional",
+    research_type: str = "survey",
+    category_major: Optional[str] = None,
+    category_subfield: Optional[str] = None,
 ):
     """Run the complete workflow asynchronously."""
     from .agents import TeamComposerAgent
@@ -409,8 +446,11 @@ async def _run_workflow(
         console.print(f"[green]✓[/green] Loaded manuscript: {manuscript_file}")
         console.print(f"   Length: {len(initial_manuscript.split()):,} words\n")
 
-    # Detect academic category from topic
-    category = suggest_category_from_topic(topic)
+    # Detect or use provided academic category
+    if category_major:
+        category = {"major": category_major, "subfield": category_subfield or ""}
+    else:
+        category = suggest_category_from_topic(topic)
 
     # Create and run orchestrator
     orchestrator = WorkflowOrchestrator(
@@ -420,6 +460,8 @@ async def _run_workflow(
         threshold=threshold,
         category=category,
         article_length=article_length,
+        audience_level=audience_level,
+        research_type=research_type,
     )
 
     try:
@@ -451,12 +493,218 @@ async def _run_workflow(
         return 1
 
 
+async def _run_collaborative_from_run(
+    topic: str,
+    num_experts: int,
+    auto_accept_team: bool,
+    max_rounds: int,
+    threshold: float,
+    article_length: str,
+    audience_level: str,
+    research_type: str,
+    category_major: Optional[str],
+    category_subfield: Optional[str],
+    num_coauthors: int,
+):
+    """Run collaborative workflow dispatched from the unified 'run' command."""
+    from datetime import datetime
+    from .agents import TeamComposerAgent
+    from .agents.writer_team_composer import WriterTeamComposerAgent
+    from .categories import suggest_category_from_topic, get_category_name
+    from .interactive import TeamEditor
+    from .models.author import AuthorRole, WriterTeam
+    from .models.expert import ExpertConfig
+    from .workflow.collaborative_workflow import CollaborativeWorkflowOrchestrator
+
+    config = get_config()
+
+    if not config.anthropic_api_key:
+        console.print("[red]Error: No LLM API key configured[/red]")
+        console.print("Set LLM_API_KEY or ANTHROPIC_API_KEY environment variable (or create .env file)")
+        return 1
+
+    # Detect or use provided category
+    if category_major:
+        category = {"major": category_major, "subfield": category_subfield or ""}
+    else:
+        category = suggest_category_from_topic(topic)
+
+    major_field = category.get("major", "computer_science")
+    subfield = category.get("subfield", "")
+
+    console.print(Panel.fit(
+        "[bold cyan]AI Collaborative Research Workflow[/bold cyan]\n"
+        f"Topic: {topic}\n"
+        f"Category: {get_category_name(major_field, subfield)}\n"
+        f"Writers: 1 lead + {num_coauthors} co-authors\n"
+        f"Reviewers: {num_experts} experts\n"
+        f"Max rounds: {max_rounds}\n"
+        f"Threshold: {threshold}/10",
+        title="Starting Workflow",
+        border_style="cyan"
+    ))
+
+    # Step 1: Compose writer team
+    console.print("\n[bold cyan]Step 1: Composing Writer Team[/bold cyan]\n")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("[cyan]AI analyzing topic and proposing writer team...", total=None)
+        composer = WriterTeamComposerAgent()
+        team_config = await composer.propose_and_format_team(
+            topic=topic,
+            major_field=major_field,
+            subfield=subfield,
+            num_coauthors=num_coauthors,
+        )
+        progress.update(task, completed=True)
+
+    lead_config = team_config["lead_author"]
+    console.print(f"  [bold]Lead Author:[/bold] {lead_config['name']}")
+    console.print(f"    Expertise: {lead_config['expertise']}")
+
+    if team_config["coauthors"]:
+        for i, ca_config in enumerate(team_config["coauthors"], 1):
+            console.print(f"  [bold]Co-Author {i}:[/bold] {ca_config['name']}")
+            console.print(f"    Expertise: {ca_config['expertise']}")
+
+    lead_author = AuthorRole(
+        id=lead_config["id"],
+        name=lead_config["name"],
+        role=lead_config["role"],
+        expertise=lead_config["expertise"],
+        focus_areas=lead_config["focus_areas"],
+        model=lead_config["model"],
+    )
+    coauthors = []
+    for ca_config in team_config["coauthors"]:
+        coauthors.append(AuthorRole(
+            id=ca_config["id"],
+            name=ca_config["name"],
+            role=ca_config["role"],
+            expertise=ca_config["expertise"],
+            focus_areas=ca_config["focus_areas"],
+            model=ca_config["model"],
+        ))
+    writer_team = WriterTeam(lead_author=lead_author, coauthors=coauthors)
+
+    # Step 2: Compose reviewer team
+    console.print("\n[bold cyan]Step 2: AI Reviewer Team Composition[/bold cyan]\n")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("[cyan]Analyzing topic and proposing expert reviewers...", total=None)
+        reviewer_composer = TeamComposerAgent()
+        proposals = await reviewer_composer.propose_team(topic, num_experts)
+        progress.update(task, completed=True)
+
+    console.print(f"[green]✓[/green] {len(proposals)} expert reviewers proposed\n")
+
+    from .model_config import get_reviewer_rotation
+    rotation = get_reviewer_rotation()
+
+    reviewer_configs: List[ExpertConfig] = []
+    if auto_accept_team:
+        for idx, proposal in enumerate(proposals):
+            model_spec = rotation[idx % len(rotation)]
+            rc = ExpertConfig(
+                id=f"reviewer_{idx + 1}",
+                name=proposal.expert_domain,
+                domain=proposal.expert_domain,
+                focus_areas=proposal.focus_areas,
+                system_prompt="",
+                provider=model_spec.provider,
+                model=model_spec.model,
+            )
+            reviewer_configs.append(rc)
+    else:
+        TeamEditor.show_proposed_team(proposals, topic)
+        reviewer_configs = TeamEditor.edit_team(proposals, topic)
+        if not reviewer_configs:
+            console.print("[yellow]Workflow cancelled by user[/yellow]")
+            return 1
+
+    # Display teams
+    team_table = Table(title="Final Teams", show_header=True)
+    team_table.add_column("Role", style="cyan")
+    team_table.add_column("Name", style="white")
+    team_table.add_column("Model", style="yellow")
+    team_table.add_row("Lead Author", lead_author.name, lead_author.model)
+    for ca in coauthors:
+        team_table.add_row("Co-Author", ca.name, ca.model)
+    for rc in reviewer_configs:
+        team_table.add_row("Reviewer", rc.name, rc.model)
+    console.print(team_table)
+    console.print()
+
+    # Step 3: Run collaborative workflow
+    console.print("[bold cyan]Step 3: Running Collaborative Research + Peer Review[/bold cyan]\n")
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe_topic = topic.lower().replace(" ", "-").replace("/", "-")[:80]
+    project_id = f"{safe_topic}-{timestamp}"
+    output_dir = Path("results") / project_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    target_length = 4000 if article_length == "full" else 2000
+
+    orchestrator = CollaborativeWorkflowOrchestrator(
+        topic=topic,
+        major_field=major_field,
+        subfield=subfield,
+        writer_team=writer_team,
+        reviewer_configs=reviewer_configs,
+        output_dir=output_dir,
+        max_rounds=max_rounds,
+        threshold=threshold,
+        target_manuscript_length=target_length,
+        article_length=article_length,
+        research_type=research_type,
+        audience_level=audience_level,
+    )
+
+    try:
+        result = await orchestrator.run()
+
+        # Export to web viewer
+        console.print("\n[bold cyan]Step 4: Exporting to Web Viewer[/bold cyan]\n")
+        try:
+            import subprocess
+            import sys
+            result = subprocess.run(
+                [sys.executable, "export_to_web.py"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            console.print("[green]✓ Results exported to web/data/[/green]")
+            console.print("[dim]View at: http://localhost:8080/web/review-viewer.html[/dim]\n")
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not export to web: {e}[/yellow]\n")
+
+        console.print("[bold green]✓ Collaborative workflow complete![/bold green]")
+        console.print(f"[dim]Results saved to: {output_dir}[/dim]\n")
+        return 0
+
+    except Exception as e:
+        console.print(f"\n[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
 @cli.command()
 @click.argument("topic")
 @click.option("--major-field", default="computer_science", help="Major academic field")
 @click.option("--subfield", default="security", help="Subfield")
 @click.option("--num-coauthors", default=2, help="Number of co-authors (0-3)")
-@click.option("--max-rounds", default=3, help="Maximum review rounds")
+@click.option("--max-rounds", default=2, help="Maximum review rounds")
 @click.option("--threshold", default=7.0, help="Acceptance threshold")
 @click.option("--target-length", default=4000, help="Target manuscript length in words")
 def collaborate(
@@ -568,18 +816,22 @@ async def _run_collaborative_workflow(
     # Get expert pool from category and generate reviewer configs dynamically
     expert_pool = get_expert_pool(major_field, subfield)
 
+    from .model_config import get_reviewer_rotation
+    rotation = get_reviewer_rotation()
+
     reviewer_configs = []
     for i, expert_id in enumerate(expert_pool):
         name = expert_id.replace("_expert", "").replace("_", " ").title() + " Expert"
         domain = expert_id.replace("_expert", "").replace("_", " ").title()
+        model_spec = rotation[i % len(rotation)]
         reviewer_configs.append(ExpertConfig(
             id=f"reviewer_{i+1}",
             name=name,
             domain=domain,
             focus_areas=[],
             system_prompt="",  # SpecialistFactory will auto-generate
-            provider="anthropic",
-            model="claude-sonnet-4.5"
+            provider=model_spec.provider,
+            model=model_spec.model,
         ))
 
     console.print(f"  ✓ {len(reviewer_configs)} external reviewers assigned from {get_category_name(major_field, subfield)}")
@@ -604,7 +856,7 @@ async def _run_collaborative_workflow(
         output_dir=output_dir,
         max_rounds=max_rounds,
         threshold=threshold,
-        target_manuscript_length=target_length
+        target_manuscript_length=target_length,
     )
 
     try:

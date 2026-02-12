@@ -7,8 +7,8 @@ from ..model_config import create_llm_for_role
 class ModeratorAgent:
     """AI moderator that makes final accept/reject decisions.
 
-    Acts as a conference chair/editor who reads all reviews and makes
-    the final decision on manuscript acceptance.
+    Acts as a journal editor-in-chief: reads reviewer scores and summaries,
+    then issues a concise editorial decision with a short rationale note.
     """
 
     def __init__(self, role: str = "moderator"):
@@ -34,178 +34,99 @@ class ModeratorAgent:
     ) -> Dict:
         """Make accept/reject decision based on peer reviews.
 
-        Args:
-            manuscript: Current manuscript text
-            reviews: List of specialist reviews
-            round_number: Current round number
-            max_rounds: Maximum rounds allowed
-            previous_rounds: Previous round data for trajectory analysis
-            domain: Domain description for editorial context
-            completeness_warning: Warning about manuscript completeness issues
-            outlier_info: Description of outlier reviewers detected
-            threshold: Acceptance threshold score (papers >= threshold should be accepted)
-
-        Returns:
-            Dictionary with decision, reasoning, and meta-review
+        Returns a concise decision dict with:
+        - decision: ACCEPT / MINOR_REVISION / MAJOR_REVISION / REJECT
+        - confidence: 1-5
+        - note: 1-3 sentence editorial rationale
+        - required_changes: list (only when revision is requested)
         """
-        system_prompt = f"""You are the Editor-in-Chief for a leading research publication in {domain}.
+        system_prompt = f"""You are the Editor-in-Chief for a research publication in {domain}.
 
-Your role is to exercise EDITORIAL JUDGMENT, not mechanical score calculation.
+Make a publication decision based on peer reviews. Be decisive and concise.
 
-Core responsibilities:
-- Synthesize reviewer feedback and assess its validity
-- Evaluate the manuscript's contribution to the field
-- Consider improvement trajectory across revision rounds
-- Balance rigor with practical contribution
-- Make final accept/reject decisions using your expertise
+Decision options:
+- ACCEPT: Meets publication standards, contribution is valuable
+- MINOR_REVISION: Small fixable issues, likely acceptable after revision
+- MAJOR_REVISION: Substantial problems requiring significant work
+- REJECT: Fundamental flaws or insufficient contribution
 
-Critical: You are NOT bound by numeric scores. Scores are ONE input among many.
+Threshold: {threshold}/10. Papers at or above threshold with no fatal flaws should be accepted.
 
-Decision framework:
-- ACCEPT: Meets publication standards for the venue (contribution is valuable, major issues resolved)
-- MINOR_REVISION: Small fixable issues remain, likely acceptable after revision
-- MAJOR_REVISION: Substantial problems that require significant work
-- REJECT: Fundamental flaws, out of scope, or insufficient contribution
+STRUCTURAL COMPLETENESS (check independently of reviewer scores):
+- The manuscript MUST have a concluding section (any heading containing "Conclusion",
+  "Summary", "Concluding Remarks", or "Open Problems and Conclusion" counts).
+- The manuscript MUST have a References/Bibliography section.
+- If either is missing, issue MAJOR_REVISION (or REJECT on final round) regardless of score.
 
-Editorial discretion factors:
-1. **Improvement trajectory**: A paper improving from 6.5→7.5 shows strong revision capability
-2. **Reviewer calibration**: Are reviewers too harsh? Demanding standards beyond venue scope?
-3. **Substantive vs. nitpicking**: Major conceptual issues vs. minor presentation details
-4. **Practical value**: Does it advance understanding even if not "novel research"?
-5. **Round context**: After 3 rounds with consistent improvement, be pragmatic
-6. **Field standards**: Industry research reports have different standards than pure theory
+When reviewers disagree by >2 points on any dimension, explain in your note which
+reviewer's assessment is more substantive and why. Do not simply average conflicting scores."""
 
-CRITICAL COMPLETENESS CHECK:
-Before making any decision, verify the manuscript is structurally complete:
-- Does the text end mid-sentence or appear truncated?
-- Are References/Bibliography present?
-- Is the Conclusion section present?
-If the manuscript appears truncated or incomplete, you MUST issue MAJOR_REVISION
-regardless of content quality. An incomplete manuscript cannot be accepted.
-
-Think like a real editor who cares about publishing valuable work, not a score calculator."""
-
-        # Format reviews for moderator
-        reviews_summary = self._format_reviews(reviews)
+        # Format reviews — compact summary only
+        reviews_summary = self._format_reviews_compact(reviews)
         overall_avg = sum(r["average"] for r in reviews) / len(reviews)
 
-        # Format improvement trajectory if available
-        trajectory_summary = ""
-        if previous_rounds and len(previous_rounds) > 0:
-            trajectory_summary = "\n\nIMPROVEMENT TRAJECTORY:\n"
-            for prev_round in previous_rounds:
-                prev_avg = prev_round.get("overall_average", 0)
-                prev_decision = prev_round.get("moderator_decision", {}).get("decision", "N/A")
-                trajectory_summary += f"- Round {prev_round['round']}: Score {prev_avg:.1f}/10, Decision: {prev_decision}\n"
+        # Trajectory — overall + per-dimension
+        trajectory = ""
+        if previous_rounds:
+            scores_line = [f"R{pr['round']}={pr.get('overall_average', 0):.1f}" for pr in previous_rounds]
+            scores_line.append(f"R{round_number}={overall_avg:.1f}")
+            trajectory = f"\nTrajectory: {' → '.join(scores_line)}"
 
-            if len(previous_rounds) > 0:
-                first_score = previous_rounds[0].get("overall_average", 0)
-                improvement = overall_avg - first_score
-                trajectory_summary += f"\nScore change from Round 1: {improvement:+.1f} points"
+            # Per-dimension comparison (last round vs current)
+            prev_reviews = previous_rounds[-1].get("reviews", [])
+            if prev_reviews:
+                dims = ["accuracy", "completeness", "clarity", "novelty", "rigor", "citations"]
+                prev_avgs = {}
+                curr_avgs = {}
+                for d in dims:
+                    prev_vals = [r["scores"].get(d, 0) for r in prev_reviews if "scores" in r and not r.get("on_leave")]
+                    curr_vals = [r["scores"].get(d, 0) for r in reviews if "scores" in r and not r.get("on_leave")]
+                    if prev_vals:
+                        prev_avgs[d] = sum(prev_vals) / len(prev_vals)
+                    if curr_vals:
+                        curr_avgs[d] = sum(curr_vals) / len(curr_vals)
+                deltas = []
+                for d in dims:
+                    if d in prev_avgs and d in curr_avgs:
+                        delta = curr_avgs[d] - prev_avgs[d]
+                        flag = " ⚠" if abs(delta) < 0.5 and curr_avgs[d] < 6 else ""
+                        deltas.append(f"{d[:3]}: {prev_avgs[d]:.0f}→{curr_avgs[d]:.0f} ({delta:+.1f}){flag}")
+                if deltas:
+                    trajectory += f"\nDimension changes: {' | '.join(deltas)}"
 
-        # Build completeness warning block
-        completeness_block = ""
+        # Flags
+        flags = ""
         if completeness_warning:
-            completeness_block = f"""
-⚠ {completeness_warning}
-An incomplete or truncated manuscript MUST receive MAJOR_REVISION (or REJECT), never ACCEPT.
-"""
-
-        # Build outlier warning block
-        outlier_block = ""
+            flags += f"\n⚠ INCOMPLETE: {completeness_warning}"
         if outlier_info:
-            outlier_block = f"""
-⚠ {outlier_info}
+            flags += f"\n⚠ OUTLIER: {outlier_info}"
 
-EDITORIAL GUIDANCE ON OUTLIER REVIEWERS:
-When one reviewer scores significantly lower than others, consider:
-- Was the reviewer applying standards beyond the scope of this venue?
-- Do the other reviewers (who scored higher) agree the paper has merit?
-- If the adjusted average (excluding outlier) meets the threshold, you MAY accept.
-- If the article makes a notable contribution to the field, lean toward acceptance
-  even if the overall average is slightly below threshold.
-- If you decide to accept despite the outlier, explain your reasoning clearly.
-"""
+        final_round = round_number >= max_rounds
+        decision_options = "ACCEPT or REJECT" if final_round else "ACCEPT, MINOR_REVISION, MAJOR_REVISION, or REJECT"
 
-        prompt = f"""You are reviewing a manuscript submission. Exercise your editorial judgment.
+        prompt = f"""Round {round_number}/{max_rounds} | Avg score: {overall_avg:.1f}/10 | Threshold: {threshold}{trajectory}
+{"⚠ FINAL ROUND — binary decision only (ACCEPT or REJECT)." if final_round else ""}
+{flags}
 
-SUBMISSION STATUS:
-- Round: {round_number} of {max_rounds}
-- Average reviewer score: {overall_avg:.1f}/10
-- **Acceptance threshold: {threshold}/10** (papers meeting or exceeding this threshold should be accepted unless fundamental flaws exist)
-{"- **FINAL ROUND**: You MUST make a binary decision: ACCEPT or REJECT. No further revisions are possible. Consider the full trajectory, improvement shown, and whether remaining issues are minor enough to overlook." if round_number >= max_rounds else ""}
-{trajectory_summary}
-
-PEER REVIEWS:
+REVIEWS:
 {reviews_summary}
-{completeness_block}{outlier_block}
----
 
-EDITORIAL ANALYSIS REQUIRED:
-
-Before making your decision, evaluate:
-
-1. **Reviewer Calibration**: Are reviewers applying appropriate standards?
-   - Are they demanding theoretical novelty for an industry research report?
-   - Are criticisms substantive or nitpicking presentation?
-   - Are reviewers too harsh relative to typical venue standards?
-
-2. **Improvement Trajectory**: (Check previous rounds if this is Round {round_number})
-   - Has the author addressed major concerns?
-   - Is there consistent improvement in scores?
-   - Does revision show engagement with feedback?
-
-3. **Contribution Assessment**:
-   - Does this advance understanding in the field?
-   - Is it valuable to practitioners/researchers even if not groundbreaking?
-   - Are the findings/analysis reliable and useful?
-
-4. **Issue Severity**:
-   - Are remaining weaknesses FATAL or FIXABLE?
-   - Would minor revision truly address concerns?
-   - Are "required changes" reasonable or unbounded?
-
-5. **Context**:
-   - Round {round_number}/{max_rounds}: How much more iteration is realistic?
-   - Have we reached diminishing returns on revisions?
-
----
-
-Make your decision in JSON format:
+Respond with JSON only:
 
 {{
-  "decision": "{f"ACCEPT|REJECT" if round_number >= max_rounds else "ACCEPT|MINOR_REVISION|MAJOR_REVISION|REJECT"}",
+  "decision": "{decision_options}",
   "confidence": <1-5>,
-  "meta_review": "<2-3 paragraphs: synthesize reviews, assess validity of concerns, explain your editorial judgment>",
-  "key_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "key_weaknesses": ["<weakness 1>", "<weakness 2>", "<weakness 3>"],
-  "required_changes": ["<change 1>", "<change 2>", "<change 3>"],
-  "recommendation": "<clear guidance: accept rationale or what's needed for acceptance>"
+  "note": "<1-3 sentences: key rationale for your decision>",
+  "required_changes": ["<change>", "..."]
 }}
 
-{f"FINAL ROUND — Binary decision only: ACCEPT or REJECT. No more revisions possible. If the paper has shown improvement and remaining issues are minor, ACCEPT. If fundamental problems persist, REJECT." if round_number >= max_rounds else "DECISION GUIDANCE (not strict rules):"}
-{f"" if round_number >= max_rounds else f"- ACCEPT: Score >= {threshold} OR notable contribution with outlier reviewer OR valuable contribution with strong improvement"}
-{f"" if round_number >= max_rounds else "- MINOR_REVISION: Specific small fixes needed"}
-{f"" if round_number >= max_rounds else "- MAJOR_REVISION: Substantial problems remain"}
-{f"" if round_number >= max_rounds else "- REJECT: Fundamental flaws or insufficient contribution"}
-
-**CRITICAL THRESHOLD GUIDANCE**:
-- If average score >= {threshold}/10 and no fundamental flaws exist, you SHOULD accept.
-- Scores at or above {threshold} indicate the paper meets publication standards.
-- Only reject papers above {threshold} if there are clear fundamental problems (plagiarism, fabricated data, completely wrong methodology, etc.).
-- Editorial judgment is for borderline cases ({threshold-1.0}-{threshold}), not to override clear threshold success.
-
-Remember: You are an EDITOR, not a score calculator, but the threshold ({threshold}) represents the editorial board's agreed standard.
-A paper at or above {threshold} with substantive contribution should be accepted unless exceptional circumstances exist.
-If an article makes a clear contribution to the field and meets the threshold, accept it.
-
-Exercise your judgment now."""
+required_changes: list specific changes if requesting revision; empty list [] if accepting or rejecting."""
 
         response = await self.llm.generate(
             prompt=prompt,
             system=system_prompt,
             temperature=0.3,
-            max_tokens=2048
+            max_tokens=1024
         )
 
         # Parse JSON response
@@ -224,7 +145,6 @@ Exercise your judgment now."""
         try:
             decision_data = json.loads(content)
         except json.JSONDecodeError:
-            # Fallback 1: extract ```json ... ``` block from within text
             json_match = re.search(r'```json\s*\n(.*?)\n```', response.content, re.DOTALL)
             if json_match:
                 try:
@@ -232,7 +152,6 @@ Exercise your judgment now."""
                 except json.JSONDecodeError:
                     pass
 
-            # Fallback 2: find raw JSON object { ... } in the response
             if decision_data is None:
                 brace_match = re.search(r'\{.*\}', response.content, re.DOTALL)
                 if brace_match:
@@ -243,9 +162,7 @@ Exercise your judgment now."""
 
             if decision_data is None:
                 raise ValueError(
-                    f"Failed to parse moderator decision as JSON: no valid JSON found\n"
-                    f"Raw response length: {len(response.content)}\n"
-                    f"Cleaned content length: {len(content)}\n"
+                    f"Failed to parse moderator decision as JSON\n"
                     f"Content preview: {content[:200]}..."
                 )
 
@@ -259,32 +176,24 @@ Exercise your judgment now."""
 
         return decision_data
 
-    def _format_reviews(self, reviews: List[Dict]) -> str:
-        """Format reviews for moderator consumption."""
-        formatted = []
-
+    def _format_reviews_compact(self, reviews: List[Dict]) -> str:
+        """Format reviews as compact summary for moderator."""
+        parts = []
         for i, review in enumerate(reviews, 1):
-            formatted.append(f"""
-REVIEWER {i} ({review["specialist_name"]}):
-Average Score: {review["average"]}/10
-
-Scores:
-- Accuracy: {review["scores"]["accuracy"]}/10
-- Completeness: {review["scores"]["completeness"]}/10
-- Clarity: {review["scores"]["clarity"]}/10
-- Novelty: {review["scores"]["novelty"]}/10
-- Rigor: {review["scores"]["rigor"]}/10
-
-Summary: {review["summary"]}
-
-Strengths:
-{chr(10).join('- ' + s for s in review["strengths"])}
-
-Weaknesses:
-{chr(10).join('- ' + w for w in review["weaknesses"])}
-
-Suggestions:
-{chr(10).join('- ' + s for s in review["suggestions"])}
-""")
-
-        return "\n---\n".join(formatted)
+            scores = review["scores"]
+            score_str = " | ".join(f"{k[:3]}={v}" for k, v in scores.items())
+            weaknesses = "\n    - ".join(review.get("weaknesses", []))
+            if weaknesses:
+                weaknesses = "    - " + weaknesses
+            # Include detailed_feedback summary (first 300 chars)
+            detailed = review.get("detailed_feedback", "")
+            detail_summary = detailed[:300].rstrip()
+            if len(detailed) > 300:
+                detail_summary += "..."
+            parts.append(
+                f"R{i} ({review['specialist_name']}): avg={review['average']}/10 [{score_str}]\n"
+                f"  Summary: {review['summary']}\n"
+                f"  Weaknesses:\n{weaknesses}\n"
+                f"  Analysis: {detail_summary}"
+            )
+        return "\n".join(parts)

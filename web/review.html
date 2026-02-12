@@ -21,7 +21,7 @@
         body {
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            min-height: 100vh;
             font-size: 15px;
         }
 
@@ -150,6 +150,8 @@
             flex: 1;
             overflow-y: auto;
             padding: 2rem;
+            display: flex;
+            flex-direction: column;
         }
 
         .section {
@@ -542,6 +544,18 @@
         .moderator-decision-badge.decision-major { background: #dc2626; }
         .moderator-decision-badge.decision-minor { background: #d97706; }
 
+        .moderator-changes {
+            margin: 8px 16px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .moderator-changes ul {
+            margin: 4px 0 0 16px;
+            padding: 0;
+        }
+        .moderator-changes li {
+            margin-bottom: 2px;
+        }
         .moderator-recommendation {
             margin-top: 0.75rem;
             font-size: 0.875rem;
@@ -1033,6 +1047,12 @@
             <div id="content" class="loading">
                 <p>Select a project to view details</p>
             </div>
+            <footer class="site-footer" style="margin-top: auto; flex-shrink: 0;">
+                <div class="container">
+                    <p><strong>Platform:</strong> Autonomous Research Press</p>
+                    <p class="copyright">&copy; 2026 Autonomous Research Press. All rights reserved.</p>
+                </div>
+            </footer>
         </div>
     </div>
 
@@ -1047,20 +1067,10 @@
         let showDiff = false;
         let currentProject = null;
 
-        // Load system version
+        // Load system version (static mode: skip API call)
         async function loadSystemVersion() {
-            try {
-                const response = await fetch('/api/version');
-                if (response.ok) {
-                    const data = await response.json();
-                    const versionEl = document.getElementById('system-version');
-                    if (versionEl && data.version) {
-                        versionEl.textContent = `v${data.version}`;
-                    }
-                }
-            } catch (e) {
-                console.log('Version info unavailable');
-            }
+            const versionEl = document.getElementById('system-version');
+            if (versionEl) versionEl.textContent = '';
         }
         loadSystemVersion();
 
@@ -1081,9 +1091,15 @@
 
         async function downloadReport(id) {
             try {
-                const res = await fetch(`/api/projects/${id}/report`);
-                if (!res.ok) throw new Error('Failed to download report');
-                const blob = await res.blob();
+                // Load manuscript from static JSON
+                const res = await fetch(`data/${id}_manuscripts.json`);
+                if (!res.ok) throw new Error('Manuscript data not found');
+                const mData = await res.json();
+                // Find latest version
+                const keys = Object.keys(mData).filter(k => k.startsWith('manuscript_'));
+                const finalKey = keys.find(k => k.includes('final')) || keys.sort().pop();
+                if (!finalKey) throw new Error('No manuscript found');
+                const blob = new Blob([mData[finalKey]], { type: 'text/markdown' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1101,8 +1117,8 @@
 
         async function loadProjects() {
             try {
-                const indexRes = await fetch('/api/projects');
-                if (!indexRes.ok) throw new Error('No data found');
+                const indexRes = await fetch('data/index.json');
+                if (!indexRes.ok) throw new Error('No data found. Run export_to_web.py first.');
 
                 const index = await indexRes.json();
                 allProjects = index.projects;
@@ -1161,8 +1177,8 @@
                 }
 
                 const [dataRes, manuscriptsRes] = await Promise.all([
-                    fetch(`/api/projects/${projectId}`),
-                    fetch(`/api/projects/${projectId}/manuscripts`)
+                    fetch(`data/${projectId}.json`),
+                    fetch(`data/${projectId}_manuscripts.json`)
                 ]);
 
                 currentData = await dataRes.json();
@@ -1408,6 +1424,34 @@
                 const decisionClass = getDecisionClass(moderator.decision);
                 const decisionColor = getDecisionColor(moderator.decision);
 
+                // Build note text: new format uses "note", legacy uses "recommendation" or "meta_review"
+                const noteText = moderator.note || moderator.recommendation || '';
+                const legacyMeta = moderator.meta_review || '';
+
+                // Build required_changes / legacy key_weaknesses + required_changes
+                const changes = moderator.required_changes || [];
+                const legacyStrengths = moderator.key_strengths || [];
+                const legacyWeaknesses = moderator.key_weaknesses || [];
+
+                let changesHtml = '';
+                if (changes.length > 0) {
+                    changesHtml = `<div class="moderator-changes"><strong>Required changes:</strong><ul>${changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul></div>`;
+                }
+
+                // Legacy details (old verbose format) — shown in collapsible only if present
+                let legacyHtml = '';
+                if (legacyMeta || legacyStrengths.length > 0 || legacyWeaknesses.length > 0) {
+                    let inner = '';
+                    if (legacyMeta) inner += `<p>${escapeHtml(legacyMeta)}</p>`;
+                    if (legacyStrengths.length > 0) inner += `<p><strong>Strengths:</strong> ${legacyStrengths.map(s => escapeHtml(s)).join('; ')}</p>`;
+                    if (legacyWeaknesses.length > 0) inner += `<p><strong>Weaknesses:</strong> ${legacyWeaknesses.map(w => escapeHtml(w)).join('; ')}</p>`;
+                    legacyHtml = `
+                        <details class="moderator-details">
+                            <summary style="color: ${decisionColor};">Full Editorial Review</summary>
+                            <div class="moderator-details-content">${inner}</div>
+                        </details>`;
+                }
+
                 moderatorHtml = `
                     <div class="moderator-panel ${decisionClass}">
                         <div class="moderator-top">
@@ -1426,18 +1470,9 @@
                             ${moderator.decision.replace('_', ' ')}
                         </div>
 
-                        ${moderator.recommendation ? `
-                            <p class="moderator-recommendation">${escapeHtml(moderator.recommendation)}</p>
-                        ` : ''}
-
-                        ${moderator.meta_review ? `
-                            <details class="moderator-details">
-                                <summary style="color: ${decisionColor};">Full Editorial Review</summary>
-                                <div class="moderator-details-content">
-                                    <p>${escapeHtml(moderator.meta_review)}</p>
-                                </div>
-                            </details>
-                        ` : ''}
+                        ${noteText ? `<p class="moderator-recommendation">${escapeHtml(noteText)}</p>` : ''}
+                        ${changesHtml}
+                        ${legacyHtml}
                     </div>
                 `;
             }
@@ -1950,11 +1985,5 @@
         }
     </script>
 
-    <footer class="site-footer">
-        <div class="container">
-            <p><strong>Platform:</strong> Autonomous Research Press</p>
-            <p class="copyright">© 2026 Autonomous Research Press. All rights reserved. <span id="system-version" style="color: var(--text-secondary); font-size: 0.9em;"></span></p>
-        </div>
-    </footer>
 </body>
 </html>

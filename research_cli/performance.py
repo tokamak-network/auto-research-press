@@ -1,12 +1,50 @@
 """Performance tracking for AI research workflow."""
 
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 from contextlib import contextmanager
 
 from .model_config import get_all_pricing, get_pricing
+
+
+class PhaseTimer:
+    """Lightweight timer for tracking per-step durations within a workflow phase."""
+
+    def __init__(self, phase_name: str):
+        self.phase_name = phase_name
+        self._phase_start: Optional[float] = None
+        self._steps: OrderedDict[str, float] = OrderedDict()
+        self._current_step: Optional[str] = None
+        self._current_start: Optional[float] = None
+
+    def start(self):
+        """Start the phase timer."""
+        self._phase_start = time.time()
+
+    def step(self, name: str):
+        """Start timing a new step (automatically ends previous step)."""
+        now = time.time()
+        if self._current_step and self._current_start:
+            self._steps[self._current_step] = round(now - self._current_start, 2)
+        self._current_step = name
+        self._current_start = now
+
+    def end(self) -> dict:
+        """End timing and return results dict."""
+        now = time.time()
+        # Close current step
+        if self._current_step and self._current_start:
+            self._steps[self._current_step] = round(now - self._current_start, 2)
+            self._current_step = None
+        total = round(now - self._phase_start, 2) if self._phase_start else 0.0
+        return {
+            "phase": self.phase_name,
+            "total_duration": total,
+            "steps": dict(self._steps),
+        }
 
 
 def _load_model_pricing() -> Dict[str, dict]:
@@ -293,6 +331,9 @@ class PerformanceTracker:
         """
         if self._current_round:
             self._current_round.revision_time = duration
+        elif self._rounds:
+            # Revision happens after end_round() — attach to last completed round
+            self._rounds[-1].revision_time = duration
 
     def record_round_tokens(self, tokens: int):
         """Record tokens used in current round.

@@ -72,7 +72,7 @@ Integration tasks:
    - Backward references (e.g., "Building on the mechanism described earlier...")
 
 2. Ensure consistency
-   - Standardize terminology (e.g., always "blob transaction" not switching terms)
+   - Standardize terminology (e.g., pick one term for each concept and use it consistently throughout — don't alternate between synonyms)
    - Consistent notation and symbols
    - Consistent citation style
 

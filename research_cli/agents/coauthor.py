@@ -61,7 +61,9 @@ You are contributing to a collaborative research project. Your role is to:
 1. Investigate the assigned research task thoroughly
 2. Find specific evidence and examples
 3. Provide authoritative references
-4. Document your findings clearly"""
+4. Document your findings clearly
+
+CRITICAL: Only cite references you are CERTAIN exist. If you are unsure whether a paper, author combination, or venue is real, do not include it. Fabricated references are worse than no references. Prefer citing from any verified sources provided in the project context."""
 
         # Build context from research notes
         context_text = ""
@@ -72,6 +74,11 @@ You are contributing to a collaborative research project. Your role is to:
         if context.get("hypotheses"):
             context_text += "\n\nPROJECT HYPOTHESES:\n"
             context_text += "\n".join(f"- {h}" for h in context["hypotheses"])
+
+        if context.get("available_references"):
+            context_text += "\n\nAVAILABLE REAL REFERENCES (use these as citations — they are verified academic sources):\n"
+            context_text += context["available_references"]
+            context_text += "\n\nIMPORTANT: You may ONLY cite references from the list above. Do not add references from memory — they may be fabricated. If a claim cannot be supported by these sources, state the claim without citation rather than inventing one."
 
         prompt = f"""You have been assigned a research task:
 
@@ -85,29 +92,19 @@ PROJECT CONTEXT:
 
 ---
 
-Conduct thorough research on this task. Provide:
+Conduct focused research on this task. Be concise — prioritize substance over length.
 
-1. **Findings** (3-5 key findings)
-   For each finding:
+1. **Findings** (3-4 key findings, each 2-3 sentences)
    - Title: Brief descriptive title
-   - Description: What you discovered
-   - Evidence: Specific examples, data, or observations
+   - Description: Core discovery (2-3 sentences max)
+   - Evidence: One concrete example or data point
    - Confidence: "high", "medium", or "low"
 
-2. **References** (4-8 authoritative sources)
-   For each reference:
-   - Authors (list of names)
-   - Title
-   - Venue (journal/conference/book)
-   - Year
-   - URL or DOI (if available)
-   - Brief summary of why this source is relevant
+2. **References** (3-6 authoritative sources)
+   - Authors, Title, Venue, Year, DOI/URL
 
-3. **Research Notes**
-   - Additional observations
-   - Methodological considerations
-   - Limitations or caveats
-   - Suggestions for further investigation
+3. **Research Notes** (2-4 sentences)
+   - Key limitations or open questions only
 
 Return your research in JSON format:
 {{
@@ -137,7 +134,7 @@ Return your research in JSON format:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=8192
+            max_tokens=3072
         )
 
         # Parse response

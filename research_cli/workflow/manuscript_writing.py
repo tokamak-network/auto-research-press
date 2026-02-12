@@ -16,6 +16,7 @@ from ..models.manuscript import (
 )
 from ..agents.lead_author import LeadAuthorAgent
 from ..agents.coauthor import CoauthorAgent
+from ..performance import PhaseTimer
 
 
 console = Console()
@@ -38,7 +39,9 @@ class ManuscriptWritingPhase:
         output_dir: Path,
         target_length: int = 4000,
         status_callback: Optional[Callable] = None,
-        parallel: bool = False
+        parallel: bool = False,
+        audience_level: str = "professional",
+        research_type: str = "survey",
     ):
         """Initialize writing phase.
 
@@ -51,6 +54,8 @@ class ManuscriptWritingPhase:
             target_length: Target manuscript length in words
             status_callback: Optional callback for status updates
             parallel: If True, write sections in parallel instead of sequentially
+            audience_level: "beginner", "intermediate", or "professional"
+            research_type: "explainer", "survey", or "original"
         """
         self.topic = topic
         self.category = category
@@ -60,6 +65,8 @@ class ManuscriptWritingPhase:
         self.target_length = target_length
         self.status_callback = status_callback
         self.parallel = parallel
+        self.audience_level = audience_level
+        self.research_type = research_type
 
         # Initialize agents
         lead = writer_team.lead_author
@@ -87,17 +94,23 @@ class ManuscriptWritingPhase:
     async def run(self) -> Manuscript:
         """Run complete manuscript writing phase."""
 
+        self.timer = PhaseTimer("writing")
+        self.timer.start()
+
         console.print("\n[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]")
         console.print("[bold cyan] Phase 2: Manuscript Writing[/bold cyan]")
         console.print("[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]\n")
 
         # Step 1: Lead plans structure
         self._update_status("[1/7] Lead: Planning manuscript structure...")
+        self.timer.step("plan_structure")
         initial_plan = await self.lead_agent.plan_manuscript_structure(
             research_notes=self.research_notes,
             topic=self.topic,
             target_journal=self.category,
-            target_length=self.target_length
+            target_length=self.target_length,
+            research_type=self.research_type,
+            audience_level=self.audience_level,
         )
 
         console.print(f"  ✓ Initial structure: {len(initial_plan.sections)} sections, "
@@ -110,6 +123,7 @@ class ManuscriptWritingPhase:
 
         # Step 2: Co-authors provide feedback on structure
         self._update_status("[2/7] Co-authors: Providing feedback on plan...")
+        self.timer.step("plan_feedback")
 
         plan_dict = {
             "title": initial_plan.title,
@@ -133,6 +147,7 @@ class ManuscriptWritingPhase:
 
         # Step 3: Lead finalizes structure based on feedback
         self._update_status("[3/7] Lead: Finalizing structure (integrating feedback)...")
+        self.timer.step("finalize_structure")
 
         plan = await self.lead_agent.finalize_plan_with_feedback(
             original_plan=initial_plan,
@@ -146,7 +161,11 @@ class ManuscriptWritingPhase:
             console.print(f"    {section.order}. {section.title} ({section.target_length} words)")
         console.print()
 
+        # Save finalized plan
+        self._save_plan(plan)
+
         # Step 4: Write sections
+        self.timer.step("write_sections")
         if self.parallel:
             self._update_status("[4/7] Writing sections in parallel...")
             sections = await self._write_sections_parallel(plan)
@@ -161,10 +180,12 @@ class ManuscriptWritingPhase:
 
         # Step 5: Integrate manuscript
         self._update_status("[5/7] Integrating sections into manuscript...")
+        self.timer.step("integrate_sections")
         manuscript = await self.lead_agent.integrate_sections(
             sections=sections,
             plan=plan,
-            research_notes=self.research_notes
+            research_notes=self.research_notes,
+            audience_level=self.audience_level,
         )
 
         console.print("  ✓ Sections integrated")
@@ -173,6 +194,7 @@ class ManuscriptWritingPhase:
 
         # Step 6: Co-authors review full manuscript (parallel)
         self._update_status("[6/7] Co-authors reviewing full manuscript...")
+        self.timer.step("coauthor_review")
         feedbacks = await self._coauthor_manuscript_review(manuscript.content)
 
         total_suggestions = sum(len(fb["suggestions"]) for fb in feedbacks)
@@ -180,6 +202,7 @@ class ManuscriptWritingPhase:
 
         # Step 7: Final polish (simplified)
         self._update_status("[7/7] Final polish...")
+        self.timer.step("final_polish")
         console.print("  ✓ Flow checked")
         console.print("  ✓ Formatting standardized\n")
 
@@ -189,6 +212,7 @@ class ManuscriptWritingPhase:
         # Save manuscript
         self._save_manuscript(manuscript)
 
+        self.phase_timing = self.timer.end()
         return manuscript
 
     async def _gather_plan_feedback(self, plan_dict: dict) -> List[dict]:
@@ -224,7 +248,8 @@ class ManuscriptWritingPhase:
                 section_spec=section_spec,
                 research_notes=self.research_notes,
                 previous_sections=sections,
-                manuscript_plan=plan
+                manuscript_plan=plan,
+                audience_level=self.audience_level,
             )
 
             sections.append(section_draft)
@@ -249,7 +274,8 @@ class ManuscriptWritingPhase:
                 section_spec=section_spec,
                 research_notes=self.research_notes,
                 previous_sections=[],  # No sequential context — plan is sufficient
-                manuscript_plan=plan
+                manuscript_plan=plan,
+                audience_level=self.audience_level,
             )
             console.print(f"  ✓ {section_spec.title}: {section_draft.word_count} words, "
                          f"{len(section_draft.citations)} citations")
@@ -293,9 +319,17 @@ class ManuscriptWritingPhase:
         # Save full manuscript as markdown
         manuscript_file = self.output_dir / "manuscript_v1.md"
 
+        # Audience-appropriate summary heading
+        if self.audience_level == "beginner":
+            summary_heading = "## TL;DR"
+        elif self.audience_level == "intermediate":
+            summary_heading = "## TL;DR"
+        else:
+            summary_heading = "## Abstract"
+
         full_content = f"""# {manuscript.title}
 
-## Abstract
+{summary_heading}
 
 {manuscript.abstract}
 
@@ -320,3 +354,11 @@ class ManuscriptWritingPhase:
             json.dump(manuscript.to_dict(), f, indent=2)
 
         console.print(f"[dim]Manuscript data saved to: {manuscript_data_file}[/dim]\n")
+
+    def _save_plan(self, plan: ManuscriptPlan):
+        """Save finalized manuscript plan as JSON."""
+        import json
+        plan_file = self.output_dir / "manuscript_plan.json"
+        with open(plan_file, "w") as f:
+            json.dump(plan.to_dict(), f, indent=2)
+        console.print(f"[dim]Manuscript plan saved to: {plan_file}[/dim]")

@@ -105,6 +105,22 @@ def get_role_config(role: str) -> RoleConfig:
     )
 
 
+def get_reviewer_rotation() -> List[ModelSpec]:
+    """Get reviewer model rotation list from config.
+
+    Returns a list of ModelSpec to cycle through when assigning reviewers.
+    Falls back to the default reviewer tier if rotation is not configured.
+    """
+    config = _load_config()
+    roles = config.get("roles", {})
+    rotation = roles.get("reviewer_rotation", [])
+    if rotation:
+        return [ModelSpec(**r) for r in rotation]
+    # Fallback: use default reviewer model for all
+    rc = get_role_config("reviewer")
+    return [rc.primary]
+
+
 def _get_api_key(provider: str) -> str:
     """Get API key for a provider from environment.
 

@@ -255,20 +255,10 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
     <script src="js/main.js"></script>
     <script>
-        // Load system version
+        // Load system version (static mode)
         async function loadSystemVersion() {
-            try {
-                const response = await fetch('/api/version');
-                if (response.ok) {
-                    const data = await response.json();
-                    const versionEl = document.getElementById('system-version');
-                    if (versionEl && data.version) {
-                        versionEl.textContent = `v${data.version}`;
-                    }
-                }
-            } catch (e) {
-                console.log('Version info unavailable');
-            }
+            const versionEl = document.getElementById('system-version');
+            if (versionEl) versionEl.textContent = '';
         }
         loadSystemVersion();
 
@@ -284,8 +274,8 @@
         async function loadArticle(id) {
             try {
                 const [metaRes, manuscriptsRes] = await Promise.all([
-                    fetch(`/api/projects/${id}`),
-                    fetch(`/api/projects/${id}/manuscripts`)
+                    fetch(`data/${id}.json`),
+                    fetch(`data/${id}_manuscripts.json`)
                 ]);
 
                 if (!metaRes.ok) throw new Error('Project not found');
@@ -341,7 +331,7 @@
                         <span class="meta-item"><strong>Version:</strong> ${version}</span>
                         <span class="meta-item"><strong>Review Score:</strong> ${finalScore}/10</span>
                         <span class="meta-item"><strong>Status:</strong> ${finalDecision.replace(/_/g, ' ')}</span>
-                        ${audienceLevel !== 'professional' ? `<span class="meta-item"><strong>Audience:</strong> ${audienceLevel === 'beginner' ? 'Beginner-Friendly' : 'Intermediate'}</span>` : ''}
+                        <span class="meta-item"><strong>Audience:</strong> ${audienceLevel === 'beginner' ? 'Beginner-Friendly' : audienceLevel === 'intermediate' ? 'Intermediate' : 'Professional'}</span>
                         <button class="download-report-btn" onclick="downloadReport('${id}')">
                             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H2.75z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969z"/></svg>
                             Download .md
@@ -526,9 +516,13 @@
 
         async function downloadReport(id) {
             try {
-                const res = await fetch(`/api/projects/${id}/report`);
-                if (!res.ok) throw new Error('Failed to download report');
-                const blob = await res.blob();
+                const res = await fetch(`data/${id}_manuscripts.json`);
+                if (!res.ok) throw new Error('Manuscript data not found');
+                const mData = await res.json();
+                const keys = Object.keys(mData).filter(k => k.startsWith('manuscript_'));
+                const finalKey = keys.find(k => k.includes('final')) || keys.sort().pop();
+                if (!finalKey) throw new Error('No manuscript found');
+                const blob = new Blob([mData[finalKey]], { type: 'text/markdown' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;

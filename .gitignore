@@ -59,3 +59,7 @@ gemini_flash_*.json
 WORKFLOW_TEST_RESULTS.md
 *_results.json
 *_results.md
+.venv/
+
+# E2E diagnostic results
+tests/results/

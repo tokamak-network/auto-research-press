@@ -1501,20 +1501,10 @@
         const expandedPanels = new Map();
         let lastDataHash = null;
 
-        // Load system version
+        // Load system version (static mode)
         async function loadSystemVersion() {
-            try {
-                const response = await fetch(`${API_BASE}/api/version`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const versionEl = document.getElementById('system-version');
-                    if (versionEl && data.version) {
-                        versionEl.textContent = `v${data.version}`;
-                    }
-                }
-            } catch (e) {
-                console.log('Version info unavailable');
-            }
+            const versionEl = document.getElementById('system-version');
+            if (versionEl) versionEl.textContent = '';
         }
         loadSystemVersion();
 
@@ -1922,7 +1912,7 @@
             try {
                 const [wfResponse, projResponse] = await Promise.all([
                     fetch(`${API_BASE}/api/workflows`, { headers: apiHeaders() }).catch(() => null),
-                    fetch(`${API_BASE}/api/projects`).catch(() => null)
+                    fetch('data/index.json').catch(() => null)
                 ]);
 
                 let allWorkflows = [];
@@ -2479,7 +2469,7 @@
             const domId = sanitizeDomId(projectId);
             const timelineElement = document.getElementById(`timeline-${domId}`);
             try {
-                const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}`, { headers: apiHeaders() });
+                const response = await fetch(`data/${encodeURIComponent(projectId)}.json`);
                 if (!response.ok) throw new Error('Failed to load workflow data');
 
                 const data = await response.json();

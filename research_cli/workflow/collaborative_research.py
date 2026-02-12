@@ -14,6 +14,8 @@ from ..models.collaborative_research import (
 )
 from ..agents.lead_author import LeadAuthorAgent
 from ..agents.coauthor import CoauthorAgent
+from ..utils.source_retriever import SourceRetriever
+from ..performance import PhaseTimer
 
 
 console = Console()
@@ -79,13 +81,28 @@ class CollaborativeResearchPhase:
     async def run(self) -> CollaborativeResearchNotes:
         """Run complete research phase with optional cycles."""
 
+        self.timer = PhaseTimer("research")
+        self.timer.start()
+
         console.print("\n[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]")
         console.print("[bold cyan] Phase 1: Collaborative Research[/bold cyan]")
         console.print(f"[bold cyan] ({self.research_cycles} cycle{'s' if self.research_cycles > 1 else ''})[/bold cyan]")
         console.print("[bold]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold]\n")
 
+        # Step 0: Retrieve real academic sources
+        self._update_status("[0/5] Retrieving academic sources...")
+        self.timer.step("source_retrieval")
+        retriever = SourceRetriever()
+        try:
+            self.real_references = await retriever.search_all(self.topic)
+            console.print(f"  ✓ {len(self.real_references)} real references retrieved\n")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ Source retrieval failed: {e}[/yellow]")
+            self.real_references = []
+
         # Step 1: Lead creates initial research notes
         self._update_status("[1/5] Lead: Creating initial research notes...")
+        self.timer.step("lead_initial_notes")
         research_notes = await self.lead_agent.create_initial_research_notes(
             topic=self.topic,
             category=self.category
@@ -94,6 +111,12 @@ class CollaborativeResearchPhase:
         console.print(f"  ✓ Research questions: {len(research_notes.research_questions)}")
         console.print(f"  ✓ Hypotheses: {len(research_notes.hypotheses)}")
         console.print(f"  ✓ Open questions: {len(research_notes.open_questions)}\n")
+
+        # Pre-populate research notes with real references
+        if self.real_references:
+            for ref in self.real_references:
+                ref.id = research_notes.get_next_reference_id()
+                research_notes.add_reference(ref)
 
         coauthor_info = [
             {
@@ -111,6 +134,7 @@ class CollaborativeResearchPhase:
 
             # Step 2: Identify research gaps and assign tasks
             self._update_status(f"[2/5] Lead: Identifying research gaps (Cycle {cycle + 1})...")
+            self.timer.step(f"lead_gap_analysis_c{cycle + 1}")
 
             tasks = await self.lead_agent.identify_research_gaps(
                 notes=research_notes,
@@ -127,12 +151,17 @@ class CollaborativeResearchPhase:
 
             # Step 3: Co-authors conduct distributed research
             self._update_status(f"[3/5] Co-authors: Conducting research (Cycle {cycle + 1})...")
+            self.timer.step(f"coauthor_research_c{cycle + 1}")
 
             # Create context for coauthors
+            ref_text = ""
+            if self.real_references:
+                ref_text = SourceRetriever.format_for_prompt(self.real_references)
             context = {
                 "research_questions": research_notes.research_questions,
                 "hypotheses": research_notes.hypotheses,
-                "existing_findings": [f.title for f in research_notes.findings]
+                "existing_findings": [f.title for f in research_notes.findings],
+                "available_references": ref_text,
             }
 
             # Parallel research by coauthors
@@ -147,6 +176,7 @@ class CollaborativeResearchPhase:
 
             # Step 4: Integrate findings
             self._update_status(f"[4/5] Lead: Integrating findings (Cycle {cycle + 1})...")
+            self.timer.step(f"integration_c{cycle + 1}")
             research_notes = self._integrate_contributions(research_notes, contributions)
 
             console.print(f"  ✓ Total findings: {len(research_notes.findings)}")
@@ -160,6 +190,7 @@ class CollaborativeResearchPhase:
 
         # Step 5: Assess completeness
         self._update_status("[5/5] Lead: Assessing research completeness...")
+        self.timer.step("completeness_assessment")
         console.print(f"  ✓ Research phase complete")
         console.print(f"  ✓ {len(research_notes.findings)} findings")
         console.print(f"  ✓ {len(research_notes.references)} references\n")
@@ -167,6 +198,7 @@ class CollaborativeResearchPhase:
         # Save research notes
         self._save_research_notes(research_notes)
 
+        self.phase_timing = self.timer.end()
         return research_notes
 
     async def _conduct_mutual_feedback(

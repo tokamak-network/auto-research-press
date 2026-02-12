@@ -54,9 +54,15 @@ class GeminiLLM(BaseLLM):
         if system:
             full_prompt = f"{system}\n\n{prompt}"
 
+        # Gemini 2.5 thinking models consume thinking tokens from max_output_tokens
+        # Use higher limit to avoid truncation (thinking tokens typically 8x output)
+        effective_max_tokens = max_tokens
+        if "2.5" in self.model:
+            effective_max_tokens = max(max_tokens * 8, 8192)
+
         generation_config = genai.GenerationConfig(
             temperature=temperature,
-            max_output_tokens=max_tokens,
+            max_output_tokens=effective_max_tokens,
             **kwargs
         )
 
@@ -92,6 +98,77 @@ class GeminiLLM(BaseLLM):
 
         return await retry_llm_call(_call)
 
+    async def generate_streaming(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 1.0,
+        max_tokens: int = 4096,
+        **kwargs
+    ) -> LLMResponse:
+        """Generate text using streaming to prevent proxy idle-connection timeouts.
+
+        Behaves identically to generate() but uses the streaming API internally,
+        keeping the HTTP connection alive with incremental chunks. Returns the
+        same LLMResponse once the full message has been received.
+        """
+        full_prompt = prompt
+        if system:
+            full_prompt = f"{system}\n\n{prompt}"
+
+        effective_max_tokens = max_tokens
+        if "2.5" in self.model:
+            effective_max_tokens = max(max_tokens * 8, 8192)
+
+        generation_config = genai.GenerationConfig(
+            temperature=temperature,
+            max_output_tokens=effective_max_tokens,
+            **kwargs
+        )
+
+        async def _call():
+            response = await self.client.generate_content_async(
+                full_prompt,
+                generation_config=generation_config,
+                stream=True,
+            )
+
+            # Drain the stream to keep connection alive; collect text chunks
+            chunks_text = []
+            last_chunk = None
+            async for chunk in response:
+                last_chunk = chunk
+                if chunk.text:
+                    chunks_text.append(chunk.text)
+
+            content = "".join(chunks_text)
+
+            # Extract token counts and stop reason from the last chunk
+            input_tokens = None
+            output_tokens = None
+            stop_reason = None
+
+            if last_chunk:
+                if hasattr(last_chunk, 'usage_metadata') and last_chunk.usage_metadata:
+                    input_tokens = last_chunk.usage_metadata.prompt_token_count
+                    output_tokens = last_chunk.usage_metadata.candidates_token_count
+
+                if hasattr(last_chunk, 'candidates') and last_chunk.candidates:
+                    finish_reason = last_chunk.candidates[0].finish_reason
+                    if finish_reason is not None:
+                        stop_reason = finish_reason.name if hasattr(finish_reason, 'name') else str(finish_reason)
+
+            return LLMResponse(
+                content=content,
+                model=self.model,
+                provider="google",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                stop_reason=stop_reason,
+            )
+
+        return await retry_llm_call(_call)
+
     async def stream(
         self,
         prompt: str,
@@ -116,9 +193,14 @@ class GeminiLLM(BaseLLM):
         if system:
             full_prompt = f"{system}\n\n{prompt}"
 
+        # Gemini 2.5 thinking models consume thinking tokens from max_output_tokens
+        effective_max_tokens = max_tokens
+        if "2.5" in self.model:
+            effective_max_tokens = max(max_tokens * 8, 8192)
+
         generation_config = genai.GenerationConfig(
             temperature=temperature,
-            max_output_tokens=max_tokens,
+            max_output_tokens=effective_max_tokens,
             **kwargs
         )
 
