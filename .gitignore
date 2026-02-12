@@ -63,3 +63,8 @@ WORKFLOW_TEST_RESULTS.md
 
 # E2E diagnostic results
 tests/results/
+
+# Benchmark reports
+benchmark_report.html
+benchmark_summary.md
+model_comparison_results_full.json
