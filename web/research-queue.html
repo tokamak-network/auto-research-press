@@ -1912,7 +1912,7 @@
             try {
                 const [wfResponse, projResponse] = await Promise.all([
                     fetch(`${API_BASE}/api/workflows`, { headers: apiHeaders() }).catch(() => null),
-                    fetch('data/index.json').catch(() => null)
+                    fetch(`${API_BASE}/api/projects`).catch(() => null)
                 ]);
 
                 let allWorkflows = [];
