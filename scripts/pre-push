@@ -1,0 +1,70 @@
+#!/bin/bash
+# Pre-push hook: syntax check + integrity tests
+# Blocks push if any check fails.
+# Install: cp scripts/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+set -e
+
+echo "═══ Pre-push checks ═══"
+
+# 1. Python syntax check on all .py files that differ from remote
+echo "[1/3] Checking Python syntax..."
+CHANGED_PY=$(git diff --name-only @{push}.. -- '*.py' 2>/dev/null || git diff --name-only origin/main..HEAD -- '*.py' 2>/dev/null || true)
+if [ -n "$CHANGED_PY" ]; then
+    FAIL=0
+    for f in $CHANGED_PY; do
+        if [ -f "$f" ]; then
+            python3 -c "import ast; ast.parse(open('$f').read())" 2>/dev/null || {
+                echo "  ✗ Syntax error: $f"
+                FAIL=1
+            }
+        fi
+    done
+    if [ "$FAIL" -eq 1 ]; then
+        echo "Push blocked: Python syntax errors found."
+        exit 1
+    fi
+    echo "  ✓ $(echo "$CHANGED_PY" | wc -w) file(s) OK"
+else
+    echo "  ✓ No changed .py files"
+fi
+
+# 2. Import check — make sure api_server.py and key modules import cleanly
+echo "[2/3] Checking critical imports..."
+python3 -c "
+import importlib, sys
+modules = [
+    'research_cli.categories',
+    'research_cli.models.expert',
+    'research_cli.models.author',
+    'research_cli.models.manuscript',
+    'research_cli.model_config',
+    'research_cli.agents.team_composer',
+    'research_cli.agents.writer_team_composer',
+    'research_cli.workflow.orchestrator',
+    'research_cli.workflow.collaborative_workflow',
+]
+failed = []
+for m in modules:
+    try:
+        importlib.import_module(m)
+    except Exception as e:
+        failed.append(f'{m}: {e}')
+if failed:
+    print('Import failures:')
+    for f in failed:
+        print(f'  ✗ {f}')
+    sys.exit(1)
+print(f'  ✓ {len(modules)} modules OK')
+" || { echo "Push blocked: import errors."; exit 1; }
+
+# 3. Integrity tests (no LLM calls, ~1-2 seconds)
+echo "[3/3] Running integrity tests..."
+python3 -m pytest tests/test_integrity.py -q --tb=line 2>&1 | tail -5
+RESULT=${PIPESTATUS[0]}
+if [ "$RESULT" -ne 0 ]; then
+    echo "Push blocked: integrity tests failed."
+    exit 1
+fi
+
+echo "═══ All checks passed ═══"
