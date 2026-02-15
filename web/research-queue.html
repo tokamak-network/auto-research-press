@@ -17,8 +17,11 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/article.css">
     <style>
@@ -71,15 +74,15 @@
         }
 
         .stat-value.active {
-            color: #3b82f6;
+            color: var(--link-primary);
         }
 
         .stat-value.completed {
-            color: #10b981;
+            color: var(--green-60);
         }
 
         .stat-value.failed {
-            color: #ef4444;
+            color: var(--red-60);
         }
 
         .workflow-list {
@@ -101,14 +104,14 @@
         }
 
         .workflow-card.highlighted {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: var(--link-primary);
+            box-shadow: 0 0 0 3px var(--accent-dim);
             animation: highlight-pulse 2s ease-in-out;
         }
 
         @keyframes highlight-pulse {
-            0%, 100% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-            50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2); }
+            0%, 100% { box-shadow: 0 0 0 3px var(--accent-dim); }
+            50% { box-shadow: 0 0 0 6px var(--accent-border); }
         }
 
         .workflow-header {
@@ -151,54 +154,54 @@
         }
 
         .status-badge.queued {
-            background: #e0e7ff;
-            color: #4338ca;
+            background: var(--accent-dim);
+            color: var(--link-primary);
         }
 
         .status-badge.searching {
-            background: #ede9fe;
-            color: #6d28d9;
+            background: var(--purple-dim);
+            color: var(--purple-60);
         }
 
         .status-badge.research {
-            background: #ede9fe;
-            color: #6d28d9;
+            background: var(--purple-dim);
+            color: var(--purple-60);
         }
 
         .status-badge.writing_sections {
-            background: #e0e7ff;
-            color: #4338ca;
+            background: var(--accent-dim);
+            color: var(--link-primary);
         }
 
         .status-badge.writing,
         .status-badge.desk_screening {
-            background: #dbeafe;
-            color: #1d4ed8;
+            background: var(--accent-dim);
+            color: var(--link-primary);
         }
 
         .status-badge.reviewing {
-            background: #fef3c7;
-            color: #92400e;
+            background: var(--accent-dim);
+            color: var(--link-primary);
         }
 
         .status-badge.revising {
-            background: #fce7f3;
-            color: #9f1239;
+            background: rgba(184, 48, 48, 0.08);
+            color: var(--red-60);
         }
 
         .status-badge.completed {
-            background: #d1fae5;
-            color: #065f46;
+            background: rgba(45, 138, 45, 0.08);
+            color: var(--green-60);
         }
 
         .status-badge.failed {
-            background: #fee2e2;
-            color: #991b1b;
+            background: rgba(184, 48, 48, 0.08);
+            color: var(--red-60);
         }
 
         .status-badge.interrupted {
-            background: #fef3c7;
-            color: #92400e;
+            background: var(--accent-dim);
+            color: var(--link-primary);
             animation: pulse-warning 2s infinite;
         }
 
@@ -276,7 +279,7 @@
 
         .btn-primary:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 8px var(--accent-border);
         }
 
         .btn-secondary {
@@ -290,19 +293,20 @@
         }
 
         .btn-danger {
-            background: #da1e28;
+            background: var(--red-60);
             color: white;
             border: none;
         }
 
         .btn-danger:hover {
-            background: #b81922;
+            background: var(--red-60);
+            filter: brightness(0.85);
         }
 
         .error-message {
-            background: #fee2e2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
+            background: rgba(184, 48, 48, 0.05);
+            border: 1px solid var(--red-60);
+            color: var(--red-60);
             padding: 0.75rem;
             border-radius: 2px;
             margin-top: 0.5rem;
@@ -350,7 +354,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid var(--border);
-            border-top-color: #3b82f6;
+            border-top-color: var(--link-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-left: 0.5rem;
@@ -484,15 +488,15 @@
         }
 
         .expert-status-badge.active {
-            background: rgba(15, 98, 254, 0.1);
+            background: var(--accent-dim);
             border-color: var(--link-primary);
             color: var(--link-primary);
         }
 
         .expert-status-badge.completed {
-            background: rgba(16, 185, 129, 0.1);
-            border-color: #10b981;
-            color: #065f46;
+            background: rgba(45, 138, 45, 0.1);
+            border-color: var(--green-60);
+            color: var(--green-60);
         }
 
         .expert-progress-bar {
@@ -592,23 +596,23 @@
         }
 
         .activity-icon.info {
-            background: rgba(15, 98, 254, 0.1);
+            background: var(--accent-dim);
             color: var(--link-primary);
         }
 
         .activity-icon.success {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
+            background: rgba(45, 138, 45, 0.1);
+            color: var(--green-60);
         }
 
         .activity-icon.warning {
-            background: rgba(245, 158, 11, 0.1);
-            color: #d97706;
+            background: var(--accent-dim);
+            color: var(--link-primary);
         }
 
         .activity-icon.error {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
+            background: rgba(184, 48, 48, 0.1);
+            color: var(--red-60);
         }
 
         .activity-content {
@@ -741,23 +745,23 @@
         }
 
         .round-milestone-box.accept {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.06);
+            border-color: var(--green-60);
+            background: rgba(45, 138, 45, 0.06);
         }
 
         .round-milestone-box.minor {
-            border-color: var(--warning);
-            background: rgba(245, 158, 11, 0.06);
+            border-color: var(--link-primary);
+            background: var(--accent-dim);
         }
 
         .round-milestone-box.major {
-            border-color: var(--error);
-            background: rgba(239, 68, 68, 0.06);
+            border-color: var(--red-60);
+            background: rgba(184, 48, 48, 0.06);
         }
 
         .round-milestone-box.reject {
-            border-color: #991b1b;
-            background: rgba(153, 27, 27, 0.06);
+            border-color: var(--red-60);
+            background: rgba(184, 48, 48, 0.06);
         }
 
         .round-milestone-score {
@@ -993,9 +997,9 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 2px 8px;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid #10b981;
-            color: #065f46;
+            background: rgba(45, 138, 45, 0.1);
+            border: 1px solid var(--green-60);
+            color: var(--green-60);
             border-radius: 0;
         }
 
@@ -1241,11 +1245,11 @@
             font-size: 0.875rem;
         }
         .file-drop:hover, .file-drop.dragover {
-            border-color: var(--primary-600, #0f62fe);
-            background: rgba(15, 98, 254, 0.04);
+            border-color: var(--primary-600);
+            background: var(--accent-dim);
         }
         .file-drop.has-file {
-            border-color: #10b981;
+            border-color: var(--green-60);
             color: var(--text-primary);
         }
         .file-drop input { display: none; }
@@ -1274,7 +1278,7 @@
         .modal-actions .btn-upload {
             padding: 0.5rem 1rem;
             border: none;
-            background: var(--primary-600, #0f62fe);
+            background: var(--primary-600);
             color: #fff;
             cursor: pointer;
             font-size: 0.8125rem;
@@ -1283,7 +1287,7 @@
             border-radius: 0;
             transition: background 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
         }
-        .modal-actions .btn-upload:hover { background: var(--primary-700, #0043ce); }
+        .modal-actions .btn-upload:hover { background: var(--primary-700); }
         .modal-actions .btn-upload:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -1293,8 +1297,8 @@
             font-size: 0.8125rem;
             margin-top: 0.5rem;
         }
-        #upload-status.error { color: #da1e28; }
-        #upload-status.success { color: #198038; }
+        #upload-status.error { color: var(--red-60); }
+        #upload-status.success { color: var(--green-60); }
     </style>
 </head>
 <body>
@@ -2282,7 +2286,7 @@
                             <div class="project-id">${escapeHtml(wf.project_id)}</div>
                         </div>
                         <div class="workflow-status">
-                            ${wf.research_type ? `<span class="status-badge" style="background:none;border:1px solid ${wf.research_type === 'survey' ? '#d4bbff' : wf.research_type === 'explainer' ? '#a7f0ba' : '#a6c8ff'};color:${wf.research_type === 'survey' ? '#8a3ffc' : wf.research_type === 'explainer' ? '#198038' : '#0f62fe'};">${wf.research_type === 'survey' ? 'SURVEY' : wf.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
+                            ${wf.research_type ? `<span class="status-badge" style="background:none;border:1px solid var(--accent-border);color:var(--link-primary);">${wf.research_type === 'survey' ? 'SURVEY' : wf.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
                             <span class="status-badge ${wf.status}">${wf.status.replace('_', ' ').toUpperCase()}</span>
                             ${isActive ? '<div class="spinner-inline"></div>' : ''}
                         </div>

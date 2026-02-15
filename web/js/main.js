@@ -105,19 +105,19 @@ document.addEventListener('DOMContentLoaded', () => {
             tocSidebar.classList.toggle('active');
         });
 
-        // Close TOC when clicking outside
-        tocSidebar.addEventListener('click', (e) => {
-            if (e.target === tocSidebar) {
-                tocSidebar.classList.remove('active');
-            }
-        });
-
-        // Close TOC when clicking a link
-        const tocLinks = tocSidebar.querySelectorAll('a');
-        tocLinks.forEach(link => {
-            link.addEventListener('click', () => {
+        // Close button
+        const tocClose = tocSidebar.querySelector('.toc-close');
+        if (tocClose) {
+            tocClose.addEventListener('click', () => {
                 tocSidebar.classList.remove('active');
             });
+        }
+
+        // Close TOC when clicking outside or clicking a link (event delegation for dynamic links)
+        tocSidebar.addEventListener('click', (e) => {
+            if (e.target === tocSidebar || e.target.closest('.toc-list a')) {
+                tocSidebar.classList.remove('active');
+            }
         });
     }
 

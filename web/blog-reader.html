@@ -58,7 +58,7 @@
 
             if (!projectId) {
                 document.getElementById('content').innerHTML =
-                    `<div style="background: #fef3c7; border: 1px solid #fbbf24; color: #92400e; padding: 1.5rem; border-radius: 8px; margin: 2rem;">
+                    `<div style="background: var(--accent-dim); border: 1px solid var(--accent-border); color: var(--link-primary); padding: 1.5rem; border-radius: 2px; margin: 2rem;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.125rem;">No project specified</h3>
                         <p style="margin: 0;">Please provide a project ID in the URL:</p>
                         <code style="display: block; background: #fff; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px;">?project=your-project-id</code>
@@ -125,13 +125,13 @@
 
                 const html = `
                     <header class="article-header">
-                        <div class="info-banner" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
-                            <svg viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; color: #3b82f6; flex-shrink: 0;">
+                        <div class="info-banner" style="background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 2px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <svg viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; color: var(--link-primary); flex-shrink: 0;">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
                             </svg>
                             <span style="font-size: 0.9rem;">
                                 This article shows the <strong>latest version</strong> of the manuscript.
-                                <a href="review-viewer.html?id=${projectId}" style="color: #3b82f6; text-decoration: underline; font-weight: 600;">View full review board</a> to see all versions, reviewer feedback, and revision history.
+                                <a href="review-viewer.html?id=${projectId}" style="color: var(--link-primary); text-decoration: underline; font-weight: 600;">View full review board</a> to see all versions, reviewer feedback, and revision history.
                             </span>
                         </div>
                         <h1 class="article-title">${data.topic}</h1>
@@ -154,7 +154,7 @@
             } catch (error) {
                 console.error('Error loading article:', error);
                 document.getElementById('content').innerHTML =
-                    `<div style="background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 1.5rem; border-radius: 8px; margin: 2rem;">
+                    `<div style="background: rgba(184, 48, 48, 0.05); border: 1px solid var(--red-60); color: var(--red-60); padding: 1.5rem; border-radius: 2px; margin: 2rem;">
                         <h3 style="margin: 0 0 1rem 0; font-size: 1.125rem;">Error loading article</h3>
                         <p style="margin: 0 0 0.5rem 0;"><strong>Message:</strong> ${error.message}</p>
                         <p style="margin: 0 0 0.5rem 0;"><strong>Project ID:</strong> ${projectId}</p>

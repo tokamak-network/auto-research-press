@@ -20,8 +20,11 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
@@ -221,11 +224,11 @@
             // Audience level badge
             let audienceBadgeHtml = '';
             if (proj.audience_level === 'beginner') {
-                audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#059669;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Beginner-Friendly</span>';
+                audienceBadgeHtml = '<span class="badge-beginner">Beginner-Friendly</span>';
             } else if (proj.audience_level === 'intermediate') {
-                audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Intermediate</span>';
+                audienceBadgeHtml = '<span class="badge-intermediate">Intermediate</span>';
             } else if (proj.audience_level === 'professional') {
-                audienceBadgeHtml = '<span style="display:inline-block;padding:2px 8px;background:#6b21a8;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:0;letter-spacing:0.5px;">Professional</span>';
+                audienceBadgeHtml = '<span class="badge-professional">Professional</span>';
             }
 
             // Format date with time (YYYY-MM-DD HH:MM)
@@ -244,12 +247,18 @@
             // Research type badge
             let researchTypeBadgeHtml = '';
             if (proj.research_type === 'survey') {
-                researchTypeBadgeHtml = '<span class="category-tag" style="color:#8a3ffc;border-color:#d4bbff;">Survey</span>';
+                researchTypeBadgeHtml = '<span class="category-tag tag-survey">Survey</span>';
             } else if (proj.research_type === 'explainer') {
-                researchTypeBadgeHtml = '<span class="category-tag" style="color:#198038;border-color:#a7f0ba;">Explainer</span>';
+                researchTypeBadgeHtml = '<span class="category-tag tag-explainer">Explainer</span>';
             } else if (proj.research_type === 'research') {
-                researchTypeBadgeHtml = '<span class="category-tag" style="color:#0f62fe;border-color:#a6c8ff;">Original</span>';
+                researchTypeBadgeHtml = '<span class="category-tag tag-original">Original</span>';
             }
+
+            // Audience level as text label
+            let audienceText = '';
+            if (proj.audience_level === 'beginner') audienceText = 'Beginner-Friendly';
+            else if (proj.audience_level === 'intermediate') audienceText = 'Intermediate';
+            else if (proj.audience_level === 'professional') audienceText = 'Professional';
 
             return `
                 <article class="article-card">
@@ -257,32 +266,23 @@
                         ${badgeHtml}
                         ${researchTypeBadgeHtml}
                         ${categoryHtml}
-                        ${audienceBadgeHtml}
                     </div>
                     <div class="card-content">
                         <div class="card-meta">
                             <span class="meta-date">${dateTimeStr}</span>
-                            <span class="meta-divider">•</span>
-                            <span class="meta-reading-time">${readingTime} min read</span>
+                            ${audienceText ? `<span class="meta-divider">•</span><span>${audienceText}</span>` : ''}
                         </div>
                         <h3 class="card-title">
                             <a href="article.html?id=${proj.id}">${proj.title || proj.topic}</a>
                         </h3>
-                        <p class="card-description">
-                            Autonomous research with AI-powered peer review.
-                        </p>
                         <div class="card-highlights">
                             <div class="highlight-item">
-                                <span class="highlight-label">Final Score</span>
+                                <span class="highlight-label">Score</span>
                                 <span class="highlight-value">${proj.final_score}/10</span>
                             </div>
                             <div class="highlight-item">
-                                <span class="highlight-label">Review Rounds</span>
+                                <span class="highlight-label">Rounds</span>
                                 <span class="highlight-value">${proj.total_rounds}</span>
-                            </div>
-                            <div class="highlight-item">
-                                <span class="highlight-label">Status</span>
-                                <span class="highlight-value">${proj.passed ? 'Accepted' : 'Rejected'}</span>
                             </div>
                         </div>
                     </div>

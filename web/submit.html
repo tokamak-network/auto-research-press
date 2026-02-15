@@ -14,8 +14,11 @@
 
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/article.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
@@ -78,7 +81,7 @@
         .form-group textarea {
             min-height: 300px;
             resize: vertical;
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.875rem;
             line-height: 1.6;
         }
@@ -88,7 +91,7 @@
         .form-group select:focus {
             outline: none;
             border-color: var(--primary-600);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+            box-shadow: 0 0 0 2px var(--accent-dim);
         }
 
         .help-text { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem; }
@@ -184,8 +187,8 @@
             margin-top: 0.5rem;
         }
 
-        .word-count.warn { color: #da1e28; }
-        .word-count.ok { color: #198038; }
+        .word-count.warn { color: var(--red-60); }
+        .word-count.ok { color: var(--green-60); }
 
         /* Status section */
         .status-section { display: none; }
@@ -198,12 +201,12 @@
             margin-bottom: 1.5rem;
         }
 
-        .status-banner.pending { border-color: #f1c21b; }
-        .status-banner.reviewing { border-color: #0f62fe; }
-        .status-banner.awaiting_revision { border-color: #f59e0b; }
-        .status-banner.accepted { border-color: #42be65; background: rgba(66, 190, 101, 0.05); }
-        .status-banner.rejected { border-color: #da1e28; background: rgba(218, 30, 40, 0.05); }
-        .status-banner.expired { border-color: #6f6f6f; background: rgba(111, 111, 111, 0.05); }
+        .status-banner.pending { border-color: var(--link-primary); }
+        .status-banner.reviewing { border-color: var(--link-primary); }
+        .status-banner.awaiting_revision { border-color: var(--link-primary); }
+        .status-banner.accepted { border-color: var(--green-60); background: rgba(45, 138, 45, 0.05); }
+        .status-banner.rejected { border-color: var(--red-60); background: rgba(184, 48, 48, 0.05); }
+        .status-banner.expired { border-color: var(--text-tertiary); background: var(--layer-02); }
 
         .status-title {
             font-weight: 700;
@@ -214,24 +217,7 @@
             gap: 0.5rem;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 0.1875rem 0.5rem;
-            font-size: 0.6875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-radius: 0;
-            color: #fff;
-        }
-
-        .status-badge.pending { background: #f1c21b; color: #161616; }
-        .status-badge.desk_review { background: #f1c21b; color: #161616; }
-        .status-badge.reviewing { background: #0f62fe; }
-        .status-badge.awaiting_revision { background: #f59e0b; color: #161616; }
-        .status-badge.accepted { background: #42be65; }
-        .status-badge.rejected { background: #da1e28; }
-        .status-badge.expired { background: #6f6f6f; }
+        /* status-badge base + variants provided by main.css */
 
         .status-meta { font-size: 0.875rem; color: var(--text-secondary); }
 
@@ -300,7 +286,7 @@
         .deadline-countdown {
             font-size: 1rem;
             font-weight: 700;
-            color: #f59e0b;
+            color: var(--link-primary);
             margin: 0.5rem 0;
         }
 
@@ -317,9 +303,9 @@
 
         /* Error/info boxes */
         .error-box {
-            background: #fee2e2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
+            background: rgba(184, 48, 48, 0.05);
+            border: 1px solid var(--red-60);
+            color: var(--red-60);
             padding: 1rem;
             border-radius: 2px;
             margin-top: 1rem;
@@ -327,8 +313,8 @@
         }
 
         .info-box {
-            background: rgba(59, 130, 246, 0.05);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
             color: var(--text);
             padding: 1rem;
             border-radius: 2px;
@@ -439,9 +425,9 @@
 
         .word-count-warning {
             display: none;
-            background: #fee2e2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
+            background: rgba(184, 48, 48, 0.05);
+            border: 1px solid var(--red-60);
+            color: var(--red-60);
             padding: 0.625rem 0.75rem;
             border-radius: 2px;
             font-size: 0.8125rem;

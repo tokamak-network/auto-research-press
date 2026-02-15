@@ -8,8 +8,11 @@
 
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/article.css">
     <style>
@@ -89,12 +92,13 @@
         }
 
         .btn-danger {
-            background: #da1e28;
+            background: var(--red-60);
             color: white;
         }
 
         .btn-danger:hover {
-            background: #b81922;
+            background: var(--red-60);
+            filter: brightness(0.85);
         }
 
         .btn-sm {
@@ -107,8 +111,8 @@
             margin-top: 0.75rem;
         }
 
-        .status-ok { color: #198038; }
-        .status-err { color: #da1e28; }
+        .status-ok { color: var(--green-60); }
+        .status-err { color: var(--red-60); }
 
         /* Key management (hidden until auth) */
         #key-management {
@@ -158,7 +162,7 @@
         }
 
         .key-mono {
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8125rem;
         }
 
@@ -171,16 +175,16 @@
         /* New key banner */
         .new-key-banner {
             display: none;
-            background: #defbe6;
-            border: 1px solid #42be65;
+            background: rgba(45, 138, 45, 0.08);
+            border: 1px solid var(--green-60);
             border-radius: 2px;
             padding: 1rem 1.25rem;
             margin-bottom: 1.5rem;
         }
 
         [data-theme="dark"] .new-key-banner {
-            background: #044317;
-            border-color: #42be65;
+            background: rgba(109, 181, 109, 0.08);
+            border-color: var(--green-60);
         }
 
         .new-key-banner p {
@@ -201,16 +205,16 @@
             background: var(--background);
             border: 1px solid var(--border);
             border-radius: 2px;
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 0.8125rem;
             word-break: break-all;
         }
 
         .error-box {
-            background: #fff1f1;
-            border: 1px solid #fa4d56;
+            background: rgba(184, 48, 48, 0.05);
+            border: 1px solid var(--red-60);
             border-radius: 2px;
-            color: #da1e28;
+            color: var(--red-60);
             padding: 0.75rem 1rem;
             margin-top: 1rem;
             font-size: 0.875rem;
@@ -218,7 +222,7 @@
         }
 
         [data-theme="dark"] .error-box {
-            background: #2d0709;
+            background: rgba(192, 80, 80, 0.08);
         }
 
         /* Tabs */
@@ -292,9 +296,9 @@
             border-radius: 0;
         }
 
-        .app-status.pending { background: #f1c21b; color: #161616; }
-        .app-status.approved { background: #42be65; color: #fff; }
-        .app-status.rejected { background: #da1e28; color: #fff; }
+        .app-status.pending { background: var(--link-primary); color: #fff; }
+        .app-status.approved { background: var(--green-60); color: #fff; }
+        .app-status.rejected { background: var(--red-60); color: #fff; }
 
         .app-detail-panel {
             background: var(--background);
@@ -723,8 +727,8 @@
                             <button class="btn btn-danger btn-sm" onclick="rejectApp('${app.id}')">Reject</button>
                         </div>
                     ` : ''}
-                    ${app.status === 'rejected' && app.rejection_reason ? `<p style="font-size: 0.8125rem; color: #da1e28; margin-top: 0.5rem;">Reason: ${escapeHtml(app.rejection_reason)}</p>` : ''}
-                    ${app.status === 'approved' && app.reviewed_at ? `<p style="font-size: 0.8125rem; color: #198038; margin-top: 0.5rem;">Approved: ${new Date(app.reviewed_at).toLocaleString()}</p>` : ''}
+                    ${app.status === 'rejected' && app.rejection_reason ? `<p style="font-size: 0.8125rem; color: var(--red-60); margin-top: 0.5rem;">Reason: ${escapeHtml(app.rejection_reason)}</p>` : ''}
+                    ${app.status === 'approved' && app.reviewed_at ? `<p style="font-size: 0.8125rem; color: var(--green-60); margin-top: 0.5rem;">Approved: ${new Date(app.reviewed_at).toLocaleString()}</p>` : ''}
                 </div>
             `;
         }

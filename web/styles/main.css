@@ -1,5 +1,5 @@
 /* =============================================================================
-   Autonomous Research Press - IBM Carbon Inspired Design System
+   Autonomous Research Press - Warm Amber Design System
    Based on 8px grid system with strict rectangular geometry
    ============================================================================= */
 
@@ -18,46 +18,63 @@
     --spacing-07: 64px;  /* 8 units - major section */
     --spacing-08: 96px;  /* 12 units - hero */
 
-    /* Neutral Palette - Carbon inspired */
-    --gray-10: #f4f4f4;
-    --gray-20: #e0e0e0;
-    --gray-30: #c6c6c6;
-    --gray-40: #a8a8a8;
-    --gray-50: #8d8d8d;
-    --gray-60: #6f6f6f;
-    --gray-70: #525252;
-    --gray-80: #393939;
-    --gray-90: #262626;
-    --gray-100: #161616;
+    /* Neutral Palette - Warm tones */
+    --gray-10: #EEECEA;
+    --gray-20: #DDD9D3;
+    --gray-30: #B0ACA4;
+    --gray-40: #9B978F;
+    --gray-50: #6B6860;
+    --gray-60: #555555;
+    --gray-70: #3A3A3A;
+    --gray-80: #2E2E2E;
+    --gray-90: #232323;
+    --gray-100: #1A1A1A;
 
-    /* Primary Colors */
-    --blue-60: #0f62fe;
-    --blue-70: #0043ce;
-    --blue-80: #002d9c;
+    /* Primary Colors - Amber */
+    --amber-60: #7A6010;
+    --amber-70: #5E4A0C;
+    --amber-80: #4A3A09;
+
+    /* Legacy aliases for backward compat */
+    --blue-60: var(--amber-60);
+    --blue-70: var(--amber-70);
+    --blue-80: var(--amber-80);
 
     /* Semantic Colors */
-    --green-60: #24a148;
-    --yellow-30: #f1c21b;
-    --red-60: #da1e28;
+    --green-60: #2D8A2D;
+    --yellow-30: #D4A853;
+    --red-60: #B83030;
 
-    /* Theme - Light Mode */
-    --background: #ffffff;
-    --background-hover: #f4f4f4;
-    --layer-01: #f4f4f4;
-    --layer-02: #ffffff;
-    --field: #f4f4f4;
-    --border-subtle: #e0e0e0;
-    --border-strong: #8d8d8d;
-    --text-primary: #161616;
-    --text-secondary: #525252;
-    --text-tertiary: #6f6f6f;
-    --text-placeholder: #a8a8a8;
-    --link-primary: #0f62fe;
-    --link-hover: #0043ce;
+    /* Extended Palette */
+    --purple-60: #6B3FA0;
+    --purple-dim: rgba(107, 63, 160, 0.08);
+    --purple-border: rgba(107, 63, 160, 0.25);
+    --amber-warm: #B87A1A;
+    --yellow-60: #9E7700;
+
+    /* Accent utilities */
+    --accent-dim: rgba(150, 118, 14, 0.06);
+    --accent-border: rgba(150, 118, 14, 0.25);
+
+    /* Theme - Light Mode (Warm Ivory) */
+    --background: #F7F6F3;
+    --background-hover: #E5E3DE;
+    --layer-01: #FFFFFF;
+    --layer-02: #EEECEA;
+    --field: #FFFFFF;
+    --border-subtle: #DDD9D3;
+    --border-strong: #B0ACA4;
+    --text-primary: #1A1A1A;
+    --text-secondary: #6B6860;
+    --text-tertiary: #9B978F;
+    --text-placeholder: #B0ACA4;
+    --link-primary: #7A6010;
+    --link-hover: #96760E;
 
     /* Typography Scale */
-    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'IBM Plex Mono', 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 
     /* Type Scale */
     --type-scale-01: 12px;  /* Caption */
@@ -94,9 +111,9 @@
     --surface: var(--layer-01);
     --border: var(--border-subtle);
     --text: var(--text-primary);
-    --primary-500: var(--blue-60);
-    --primary-600: var(--blue-60);
-    --primary-700: var(--blue-70);
+    --primary-500: var(--amber-60);
+    --primary-600: var(--amber-60);
+    --primary-700: var(--amber-70);
 
     /* Spacing aliases */
     --space-1: var(--spacing-01);
@@ -125,7 +142,7 @@
     --bg-secondary: var(--layer-01);
     --bg-accent: var(--layer-02);
     --primary: var(--link-primary);
-    --primary-light: #78a9ff;
+    --primary-light: #E0B862;
     --transition: var(--duration-moderate) var(--easing);
     --transition-fast: var(--duration-fast) var(--easing);
 
@@ -143,25 +160,36 @@
 
 /* Dark Theme */
 [data-theme="dark"] {
-    --background: #161616;
-    --background-hover: #262626;
-    --layer-01: #262626;
-    --layer-02: #393939;
-    --field: #262626;
-    --border-subtle: #393939;
-    --border-strong: #6f6f6f;
-    --text-primary: #f4f4f4;
-    --text-secondary: #c6c6c6;
-    --text-tertiary: #a8a8a8;
-    --text-placeholder: #6f6f6f;
-    --link-primary: #78a9ff;
-    --link-hover: #a6c8ff;
+    --background: #151515;
+    --background-hover: #2A2A2A;
+    --layer-01: #1C1C1C;
+    --layer-02: #232323;
+    --field: #1C1C1C;
+    --border-subtle: #2E2E2E;
+    --border-strong: #555555;
+    --text-primary: #E8E8E8;
+    --text-secondary: #9A9A9A;
+    --text-tertiary: #6A6A6A;
+    --text-placeholder: #4A4A4A;
+    --link-primary: #D4A853;
+    --link-hover: #E0B862;
+
+    --accent-dim: rgba(212, 168, 83, 0.08);
+    --accent-border: rgba(212, 168, 83, 0.3);
+
+    --green-60: #6DB56D;
+    --red-60: #C05050;
+    --purple-60: #B89ADB;
+    --purple-dim: rgba(184, 154, 219, 0.08);
+    --purple-border: rgba(184, 154, 219, 0.3);
+    --amber-warm: #E0A040;
+    --yellow-60: #D4A853;
 
     --shadow-01: 0 1px 3px rgba(0, 0, 0, 0.5);
     --shadow-02: 0 2px 6px rgba(0, 0, 0, 0.7);
 
     /* Dark theme specific overrides */
-    --primary-light: #a6c8ff;
+    --primary-light: #E0B862;
 }
 
 /* Base Styles */
@@ -442,6 +470,7 @@ code {
 }
 
 .hero-title {
+    font-family: var(--font-serif);
     font-size: var(--type-scale-08);
     font-weight: 600;
     color: var(--text-primary);
@@ -467,6 +496,7 @@ code {
 }
 
 .section-title {
+    font-family: var(--font-serif);
     font-size: var(--type-scale-07);
     font-weight: 600;
     color: var(--text-primary);
@@ -558,6 +588,59 @@ code {
     letter-spacing: 0.32px;
 }
 
+/* Audience Level Badges */
+.badge-beginner {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--green-60);
+    color: #fff;
+    font-size: var(--type-scale-01);
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 0;
+    letter-spacing: 0.5px;
+}
+
+.badge-intermediate {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--amber-60);
+    color: #fff;
+    font-size: var(--type-scale-01);
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 0;
+    letter-spacing: 0.5px;
+}
+
+.badge-professional {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--purple-60);
+    color: #fff;
+    font-size: var(--type-scale-01);
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 0;
+    letter-spacing: 0.5px;
+}
+
+/* Research Type Tags */
+.tag-survey {
+    color: var(--purple-60);
+    border-color: var(--purple-border);
+}
+
+.tag-explainer {
+    color: var(--green-60);
+    border-color: rgba(45, 138, 45, 0.25);
+}
+
+.tag-original {
+    color: var(--amber-60);
+    border-color: var(--accent-border);
+}
+
 .expert-team-row {
     display: flex;
     align-items: baseline;
@@ -594,7 +677,8 @@ code {
 .card-title a {
     color: var(--text-primary);
     font-size: var(--type-scale-05);
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     transition: color var(--duration-fast) var(--easing);
 }
 
@@ -611,7 +695,7 @@ code {
 
 .card-highlights {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-03);
     padding: var(--spacing-03) 0;
     border-top: 1px solid var(--border-subtle);
@@ -747,14 +831,14 @@ code {
 }
 
 .btn-primary {
-    background: var(--blue-60);
+    background: var(--amber-60);
     color: #ffffff;
-    border-color: var(--blue-60);
+    border-color: var(--amber-60);
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: var(--blue-70);
-    border-color: var(--blue-70);
+    background: var(--amber-70);
+    border-color: var(--amber-70);
 }
 
 .btn-secondary {
@@ -928,3 +1012,51 @@ code {
         font-size: var(--type-scale-03);
     }
 }
+
+/* =============================================================================
+   Common Badge Components (shared across pages)
+   ============================================================================= */
+
+/* Status Badges (queue, submit, research-queue) */
+.status-badge {
+    display: inline-block;
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 0;
+    color: #fff;
+}
+
+.status-badge.completed { background: var(--green-60); }
+.status-badge.reviewing { background: var(--amber-60); }
+.status-badge.writing { background: var(--purple-60); }
+.status-badge.failed { background: var(--red-60); }
+.status-badge.queued { background: var(--text-tertiary); }
+.status-badge.pending { background: var(--amber-60); }
+.status-badge.desk_review { background: var(--amber-60); }
+.status-badge.awaiting_revision { background: var(--amber-60); }
+.status-badge.accepted { background: var(--green-60); }
+.status-badge.rejected { background: var(--red-60); }
+.status-badge.expired { background: var(--text-tertiary); }
+.status-badge.searching { background: var(--purple-60); }
+.status-badge.research { background: var(--purple-60); }
+.status-badge.writing_sections { background: var(--amber-60); }
+.status-badge.revising { background: var(--red-60); }
+.status-badge.interrupted { background: var(--amber-60); }
+
+/* Decision Badges (about, review) */
+.decision-badge {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 0;
+}
+
+.decision-badge.accept { background: var(--green-60); color: #fff; }
+.decision-badge.minor { background: var(--yellow-60); color: #fff; }
+.decision-badge.major { background: var(--amber-warm); color: #fff; }
+.decision-badge.reject { background: var(--red-60); color: #fff; }

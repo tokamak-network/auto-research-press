@@ -12,7 +12,10 @@
     <meta name="twitter:image" content="https://ar-press.com/images/og-cover.png">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -111,7 +114,45 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-secondary);
+            margin-bottom: 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 1rem;
+        }
+
+        .sidebar-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            cursor: pointer;
+            color: var(--text-primary);
+            border-radius: 0;
+            font-family: var(--font-sans);
+            transition: all var(--duration-fast) var(--easing);
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--background-hover);
+        }
+
+        .sidebar-toggle svg {
+            transition: transform var(--duration-fast) var(--easing);
+        }
+
+        .sidebar.collapsed #projects-list {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-toggle svg {
+            transform: rotate(-90deg);
         }
 
         .project-item {
@@ -381,8 +422,8 @@
         }
 
         .diff-highlight {
-            background: var(--highlight, #fef08a);
-            border-bottom: 2px solid var(--highlight-border, #fde047);
+            background: var(--highlight);
+            border-bottom: 2px solid var(--highlight-border);
             padding: 0.125rem 0.25rem;
             border-radius: 0;
             font-weight: 500;
@@ -406,6 +447,7 @@
         }
 
         .project-title {
+            font-family: var(--font-serif);
             font-size: 1.375rem;
             font-weight: 700;
             letter-spacing: -0.02em;
@@ -470,21 +512,21 @@
         }
 
         .moderator-panel.decision-accept {
-            background: rgba(16, 185, 129, 0.08);
-            border: 2px solid #10b981;
-            border-left: 6px solid #059669;
+            background: rgba(45, 138, 45, 0.08);
+            border: 2px solid var(--green-60);
+            border-left: 6px solid var(--green-60);
         }
 
         .moderator-panel.decision-major {
-            background: rgba(239, 68, 68, 0.08);
-            border: 2px solid #ef4444;
-            border-left: 6px solid #dc2626;
+            background: rgba(184, 48, 48, 0.08);
+            border: 2px solid var(--red-60);
+            border-left: 6px solid var(--red-60);
         }
 
         .moderator-panel.decision-minor {
-            background: rgba(245, 158, 11, 0.08);
-            border: 2px solid #f59e0b;
-            border-left: 6px solid #d97706;
+            background: var(--accent-dim);
+            border: 2px solid var(--link-primary);
+            border-left: 6px solid var(--link-primary);
         }
 
         .moderator-top {
@@ -540,9 +582,9 @@
             overflow-wrap: break-word;
         }
 
-        .moderator-decision-badge.decision-accept { background: #059669; }
-        .moderator-decision-badge.decision-major { background: #dc2626; }
-        .moderator-decision-badge.decision-minor { background: #d97706; }
+        .moderator-decision-badge.decision-accept { background: var(--green-60); }
+        .moderator-decision-badge.decision-major { background: var(--red-60); }
+        .moderator-decision-badge.decision-minor { background: var(--link-primary); }
 
         .moderator-changes {
             margin: 8px 16px 0;
@@ -902,25 +944,31 @@
 
         /* Highlight vars for diff mode */
         :root {
-            --highlight: #fef08a;
-            --highlight-border: #fde047;
+            --highlight: rgba(212, 168, 83, 0.2);
+            --highlight-border: rgba(212, 168, 83, 0.5);
         }
 
         [data-theme="dark"] {
-            --highlight: #713f12;
-            --highlight-border: #a16207;
+            --highlight: rgba(212, 168, 83, 0.15);
+            --highlight-border: rgba(212, 168, 83, 0.4);
         }
 
         /* --- Responsive --- */
         @media (max-width: 1024px) {
             .main-container {
                 flex-direction: column;
+                overflow: visible;
             }
 
             .sidebar {
                 width: 100%;
                 border-right: none;
                 border-bottom: 1px solid var(--border-subtle);
+                overflow: visible;
+            }
+
+            .content {
+                overflow: visible;
             }
 
             .version-tabs {
@@ -948,10 +996,15 @@
                 gap: 0.75rem;
             }
 
+            /* Sidebar: collapsible instead of fixed max-height */
             .sidebar {
                 width: 100%;
-                max-height: 200px;
-                overflow-y: auto;
+                max-height: none;
+                overflow: visible;
+            }
+
+            .sidebar-toggle {
+                display: flex;
             }
 
             .content {
@@ -973,22 +1026,45 @@
             }
 
             .chart-container {
-                height: 200px;
+                height: 240px;
                 padding: 1rem;
             }
 
+            /* Remove scroll-within-scroll traps */
             .manuscript-viewer {
-                max-height: 400px;
+                max-height: 70vh;
                 padding: 1rem;
+            }
+
+            .detailed-feedback {
+                max-height: none;
+                overflow: visible;
             }
 
             .version-tabs {
                 gap: 0.25rem;
             }
 
+            /* Touch targets: minimum 44px */
             .version-tab {
                 padding: 0.5rem 0.75rem;
                 font-size: 0.75rem;
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .project-item {
+                min-height: 44px;
+            }
+
+            .score-item {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8125rem;
+            }
+
+            .blog-link-btn {
+                margin-left: 0;
             }
 
             .moderator-top {
@@ -1013,12 +1089,7 @@
                 grid-template-columns: 1fr;
             }
 
-            .sidebar {
-                max-height: 150px;
-            }
-
             .blog-link-btn {
-                margin-left: 0;
                 width: 100%;
                 justify-content: center;
             }
@@ -1038,8 +1109,15 @@
     </div>
 
     <div class="main-container">
-        <div class="sidebar">
-            <div class="sidebar-title">Research Projects</div>
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Research Projects</div>
+                <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle project list">
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16">
+                        <path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/>
+                    </svg>
+                </button>
+            </div>
             <div id="projects-list" class="loading">Loading...</div>
         </div>
 
@@ -1088,6 +1166,23 @@
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.getElementById('theme-btn').textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+
+        // Sidebar toggle for mobile
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarEl = document.getElementById('sidebar');
+        if (sidebarToggle && sidebarEl) {
+            if (window.innerWidth <= 768) {
+                sidebarEl.classList.add('collapsed');
+            }
+            sidebarToggle.addEventListener('click', function() {
+                sidebarEl.classList.toggle('collapsed');
+            });
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebarEl.classList.remove('collapsed');
+                }
+            });
+        }
 
         async function downloadReport(id) {
             try {
@@ -1251,7 +1346,7 @@
                     <div class="project-header">
                         <h1 class="project-title">${data.title || data.topic}</h1>
                         <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0;">
-                            ${data.research_type ? `<span class="review-status-badge" style="color:${data.research_type === 'survey' ? '#8a3ffc' : data.research_type === 'explainer' ? '#198038' : '#0f62fe'};border-color:${data.research_type === 'survey' ? '#d4bbff' : data.research_type === 'explainer' ? '#a7f0ba' : '#a6c8ff'};">${data.research_type === 'survey' ? 'SURVEY' : data.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
+                            ${data.research_type ? `<span class="review-status-badge" style="color:var(--link-primary);border-color:var(--accent-border);">${data.research_type === 'survey' ? 'SURVEY' : data.research_type === 'explainer' ? 'EXPLAINER' : 'ORIGINAL'}</span>` : ''}
                             <span class="review-status-badge">${finalDecision}</span>
                         </div>
                     </div>
@@ -1408,9 +1503,10 @@
         }
 
         function getDecisionColor(decision) {
-            if (decision === 'ACCEPT') return '#047857';
-            if (decision.includes('MAJOR')) return '#b91c1c';
-            return '#b45309';
+            const cs = getComputedStyle(document.documentElement);
+            if (decision === 'ACCEPT') return cs.getPropertyValue('--green-60').trim();
+            if (decision.includes('MAJOR')) return cs.getPropertyValue('--red-60').trim();
+            return cs.getPropertyValue('--link-primary').trim();
         }
 
         function renderRound(round, idx, allRounds) {
@@ -1583,8 +1679,8 @@
             if (!ctx) return;
 
             const theme = document.documentElement.getAttribute('data-theme');
-            const textColor = theme === 'dark' ? '#f4f4f4' : '#161616';
-            const gridColor = theme === 'dark' ? '#393939' : '#e0e0e0';
+            const textColor = theme === 'dark' ? '#E8E8E8' : '#1A1A1A';
+            const gridColor = theme === 'dark' ? '#2E2E2E' : '#DDD9D3';
 
             const reviewerSet = new Set();
             data.rounds.forEach(round => {
@@ -1597,7 +1693,8 @@
             const specialists = Array.from(reviewerSet);
 
             const datasets = specialists.map((name, idx) => {
-                const colors = ['#0f62fe', '#8a3ffc', '#ff7eb6', '#42be65', '#f1c21b'];
+                const cs = getComputedStyle(document.documentElement);
+                const colors = [cs.getPropertyValue('--amber-60').trim() || '#7A6010', cs.getPropertyValue('--purple-60').trim() || '#6B3FA0', '#D4A853', cs.getPropertyValue('--green-60').trim() || '#2D8A2D', '#B08A2E'];
                 return {
                     label: name,
                     data: data.rounds.map(r => {
@@ -1702,8 +1799,8 @@
             if (!scoreChart) return;
 
             const theme = document.documentElement.getAttribute('data-theme');
-            const textColor = theme === 'dark' ? '#f4f4f4' : '#161616';
-            const gridColor = theme === 'dark' ? '#393939' : '#e0e0e0';
+            const textColor = theme === 'dark' ? '#E8E8E8' : '#1A1A1A';
+            const gridColor = theme === 'dark' ? '#2E2E2E' : '#DDD9D3';
 
             scoreChart.options.plugins.legend.labels.color = textColor;
             scoreChart.options.scales.y.ticks.color = textColor;
@@ -1801,8 +1898,8 @@
 
         function renderPerformanceCharts(perf) {
             const theme = document.documentElement.getAttribute('data-theme');
-            const textColor = theme === 'dark' ? '#f4f4f4' : '#161616';
-            const gridColor = theme === 'dark' ? '#393939' : '#e0e0e0';
+            const textColor = theme === 'dark' ? '#E8E8E8' : '#1A1A1A';
+            const gridColor = theme === 'dark' ? '#2E2E2E' : '#DDD9D3';
 
             // Time Distribution Chart
             const timeDistCtx = document.getElementById('timeDistributionChart');
@@ -1812,6 +1909,11 @@
                 const moderatorTimes = perf.rounds.map(r => r.moderator_time || 0);
                 const revisionTimes = perf.rounds.map(r => r.revision_time || 0);
 
+                const csT = getComputedStyle(document.documentElement);
+                const amberBar = csT.getPropertyValue('--amber-60').trim() || '#7A6010';
+                const yellowBar = csT.getPropertyValue('--yellow-30').trim() || '#D4A853';
+                const hoverBar = csT.getPropertyValue('--link-hover').trim() || '#96760E';
+
                 timeDistributionChart = new Chart(timeDistCtx, {
                     type: 'bar',
                     data: {
@@ -1820,7 +1922,7 @@
                             {
                                 label: 'Review Phase',
                                 data: reviewTimes,
-                                backgroundColor: '#0f62fe',
+                                backgroundColor: amberBar,
                                 borderWidth: 0,
                                 borderRadius: 0,
                                 barThickness: 32,
@@ -1829,7 +1931,7 @@
                             {
                                 label: 'Moderator Phase',
                                 data: moderatorTimes,
-                                backgroundColor: '#8a3ffc',
+                                backgroundColor: yellowBar,
                                 borderWidth: 0,
                                 borderRadius: 0,
                                 barThickness: 32,
@@ -1838,7 +1940,7 @@
                             {
                                 label: 'Revision Phase',
                                 data: revisionTimes,
-                                backgroundColor: '#ff7eb6',
+                                backgroundColor: hoverBar,
                                 borderWidth: 0,
                                 borderRadius: 0,
                                 barThickness: 32,
@@ -1897,7 +1999,8 @@
             if (reviewerTimingCtx) {
                 const labels = perf.rounds.map(r => `Round ${r.round_number}`);
                 const reviewers = Object.keys(perf.rounds[0].reviewer_times);
-                const colors = ['#0f62fe', '#8a3ffc', '#ff7eb6', '#42be65', '#f1c21b', '#da1e28'];
+                const csR = getComputedStyle(document.documentElement);
+                const colors = [csR.getPropertyValue('--amber-60').trim() || '#7A6010', csR.getPropertyValue('--purple-60').trim() || '#6B3FA0', '#D4A853', csR.getPropertyValue('--green-60').trim() || '#2D8A2D', '#B08A2E', csR.getPropertyValue('--red-60').trim() || '#B83030'];
 
                 const datasets = reviewers.map((reviewer, idx) => ({
                     label: reviewer,
@@ -1962,8 +2065,8 @@
 
         function updatePerformanceChartTheme() {
             const theme = document.documentElement.getAttribute('data-theme');
-            const textColor = theme === 'dark' ? '#f4f4f4' : '#161616';
-            const gridColor = theme === 'dark' ? '#393939' : '#e0e0e0';
+            const textColor = theme === 'dark' ? '#E8E8E8' : '#1A1A1A';
+            const gridColor = theme === 'dark' ? '#2E2E2E' : '#DDD9D3';
 
             if (timeDistributionChart) {
                 timeDistributionChart.options.plugins.legend.labels.color = textColor;

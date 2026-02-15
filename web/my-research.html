@@ -14,8 +14,11 @@
 
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
-    <link rel="mask-icon" href="favicon.svg" color="#2563eb">
+    <link rel="mask-icon" href="favicon.svg" color="#96760E">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/article.css">
     <style>
@@ -64,7 +67,7 @@
             background: var(--background);
             color: var(--text);
             font-size: 0.875rem;
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: var(--font-mono);
         }
 
         .btn {
@@ -97,8 +100,8 @@
             margin-top: 0.5rem;
         }
 
-        .status-ok { color: #198038; }
-        .status-err { color: #da1e28; }
+        .status-ok { color: var(--green-60); }
+        .status-err { color: var(--red-60); }
 
         /* Dashboard content */
         #dashboard {
@@ -244,11 +247,11 @@
             border-radius: 0;
         }
 
-        .workflow-status.completed, .workflow-status.accepted { background: #42be65; color: #fff; }
-        .workflow-status.rejected, .workflow-status.expired { background: #da1e28; color: #fff; }
-        .workflow-status.reviewing, .workflow-status.writing { background: #0f62fe; color: #fff; }
-        .workflow-status.queued, .workflow-status.pending, .workflow-status.desk_review { background: #f1c21b; color: #161616; }
-        .workflow-status.awaiting_revision { background: #f59e0b; color: #161616; }
+        .workflow-status.completed, .workflow-status.accepted { background: var(--green-60); color: #fff; }
+        .workflow-status.rejected, .workflow-status.expired { background: var(--red-60); color: #fff; }
+        .workflow-status.reviewing, .workflow-status.writing { background: var(--link-primary); color: #fff; }
+        .workflow-status.queued, .workflow-status.pending, .workflow-status.desk_review { background: var(--link-primary); color: #fff; }
+        .workflow-status.awaiting_revision { background: var(--link-primary); color: #fff; }
 
         .empty-state {
             text-align: center;
@@ -429,9 +432,9 @@
             arc.style.strokeDashoffset = offset;
 
             // Color: green if plenty, yellow if low, red if exhausted
-            if (remaining <= 0) arc.style.stroke = '#da1e28';
-            else if (remaining <= 3) arc.style.stroke = '#f1c21b';
-            else arc.style.stroke = '#42be65';
+            if (remaining <= 0) arc.style.stroke = 'var(--red-60)';
+            else if (remaining <= 3) arc.style.stroke = 'var(--link-primary)';
+            else arc.style.stroke = 'var(--green-60)';
         }
 
         function renderProfile(data) {
@@ -503,7 +506,7 @@
                 let deadlineHtml = '';
                 if (sub.status === 'awaiting_revision' && sub.remaining_hours !== null && sub.remaining_hours !== undefined) {
                     const h = Math.floor(sub.remaining_hours);
-                    deadlineHtml = `<span style="color:#f59e0b; font-weight:600;">${h}h left</span>`;
+                    deadlineHtml = `<span style="color:var(--link-primary); font-weight:600;">${h}h left</span>`;
                 }
 
                 return `
