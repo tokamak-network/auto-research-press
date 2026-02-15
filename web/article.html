@@ -56,6 +56,7 @@
             font-size: 1.05rem;
             line-height: 1.7;
             color: var(--text-primary);
+            box-shadow: var(--shadow-sharp);
         }
         .tldr-box .tldr-label {
             font-weight: 700;
@@ -76,6 +77,7 @@
             padding: 1.25rem 1.5rem;
             margin-bottom: 2rem;
             border-radius: 2px;
+            box-shadow: var(--shadow-sharp);
         }
         .key-takeaways-box h2 {
             font-size: 0.875rem;
@@ -111,6 +113,7 @@
             padding: 1.25rem 1.5rem;
             margin-bottom: 2rem;
             border-radius: 2px;
+            box-shadow: var(--shadow-sharp);
         }
         .why-matters-box h2 {
             font-size: 0.875rem;
@@ -129,6 +132,7 @@
             border-radius: 2px;
             font-size: 0.95rem;
             line-height: 1.65;
+            box-shadow: var(--shadow-sharp);
         }
         .abstract-box h2 {
             font-size: 0.875rem;
@@ -190,6 +194,7 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            box-shadow: var(--shadow-sharp);
         }
         .article-info-banner svg {
             width: 20px;
@@ -212,7 +217,7 @@
     </style>
 </head>
 <body>
-    <header class="site-header">
+    <header class="site-header grid-lines">
         <div class="container">
             <div class="header-nav">
                 <a href="index.html" class="back-link">
@@ -278,8 +283,40 @@
 
     <footer class="site-footer">
         <div class="container">
-            <p><strong>Platform:</strong> Autonomous Research Press</p>
-            <p class="copyright">2026 Autonomous Research Press. All rights reserved. <span id="system-version" style="color: var(--text-secondary); font-size: 0.9em;"></span></p>
+            <div class="footer-grid-4">
+                <div class="footer-section">
+                    <div class="footer-brand">Autonomous Research Press</div>
+                    <p>AI-powered academic research platform with rigorous multi-agent peer review and transparent editorial standards.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Platform</h4>
+                    <ul>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="submit.html">Submit Manuscript</a></li>
+                        <li><a href="my-research.html">My Research</a></li>
+                        <li><a href="apply.html">Apply for API Key</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="research-queue.html">Research Queue</a></li>
+                        <li><a href="ask-topic.html">Ask Research</a></li>
+                        <li><a href="api-docs.html">API Documentation</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Connect</h4>
+                    <ul>
+                        <li><a href="https://suhyeonlee.xyz">Author</a></li>
+                        <li><a href="https://tokamak.network">Tokamak Network</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Autonomous Research Press. All rights reserved. <span id="system-version" style="color: var(--text-secondary); font-size: 0.9em;"></span></p>
+                <p class="footer-note">Research reports are AI-generated and peer-reviewed. Verify critical information independently.</p>
+            </div>
         </div>
     </footer>
 
@@ -365,6 +402,7 @@
                         <span class="meta-item"><strong>Review Score:</strong> ${finalScore}/10</span>
                         <span class="meta-item"><strong>Status:</strong> ${finalDecision.replace(/_/g, ' ')}</span>
                         <span class="meta-item"><strong>Audience:</strong> ${audienceLevel === 'beginner' ? 'Beginner-Friendly' : audienceLevel === 'intermediate' ? 'Intermediate' : 'Professional'}</span>
+                        <span class="meta-item meta-version" title="System version that generated this article"><strong>v</strong>${meta.system_version || 'legacy'}</span>
                         <button class="download-report-btn" onclick="downloadReport('${id}')">
                             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H2.75z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969z"/></svg>
                             Download .md

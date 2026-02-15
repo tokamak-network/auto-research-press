@@ -17,7 +17,7 @@ console = Console()
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="1.2.0")
 def cli():
     """AI-native research workflow with multi-provider LLM peer review.
 
@@ -270,7 +270,7 @@ async def _test_providers():
 @click.argument("topic")
 @click.option("--num-experts", type=int, default=3, help="Number of expert reviewers")
 @click.option("--auto-accept-team/--interactive-team", default=True, help="Auto-accept AI-composed teams (default) or interactively edit")
-@click.option("--max-rounds", type=int, default=2, help="Maximum review rounds")
+@click.option("--max-rounds", type=int, default=3, help="Maximum review rounds")
 @click.option("--threshold", type=float, default=7.0, help="Score threshold for acceptance")
 @click.option("--manuscript", type=click.Path(exists=True), help="Path to existing manuscript (skip generation)")
 @click.option("--article-length", type=click.Choice(["short", "full"]), default="full", help="Article length: short (1,500-2,500 words) or full (3,000-5,000 words)")
@@ -704,7 +704,7 @@ async def _run_collaborative_from_run(
 @click.option("--major-field", default="computer_science", help="Major academic field")
 @click.option("--subfield", default="security", help="Subfield")
 @click.option("--num-coauthors", default=2, help="Number of co-authors (0-3)")
-@click.option("--max-rounds", default=2, help="Maximum review rounds")
+@click.option("--max-rounds", default=3, help="Maximum review rounds")
 @click.option("--threshold", default=7.0, help="Acceptance threshold")
 @click.option("--target-length", default=4000, help="Target manuscript length in words")
 def collaborate(
@@ -872,6 +872,151 @@ async def _run_collaborative_workflow(
         import traceback
         traceback.print_exc()
         return 1
+
+
+@cli.command(name="backfill-titles")
+@click.option("--dry-run", is_flag=True, default=False, help="Show what would change without writing")
+@click.option("--results-dir", default="results", help="Results directory to scan")
+@click.option("--project", multiple=True, help="Specific project ID(s) to backfill (repeatable)")
+@click.option("--min-score", default=0.0, type=float, help="Only backfill articles with score >= this value")
+def backfill_titles(dry_run: bool, results_dir: str, project: tuple, min_score: float):
+    """Backfill missing/broken titles for existing articles.
+
+    Scans completed workflows and regenerates titles where
+    title == topic or title is empty.
+
+    Examples:
+        ai-research backfill-titles --dry-run
+        ai-research backfill-titles --project based-rollup-20260205-234500
+        ai-research backfill-titles --min-score 8.0
+    """
+    return asyncio.run(_run_backfill_titles(dry_run, results_dir, project, min_score))
+
+
+async def _run_backfill_titles(dry_run: bool, results_dir: str, project_ids: tuple, min_score: float):
+    """Backfill titles async."""
+    import json
+    from .utils.title_generator import generate_title_from_manuscript
+
+    results_path = Path(results_dir)
+    if not results_path.exists():
+        console.print(f"[red]Results directory not found: {results_path}[/red]")
+        return 1
+
+    # If specific project IDs given, only scan those
+    if project_ids:
+        project_dirs = [results_path / pid for pid in project_ids]
+        project_dirs = [p for p in project_dirs if p.is_dir()]
+        if not project_dirs:
+            console.print("[red]No matching project directories found.[/red]")
+            return 1
+    else:
+        project_dirs = sorted(p for p in results_path.iterdir() if p.is_dir())
+
+    needs_backfill = []
+
+    console.print(f"\n[bold]Scanning {len(project_dirs)} projects...[/bold]\n")
+
+    for project_dir in project_dirs:
+        workflow_file = project_dir / "workflow_complete.json"
+        if not workflow_file.exists():
+            continue
+
+        try:
+            with open(workflow_file) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            continue
+
+        topic = data.get("topic", "")
+        title = data.get("title", "")
+        score = data.get("final_score", 0)
+
+        # Filter by min_score
+        if score < min_score:
+            continue
+
+        # Needs backfill if: no title, or title == topic
+        if not title or title.strip().lower() == topic.strip().lower():
+            needs_backfill.append((project_dir, data))
+
+    if not needs_backfill:
+        console.print("[green]All articles already have proper titles.[/green]")
+        return 0
+
+    console.print(f"[yellow]Found {len(needs_backfill)} articles needing title backfill:[/yellow]\n")
+
+    # Show table of what needs updating
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("#", width=4)
+    table.add_column("Project ID", max_width=40)
+    table.add_column("Current Title/Topic")
+    table.add_column("Audience")
+    for i, (pdir, data) in enumerate(needs_backfill, 1):
+        topic = data.get("topic", "")
+        title = data.get("title", "")
+        audience = data.get("audience_level", "professional")
+        display = title if title else f"[dim](empty → topic: {topic[:40]})[/dim]"
+        table.add_row(str(i), pdir.name[:40], display, audience)
+    console.print(table)
+    console.print()
+
+    if dry_run:
+        console.print("[yellow]Dry run — no changes written.[/yellow]")
+        return 0
+
+    # Run backfill
+    success = 0
+    failed = 0
+
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+        task = progress.add_task("Backfilling titles...", total=len(needs_backfill))
+
+        for project_dir, data in needs_backfill:
+            topic = data.get("topic", "")
+            audience = data.get("audience_level", "professional")
+
+            # Find latest manuscript
+            manuscript_text = None
+            manuscript_files = sorted(project_dir.glob("manuscript_*.md"), reverse=True)
+            if not manuscript_files:
+                # Try .txt as well
+                manuscript_files = sorted(project_dir.glob("manuscript_*"), reverse=True)
+            if manuscript_files:
+                try:
+                    manuscript_text = manuscript_files[0].read_text(encoding="utf-8")
+                except Exception:
+                    pass
+
+            if not manuscript_text:
+                console.print(f"  [red]✗[/red] {project_dir.name}: no manuscript found")
+                failed += 1
+                progress.advance(task)
+                continue
+
+            try:
+                new_title = await generate_title_from_manuscript(
+                    manuscript_text, topic, audience_level=audience
+                )
+
+                if new_title and new_title.strip().lower() != topic.strip().lower():
+                    data["title"] = new_title
+                    workflow_file = project_dir / "workflow_complete.json"
+                    with open(workflow_file, "w") as f:
+                        json.dump(data, f, indent=2)
+                    console.print(f"  [green]✓[/green] {project_dir.name[:35]}: {new_title}")
+                    success += 1
+                else:
+                    console.print(f"  [yellow]~[/yellow] {project_dir.name[:35]}: generator returned topic, skipped")
+                    failed += 1
+            except Exception as e:
+                console.print(f"  [red]✗[/red] {project_dir.name[:35]}: {e}")
+                failed += 1
+
+            progress.advance(task)
+
+    console.print(f"\n[bold]Results:[/bold] {success} updated, {failed} failed/skipped")
+    return 0
 
 
 if __name__ == "__main__":

@@ -68,3 +68,6 @@ tests/results/
 benchmark_report.html
 benchmark_summary.md
 model_comparison_results_full.json
+
+# Stitch design reference files
+stitch/

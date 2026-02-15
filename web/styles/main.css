@@ -1294,6 +1294,21 @@ code {
     color: var(--text-tertiary);
 }
 
+/* Version tags */
+.meta-version {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+.meta-version-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 1px 6px;
+    background: var(--layer-01);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+}
+
 /* Hero accent */
 .hero-accent {
     font-family: var(--font-serif);

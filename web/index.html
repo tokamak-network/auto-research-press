@@ -346,6 +346,7 @@
                         <div class="card-meta">
                             <span class="meta-date-mono">${dateStr} ${timeStr}</span>
                             ${audienceText ? `<span class="meta-divider">&middot;</span><span>${audienceText}</span>` : ''}
+                            <span class="meta-divider">&middot;</span><span class="meta-version-tag">v${proj.system_version || 'legacy'}</span>
                         </div>
                         <h3 class="card-title">
                             <a href="article.html?id=${proj.id}">${proj.title || proj.topic}</a>
