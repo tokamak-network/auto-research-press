@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
@@ -25,6 +26,13 @@ from ..performance import PerformanceTracker
 from ..utils.source_retriever import SourceRetriever
 
 console = Console()
+
+_REVISION_MARKER_RE = re.compile(r'\s*\[NO CHANGES(?:\s+NEEDED)?\]')
+
+
+def _clean_manuscript_markers(text: str) -> str:
+    """Strip revision markers (e.g. [NO CHANGES NEEDED]) from manuscript headings."""
+    return _REVISION_MARKER_RE.sub('', text)
 
 
 async def generate_review(
@@ -85,6 +93,8 @@ async def generate_review(
         my_previous_review = next((r for r in previous_reviews if r.get("specialist") == specialist_id), None)
 
         if my_previous_review:
+            suggestions = my_previous_review.get('suggestions', [])
+            checklist = chr(10).join(f"  [ ] {s}" for s in suggestions)
             previous_context = f"""
 YOUR PREVIOUS REVIEW (Round {round_number-1}):
 Summary: {my_previous_review.get('summary', 'N/A')}
@@ -92,11 +102,13 @@ Summary: {my_previous_review.get('summary', 'N/A')}
 Your Previous Weaknesses Identified:
 {chr(10).join(f"- {w}" for w in my_previous_review.get('weaknesses', []))}
 
-Your Previous Suggestions:
-{chr(10).join(f"- {s}" for s in my_previous_review.get('suggestions', []))}
+SUGGESTION IMPLEMENTATION CHECKLIST — verify each:
+{checklist}
 
-IMPORTANT: Check if the issues you identified in Round {round_number-1} have been adequately addressed in this revision.
-Focus especially on whether your specific suggestions were implemented.
+For EACH suggestion above:
+- If implemented: acknowledge in strengths
+- If NOT implemented: list as a weakness and PENALIZE the completeness score
+- If partially implemented: note what is still missing
 
 ---
 """
@@ -227,8 +239,10 @@ SCORING ADJUSTMENTS (intermediate audience — APPLY THESE):
 
     if round_number > 1:
         citations_guidance = (
-            "Score using the same 1-10 criteria as Round 1. "
-            "Focus on whether previous issues were addressed.\n\n"
+            "ABSOLUTE SCORING — DO NOT anchor on improvement from previous rounds.\n"
+            "Score this manuscript AS IF you are reading it for the first time.\n"
+            "A manuscript that improved from 3/10 to adequate does NOT deserve 8/10 — "
+            "score its current absolute quality on the 1-10 scale.\n\n"
             "Citations scoring (same criteria as Round 1):\n"
             "- 9-10: All claims properly cited with verifiable, real references\n"
             "- 5-6: Some citations but gaps or dubious references\n"
@@ -779,7 +793,7 @@ class WorkflowOrchestrator:
 
             # Save the rejected manuscript
             final_path = self.output_dir / "manuscript_final.md"
-            final_path.write_text(current_manuscript)
+            final_path.write_text(_clean_manuscript_markers(current_manuscript))
 
             # Save round data for desk reject (round 0)
             round_data = {
@@ -995,7 +1009,7 @@ class WorkflowOrchestrator:
                 console.print(f"[green]Manuscript accepted after {round_num} round(s) of review![/green]\n")
 
                 final_path = self.output_dir / "manuscript_final.md"
-                final_path.write_text(current_manuscript)
+                final_path.write_text(_clean_manuscript_markers(current_manuscript))
                 console.print(f"[green]Final manuscript saved:[/green] {final_path}")
 
                 if self.status_callback:
@@ -1010,7 +1024,7 @@ class WorkflowOrchestrator:
                 console.print(f"[yellow]Final decision: {moderator_decision['decision']}[/yellow]\n")
 
                 final_path = self.output_dir / f"manuscript_final_v{round_num}.md"
-                final_path.write_text(current_manuscript)
+                final_path.write_text(_clean_manuscript_markers(current_manuscript))
                 console.print(f"[yellow]Best attempt saved:[/yellow] {final_path}")
                 break
 
@@ -1666,7 +1680,7 @@ Research Type: {self.research_type}
                 console.print(f"[green]Manuscript accepted after {round_num} round(s) of review![/green]\n")
 
                 final_path = self.output_dir / "manuscript_final.md"
-                final_path.write_text(current_manuscript)
+                final_path.write_text(_clean_manuscript_markers(current_manuscript))
                 console.print(f"[green]Final manuscript saved:[/green] {final_path}")
 
                 if self.status_callback:
@@ -1681,7 +1695,7 @@ Research Type: {self.research_type}
                 console.print(f"[yellow]Final decision: {moderator_decision['decision']}[/yellow]\n")
 
                 final_path = self.output_dir / f"manuscript_final_v{round_num}.md"
-                final_path.write_text(current_manuscript)
+                final_path.write_text(_clean_manuscript_markers(current_manuscript))
                 console.print(f"[yellow]Best attempt saved:[/yellow] {final_path}")
                 break
 

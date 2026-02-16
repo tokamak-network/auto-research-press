@@ -170,6 +170,11 @@ Return your research in JSON format:
             )
             references.append(reference)
 
+        # Filter out hallucinated references — keep only those matching verified sources
+        verified_refs: List[Reference] = context.get("verified_references", [])
+        if verified_refs:
+            references = self._filter_verified_references(references, verified_refs)
+
         contribution = ResearchContribution(
             author=self.name,
             task_id=task.id,
@@ -179,6 +184,34 @@ Return your research in JSON format:
         )
 
         return contribution
+
+    @staticmethod
+    def _filter_verified_references(
+        generated: List[Reference],
+        verified: List[Reference],
+    ) -> List[Reference]:
+        """Keep only references that match a verified source by title similarity.
+
+        Uses normalized title comparison: lowercase, stripped of punctuation,
+        checking if one is a substring of the other (handles truncation).
+        """
+        import re as _re
+
+        def _normalize(title: str) -> str:
+            return _re.sub(r'[^a-z0-9 ]', '', title.lower()).strip()
+
+        verified_titles = [_normalize(r.title) for r in verified]
+        kept = []
+        for ref in generated:
+            norm = _normalize(ref.title)
+            if not norm:
+                continue
+            for vt in verified_titles:
+                # Substring match in either direction (handles truncation)
+                if norm in vt or vt in norm:
+                    kept.append(ref)
+                    break
+        return kept
 
     async def provide_plan_feedback(
         self,

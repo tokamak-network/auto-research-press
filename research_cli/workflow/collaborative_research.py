@@ -162,6 +162,7 @@ class CollaborativeResearchPhase:
                 "hypotheses": research_notes.hypotheses,
                 "existing_findings": [f.title for f in research_notes.findings],
                 "available_references": ref_text,
+                "verified_references": self.real_references,
             }
 
             # Parallel research by coauthors
