@@ -1,7 +1,11 @@
 """Utility to repair truncated JSON strings from LLM responses."""
 
 import json
+import logging
 import re
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def repair_json(text: str) -> dict:
@@ -71,11 +75,47 @@ def repair_json(text: str) -> dict:
         if repaired is not None:
             return repaired
 
+    # Dump raw response for debugging
+    _dump_failed_response(text)
+
     raise ValueError(
         f"Could not parse or repair JSON from LLM response.\n"
         f"Response length: {len(text)}\n"
         f"Preview: {text[:300]}..."
     )
+
+
+def _dump_failed_response(text: str) -> None:
+    """Dump raw LLM response to file for debugging JSON parse failures."""
+    try:
+        dump_dir = Path("results") / "_debug_json_failures"
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        dump_file = dump_dir / f"raw_response_{ts}.txt"
+
+        # Write raw bytes info + text
+        with open(dump_file, "w", encoding="utf-8") as f:
+            f.write(f"=== JSON Parse Failure Debug Dump ===\n")
+            f.write(f"Timestamp: {ts}\n")
+            f.write(f"Response length: {len(text)}\n")
+            f.write(f"First 50 bytes (repr): {repr(text[:50])}\n")
+            f.write(f"Last 50 bytes (repr): {repr(text[-50:])}\n")
+            first_brace_pos = text.find('{')
+            last_brace_pos = text.rfind('}')
+            f.write(f"First brace found at: {first_brace_pos}\n")
+            f.write(f"Last brace found at: {last_brace_pos}\n")
+            f.write(f"Contains <think>: {'<think>' in text.lower()}\n")
+            f.write(f"Contains ```json: {'```json' in text}\n")
+            f.write(f"Non-ASCII chars: {sum(1 for c in text if ord(c) > 127)}\n")
+            f.write(f"Control chars (excl newline/tab): {sum(1 for c in text if ord(c) < 32 and c not in ('\\n', '\\r', '\\t'))}\n")
+            f.write(f"\n=== RAW RESPONSE START ===\n")
+            f.write(text)
+            f.write(f"\n=== RAW RESPONSE END ===\n")
+
+        logger.warning(f"JSON parse failure dumped to: {dump_file}")
+    except Exception as e:
+        logger.warning(f"Failed to dump debug response: {e}")
 
 
 def _repair_truncated(text: str) -> dict | None:

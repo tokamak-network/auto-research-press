@@ -105,7 +105,8 @@ Return your response in JSON format:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
         # Parse response
@@ -176,7 +177,8 @@ Return JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
         # Parse response
@@ -397,7 +399,8 @@ Return JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
         # Parse response
@@ -529,7 +532,8 @@ Return JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
         # Parse response

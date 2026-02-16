@@ -1,6 +1,5 @@
 """AI agent for composing optimal expert review teams."""
 
-import json
 from typing import List
 
 from ..model_config import create_llm_for_role, get_role_config
@@ -49,33 +48,13 @@ class TeamComposerAgent:
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,  # Allow creative team composition
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
         # Parse JSON response
-        content = response.content.strip()
-
-        # Try to extract JSON from markdown code blocks
-        import re
-        json_match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
-        if json_match:
-            content = json_match.group(1)
-        else:
-            # Fallback: find the first { and last }
-            start = content.find("{")
-            end = content.rfind("}")
-            if start != -1 and end != -1:
-                content = content[start : end + 1]
-
-        try:
-            proposals_data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Failed to parse team proposal as JSON: {e}\n"
-                f"Raw response length: {len(response.content)}\n"
-                f"Cleaned content length: {len(content)}\n"
-                f"Content preview: {content[:200]}..."
-            )
+        from ..utils.json_repair import repair_json
+        proposals_data = repair_json(response.content)
 
         # Convert to ExpertProposal objects
         proposals = []

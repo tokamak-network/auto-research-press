@@ -3,8 +3,6 @@
 from typing import List, Dict, Optional
 from datetime import datetime
 from pathlib import Path
-import json
-
 from ..model_config import create_llm_for_role
 from ..utils.json_repair import repair_json
 from ..models.research_notes import (
@@ -127,7 +125,8 @@ Take research notes now. Include 3-5 relevant sources."""
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
         # Parse JSON
@@ -199,22 +198,13 @@ Output in JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.5,
-            max_tokens=1024
+            max_tokens=1024,
+            json_mode=True
         )
 
-        content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
         try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            # Fallback
+            data = repair_json(response.content)
+        except ValueError:
             data = {
                 "implications": [],
                 "confidence": "medium",
@@ -295,7 +285,8 @@ Identify 3-5 key gaps."""
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
         data = repair_json(response.content)

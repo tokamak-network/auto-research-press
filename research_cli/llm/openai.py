@@ -55,6 +55,11 @@ class OpenAILLM(BaseLLM):
         # gpt-5 models only support temperature=1
         api_temp = 1.0 if "gpt-5" in self.model else temperature
 
+        # Support json_mode: OpenAI uses response_format
+        json_mode = kwargs.pop("json_mode", False)
+        if json_mode:
+            kwargs.setdefault("response_format", {"type": "json_object"})
+
         async def _call():
             response = await self.client.chat.completions.create(
                 model=self.model,

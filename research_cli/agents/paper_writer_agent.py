@@ -100,7 +100,8 @@ Plan 5-8 sections."""
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=3072
+            max_tokens=3072,
+            json_mode=True
         )
 
         # Parse response

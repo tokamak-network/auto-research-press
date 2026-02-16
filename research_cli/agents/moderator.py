@@ -126,7 +126,8 @@ required_changes: list specific changes if requesting revision; empty list [] if
             prompt=prompt,
             system=system_prompt,
             temperature=0.3,
-            max_tokens=1024
+            max_tokens=1024,
+            json_mode=True
         )
 
         # Parse JSON response

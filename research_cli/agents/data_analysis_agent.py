@@ -89,23 +89,14 @@ Output in JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.6,
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
-        content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
+        from ..utils.json_repair import repair_json
         try:
-            strategy = json.loads(content)
-        except json.JSONDecodeError as e:
-            # Fallback to simple strategy if parsing fails
-            print(f"Warning: JSON parse failed, using fallback strategy: {e}")
+            strategy = repair_json(response.content)
+        except ValueError:
             strategy = {
                 "data_needed": [{
                     "metric": "Research metric",
@@ -178,24 +169,12 @@ Generate at least 10-20 data points per metric."""
             prompt=prompt,
             system=system_prompt,
             temperature=0.8,
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
-        content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse data: {e}\n{content[:200]}")
-
-        return data
+        from ..utils.json_repair import repair_json
+        return repair_json(response.content)
 
     async def analyze_data(
         self,
@@ -250,22 +229,15 @@ Output as JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.5,
-            max_tokens=2048
+            max_tokens=2048,
+            json_mode=True
         )
 
-        content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
+        from ..utils.json_repair import repair_json
         try:
-            result = json.loads(content)
+            result = repair_json(response.content)
             return result.get("findings", [])
-        except json.JSONDecodeError:
+        except ValueError:
             return ["Analysis completed but parsing failed"]
 
     def create_visualizations(

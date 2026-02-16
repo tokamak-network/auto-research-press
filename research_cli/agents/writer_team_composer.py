@@ -122,7 +122,8 @@ Return JSON format:
             prompt=prompt,
             system=system_prompt,
             temperature=0.8,  # Higher temperature for creative team composition
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
         # Parse response

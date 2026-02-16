@@ -1,6 +1,5 @@
 """Desk editor agent for initial manuscript screening (desk reject)."""
 
-import json
 from ..model_config import create_llm_for_role
 
 
@@ -62,22 +61,15 @@ Respond in JSON:
             prompt=prompt,
             system=system_prompt,
             temperature=0.1,
-            max_tokens=512
+            max_tokens=512,
+            json_mode=True
         )
 
         # Parse JSON response
-        content = response.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
+        from ..utils.json_repair import repair_json
         try:
-            result = json.loads(content)
-        except json.JSONDecodeError:
+            result = repair_json(response.content)
+        except ValueError:
             # If parsing fails, default to PASS (don't block on parse errors)
             result = {
                 "decision": "PASS",

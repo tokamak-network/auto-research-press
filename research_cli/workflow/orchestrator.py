@@ -321,16 +321,24 @@ Provide your review in the following JSON format:
 Penalize: unsupported claims, fabricated citations. Reward: inline [1], [2] citations, real DOIs/URLs."""
 
     tracker.start_operation(f"review_{specialist_id}")
+
     response = await llm.generate(
         prompt=review_prompt,
         system=specialist["system_prompt"],
         temperature=0.3,
-        max_tokens=4096
+        max_tokens=4096,
+        json_mode=True
     )
     duration = tracker.end_operation(f"review_{specialist_id}")
     tracker.record_reviewer_time(specialist_id, duration)
 
     # Parse JSON (with truncation repair)
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    _log.debug(
+        f"Reviewer {specialist_id} raw response: len={len(response.content)}, "
+        f"first_100={repr(response.content[:100])}"
+    )
     review_data = repair_json(response.content)
     scores = review_data["scores"]
     average = sum(scores.values()) / len(scores)

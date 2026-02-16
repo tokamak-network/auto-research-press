@@ -130,7 +130,8 @@ Create the complete research plan now."""
             prompt=prompt,
             system=system_prompt,
             temperature=0.7,
-            max_tokens=4096
+            max_tokens=4096,
+            json_mode=True
         )
 
         # Parse JSON response

@@ -49,6 +49,9 @@ class ClaudeLLM(BaseLLM):
         """
         messages = [{"role": "user", "content": prompt}]
 
+        # Pop json_mode if passed (not natively supported by Claude API)
+        kwargs.pop("json_mode", None)
+
         async def _call():
             response = await self.client.messages.create(
                 model=self.model,

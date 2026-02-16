@@ -60,6 +60,11 @@ class GeminiLLM(BaseLLM):
         if any(v in self.model for v in ("2.5", "3-pro", "3-flash")):
             effective_max_tokens = max(max_tokens * 8, 8192)
 
+        # Support json_mode parameter: force valid JSON output
+        json_mode = kwargs.pop("json_mode", False)
+        if json_mode:
+            kwargs.setdefault("response_mime_type", "application/json")
+
         generation_config = genai.GenerationConfig(
             temperature=temperature,
             max_output_tokens=effective_max_tokens,
