@@ -31,6 +31,22 @@ _AUDIENCE_GUIDANCE = {
 }
 
 
+def _truncate_topic(topic: str, max_chars: int = 120) -> str:
+    """Extract a display-friendly title from a potentially long topic prompt.
+
+    Takes the first sentence or line, whichever is shorter, and truncates
+    to max_chars so it works as a readable page title.
+    """
+    # Take first line only
+    first_line = topic.split('\n')[0].strip()
+    # Take first sentence if there's a period
+    if '. ' in first_line:
+        first_line = first_line.split('. ')[0] + '.'
+    if len(first_line) > max_chars:
+        first_line = first_line[:max_chars].rsplit(' ', 1)[0] + '…'
+    return first_line
+
+
 async def generate_title_from_manuscript(
     manuscript_text: str,
     original_topic: str,
@@ -99,7 +115,7 @@ Respond with ONLY the title text on a single line. No quotes, no explanation, no
                 f"Title length out of range ({len(title)} chars): {title!r}, "
                 f"using original topic"
             )
-            return original_topic
+            return _truncate_topic(original_topic)
 
         # Reject if title is identical to original topic
         if title.strip().lower() == original_topic.strip().lower():
@@ -107,10 +123,10 @@ Respond with ONLY the title text on a single line. No quotes, no explanation, no
                 f"Generated title identical to topic: {title!r}, "
                 f"using original topic (title generator did not differentiate)"
             )
-            return original_topic
+            return _truncate_topic(original_topic)
 
         return title
 
     except Exception as e:
         logger.warning(f"Title generation failed: {e}, using original topic")
-        return original_topic
+        return _truncate_topic(original_topic)
