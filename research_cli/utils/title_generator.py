@@ -31,6 +31,27 @@ _AUDIENCE_GUIDANCE = {
 }
 
 
+def _extract_heading_title(manuscript_text: str) -> str | None:
+    """Try to extract a usable English title from manuscript headings.
+
+    Looks for the first ## heading that isn't a structural label
+    (TL;DR, Introduction, Abstract, References, etc.).
+    Returns None if no suitable heading is found.
+    """
+    _SKIP = {'tl;dr', 'tldr', 'introduction', 'abstract', 'references',
+             'conclusion', 'acknowledgments', 'appendix', 'bibliography'}
+    for line in manuscript_text.split('\n'):
+        line = line.strip()
+        match = re.match(r'^#{1,2}\s+(.+)', line)
+        if match:
+            heading = match.group(1).strip().strip('*').strip()
+            # Strip "Introduction: " prefix to get the real title
+            heading = re.sub(r'^Introduction:\s*', '', heading, flags=re.IGNORECASE)
+            if heading.lower().rstrip(':') not in _SKIP and len(heading) >= 15:
+                return heading
+    return None
+
+
 def _truncate_topic(topic: str, max_chars: int = 120) -> str:
     """Extract a display-friendly title from a potentially long topic prompt.
 
@@ -113,20 +134,27 @@ Respond with ONLY the title text on a single line. No quotes, no explanation, no
         if len(title) < 15 or len(title) > 200:
             logger.warning(
                 f"Title length out of range ({len(title)} chars): {title!r}, "
-                f"using original topic"
+                f"falling back"
             )
-            return _truncate_topic(original_topic)
+            return _fallback_title(manuscript_text, original_topic)
 
         # Reject if title is identical to original topic
         if title.strip().lower() == original_topic.strip().lower():
             logger.warning(
-                f"Generated title identical to topic: {title!r}, "
-                f"using original topic (title generator did not differentiate)"
+                f"Generated title identical to topic, falling back"
             )
-            return _truncate_topic(original_topic)
+            return _fallback_title(manuscript_text, original_topic)
 
         return title
 
     except Exception as e:
-        logger.warning(f"Title generation failed: {e}, using original topic")
-        return _truncate_topic(original_topic)
+        logger.warning(f"Title generation failed: {e}, falling back")
+        return _fallback_title(manuscript_text, original_topic)
+
+
+def _fallback_title(manuscript_text: str, original_topic: str) -> str:
+    """Best-effort fallback: try manuscript heading, then truncated topic."""
+    heading = _extract_heading_title(manuscript_text)
+    if heading:
+        return heading
+    return _truncate_topic(original_topic)
