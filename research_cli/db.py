@@ -1,6 +1,8 @@
 """SQLite database management for researcher applications and API keys."""
 
+import hashlib
 import json
+import os
 import secrets
 import sqlite3
 import threading
@@ -133,9 +135,36 @@ def init_db():
     """)
     conn.commit()
 
+    # Migration: add total_quota column
+    try:
+        conn.execute("ALTER TABLE api_keys ADD COLUMN total_quota INTEGER DEFAULT 3")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Migration: add password_hash column
+    try:
+        conn.execute("ALTER TABLE researchers ADD COLUMN password_hash TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _hash_password(password: str) -> str:
+    """Hash password with random salt using SHA-256."""
+    salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"{salt}:{hashed}"
+
+
+def _verify_password(password: str, password_hash: str) -> bool:
+    """Verify password against stored hash."""
+    salt, hashed = password_hash.split(":", 1)
+    return hashlib.sha256((salt + password).encode()).hexdigest() == hashed
 
 
 # --- Researcher ---
@@ -147,17 +176,19 @@ def create_researcher(
     research_interests: list = None,
     sample_works: list = None,
     bio: str = "",
+    password: str = "",
 ) -> dict:
     """Create a researcher profile and an associated application."""
     conn = get_connection()
     researcher_id = secrets.token_urlsafe(12)
     application_id = secrets.token_urlsafe(12)
     now = _now()
+    pw_hash = _hash_password(password) if password else ""
 
     try:
         conn.execute(
-            """INSERT INTO researchers (id, email, name, affiliation, research_interests, sample_works, bio, created_at, updated_at, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')""",
+            """INSERT INTO researchers (id, email, name, affiliation, research_interests, sample_works, bio, created_at, updated_at, status, password_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
             (
                 researcher_id,
                 email.lower().strip(),
@@ -168,6 +199,7 @@ def create_researcher(
                 bio.strip(),
                 now,
                 now,
+                pw_hash,
             ),
         )
         conn.execute(
@@ -209,6 +241,28 @@ def get_researcher(researcher_id: str) -> Optional[dict]:
     if not row:
         return None
     return _row_to_dict(row)
+
+
+def authenticate_researcher(email: str, password: str) -> Optional[dict]:
+    """Verify email+password, return researcher info + api_key if valid."""
+    conn = get_connection()
+    researcher = get_researcher_by_email(email)
+    if not researcher or not researcher.get("password_hash"):
+        return None
+    if not _verify_password(password, researcher["password_hash"]):
+        return None
+    # Get active API key
+    key_row = conn.execute(
+        "SELECT key FROM api_keys WHERE researcher_id=? AND revoked_at IS NULL LIMIT 1",
+        (researcher["id"],),
+    ).fetchone()
+    if not key_row:
+        return None
+    return {
+        "api_key": key_row["key"],
+        "name": researcher["name"],
+        "email": researcher["email"],
+    }
 
 
 # --- Applications ---
@@ -274,8 +328,8 @@ def approve_application(application_id: str, reviewed_by: str = "admin", admin_n
         (now, app["researcher_id"]),
     )
     conn.execute(
-        """INSERT INTO api_keys (key, researcher_id, label, created_at, daily_quota, is_admin)
-           VALUES (?, ?, ?, ?, 10, FALSE)""",
+        """INSERT INTO api_keys (key, researcher_id, label, created_at, daily_quota, total_quota, is_admin)
+           VALUES (?, ?, ?, ?, 10, 3, FALSE)""",
         (api_key, app["researcher_id"], f"{app['name']} - auto", now),
     )
     conn.commit()
@@ -325,7 +379,7 @@ def list_api_keys() -> list:
     """List all API keys (for admin)."""
     conn = get_connection()
     rows = conn.execute("""
-        SELECT k.key, k.label, k.created_at, k.revoked_at, k.daily_quota, k.is_admin, k.researcher_id,
+        SELECT k.key, k.label, k.created_at, k.revoked_at, k.daily_quota, k.total_quota, k.is_admin, k.researcher_id,
                r.name, r.email
         FROM api_keys k
         LEFT JOIN researchers r ON k.researcher_id = r.id
@@ -347,12 +401,12 @@ def revoke_api_key(key_prefix: str, reason: str = "") -> int:
     return cursor.rowcount
 
 
-def update_key_quota(key_prefix: str, daily_quota: int) -> int:
-    """Update daily quota for keys matching prefix."""
+def update_key_quota(key_prefix: str, total_quota: int) -> int:
+    """Update total quota for keys matching prefix."""
     conn = get_connection()
     cursor = conn.execute(
-        "UPDATE api_keys SET daily_quota=? WHERE key LIKE ? AND revoked_at IS NULL",
-        (daily_quota, key_prefix + "%"),
+        "UPDATE api_keys SET total_quota=? WHERE key LIKE ? AND revoked_at IS NULL",
+        (total_quota, key_prefix + "%"),
     )
     conn.commit()
     return cursor.rowcount
@@ -410,17 +464,27 @@ def get_daily_usage(api_key: str) -> int:
     return row["cnt"] if row else 0
 
 
+def get_total_usage(api_key: str) -> int:
+    """Count total workflow usage (all time) for a key."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM key_usage WHERE api_key=? AND endpoint='/api/start-workflow'",
+        (api_key,),
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
 def check_quota(api_key: str) -> dict:
-    """Check if a key has remaining quota. Returns {allowed, used, limit}."""
+    """Check if a key has remaining total quota. Returns {allowed, used, limit}."""
     key_info = get_api_key(api_key)
     if not key_info:
         return {"allowed": False, "used": 0, "limit": 0, "reason": "Invalid key"}
-    daily_limit = key_info["daily_quota"]
-    used = get_daily_usage(api_key)
+    total_limit = key_info.get("total_quota") or 3
+    used = get_total_usage(api_key)
     return {
-        "allowed": used < daily_limit,
+        "allowed": used < total_limit,
         "used": used,
-        "limit": daily_limit,
+        "limit": total_limit,
     }
 
 

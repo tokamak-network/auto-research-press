@@ -1319,22 +1319,25 @@
                     <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Research Queue</p>
                 </div>
-                <button class="theme-toggle" aria-label="Toggle dark mode">
-                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div id="auth-nav" style="display:flex;align-items:center;gap:0.75rem;"></div>
+                    <button class="theme-toggle" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -1345,26 +1348,12 @@
             <p>Monitor the status of all research report generation workflows</p>
         </div>
 
-        <!-- Admin / API Key -->
+        <!-- Admin actions -->
         <div class="admin-bar" style="display:flex;align-items:center;gap:0.75rem;">
-            <button class="admin-toggle" id="admin-toggle" onclick="toggleApiKeyBar()">
-                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a4 4 0 0 0-4 4v3H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V5a4 4 0 0 0-4-4zm2 7H6V5a2 2 0 1 1 4 0v3z"/></svg>
-                Admin
-                <span id="auth-badge" class="auth-badge">Authenticated</span>
-                <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 5.427a.75.75 0 0 1 1.06-.073L8 7.585l2.513-2.231a.75.75 0 1 1 .997 1.122l-3 2.662a.75.75 0 0 1-.997 0l-3-2.662a.75.75 0 0 1-.086-1.049z"/></svg>
-            </button>
             <button class="upload-btn" id="upload-report-btn" onclick="openUploadModal()">
                 <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H2.75z"/><path d="M8.75 8.311V14a.75.75 0 0 1-1.5 0V8.311L5.28 10.28a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25a.749.749 0 1 1-1.06 1.06L8.75 8.311z"/></svg>
                 Upload Report
             </button>
-        </div>
-        <div id="api-key-panel" class="api-key-panel">
-            <div class="api-key-bar">
-                <label for="api-key">API Key</label>
-                <input type="password" id="api-key" placeholder="Enter your API key">
-                <button class="btn btn-secondary" onclick="saveApiKey()">Save</button>
-                <span id="api-key-status" class="api-key-status"></span>
-            </div>
         </div>
 
         <div class="auto-refresh">
@@ -1502,6 +1491,7 @@
     </footer>
 
     <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         const API_BASE = '';
         let autoRefreshInterval = null;
@@ -1526,31 +1516,10 @@
         // Store categorized workflows for rendering
         let cachedTabs = { active: [], completed: [], rejected: [] };
 
-        // --- API Key helpers ---
-        function getApiKey() {
-            return localStorage.getItem('research_api_key') || '';
-        }
-        function toggleApiKeyBar() {
-            const panel = document.getElementById('api-key-panel');
-            const toggle = document.getElementById('admin-toggle');
-            const isOpen = panel.classList.toggle('open');
-            toggle.classList.toggle('expanded', isOpen);
-        }
-        function updateAuthBadge() {
-            const badge = document.getElementById('auth-badge');
-            badge.classList.toggle('visible', !!getApiKey());
-        }
-        function saveApiKey() {
-            const key = document.getElementById('api-key').value.trim();
-            localStorage.setItem('research_api_key', key);
-            document.getElementById('api-key-status').textContent = key ? 'Saved' : 'Cleared';
-            setTimeout(() => document.getElementById('api-key-status').textContent = '', 2000);
-            updateAuthBadge();
-            checkAdmin().then(() => loadWorkflows());
-        }
+        // --- API Key helpers (uses auth.js) ---
         function apiHeaders() {
-            const headers = {};
-            const key = getApiKey();
+            var headers = {};
+            var key = getApiKey();
             if (key) headers['X-API-Key'] = key;
             return headers;
         }
@@ -1901,14 +1870,8 @@
             }
         }
 
-        // Load saved key on page load
+        // Load on page load
         document.addEventListener('DOMContentLoaded', async () => {
-            const saved = getApiKey();
-            if (saved) {
-                document.getElementById('api-key').value = saved;
-                document.getElementById('api-key-status').textContent = 'Loaded from saved';
-            }
-            updateAuthBadge();
             initTabs();
             initSearch();
             await checkAdmin();

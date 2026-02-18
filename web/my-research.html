@@ -341,10 +341,7 @@
                 </a>
             </nav>
             <div class="sidebar-footer">
-                <div class="sidebar-auth">
-                    <label for="api-key-input">API Key</label>
-                    <input type="password" id="api-key-input" placeholder="Paste your API key">
-                    <button class="btn btn-primary" onclick="loadDashboard()">Load Dashboard</button>
+                <div class="sidebar-auth" id="sidebar-auth-info" style="font-size: var(--type-scale-01); color: var(--text-secondary);">
                     <div id="auth-status"></div>
                 </div>
                 <div style="padding: 8px 0 0 0;">
@@ -398,17 +395,7 @@
             </div>
 
             <div class="dashboard-content">
-                <!-- Mobile Auth (shown on mobile where sidebar is hidden) -->
-                <div class="auth-section" style="display:none;" id="mobile-auth">
-                    <h2 style="margin:0 0 12px 0; font-size: var(--type-scale-03);">Enter API Key</h2>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="password" id="api-key-input-mobile" placeholder="Paste your API key" style="flex:1;padding:8px;border:1px solid var(--border-subtle);border-radius:2px;background:var(--background);color:var(--text-primary);font-family:var(--font-mono);font-size:var(--type-scale-01);">
-                        <button class="btn btn-primary" onclick="loadDashboardMobile()">Load</button>
-                    </div>
-                    <div id="auth-status-mobile" style="font-size:var(--type-scale-01);margin-top:4px;"></div>
-                </div>
-
-                <!-- Dashboard (shown after auth) -->
+                <!-- Dashboard -->
                 <div id="dashboard">
                     <!-- Stats Row -->
                     <div class="dashboard-stats" id="dashboard-stats">
@@ -478,36 +465,23 @@
     </div>
 
     <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
     <script>
-        let apiKey = '';
-
-        // Show mobile auth on small screens
-        if (window.innerWidth <= 768) {
-            const mobileAuth = document.getElementById('mobile-auth');
-            if (mobileAuth) mobileAuth.style.display = 'block';
-        }
-
         function getHeaders() {
-            return { 'Content-Type': 'application/json', 'X-API-Key': apiKey };
-        }
-
-        function loadDashboardMobile() {
-            apiKey = document.getElementById('api-key-input-mobile').value.trim();
-            document.getElementById('api-key-input').value = apiKey;
-            loadDashboard();
+            return getAuthHeaders();
         }
 
         async function loadDashboard() {
-            apiKey = document.getElementById('api-key-input').value.trim();
-            const statusEl = document.getElementById('auth-status');
+            var key = getApiKey();
+            var statusEl = document.getElementById('auth-status');
 
-            if (!apiKey) {
+            if (!key) {
                 statusEl.className = 'status-err';
-                statusEl.textContent = 'Please enter your API key.';
+                statusEl.innerHTML = 'Not logged in. <a href="login.html" style="color:var(--link-primary);">Log in</a> to view your dashboard.';
                 return;
             }
 
-            statusEl.textContent = 'Verifying...';
+            statusEl.textContent = 'Loading...';
             statusEl.className = '';
 
             try {
@@ -709,6 +683,16 @@
             div.textContent = text || '';
             return div.innerHTML;
         }
+
+        // Auto-load dashboard on page load if authenticated
+        document.addEventListener('DOMContentLoaded', function() {
+            var auth = getAuth();
+            var infoEl = document.getElementById('sidebar-auth-info');
+            if (auth) {
+                if (infoEl) infoEl.innerHTML = '<span style="font-weight:600;">' + escapeHtml(auth.name) + '</span><br><button onclick="logout()" style="background:none;border:none;color:var(--link-primary);cursor:pointer;padding:0;font-size:inherit;font-family:inherit;margin-top:4px;">Logout</button>';
+                loadDashboard();
+            }
+        });
     </script>
 </body>
 </html>

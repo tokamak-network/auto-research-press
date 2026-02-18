@@ -463,18 +463,21 @@
                     <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Submit Manuscript</p>
                 </div>
-                <button class="theme-toggle" aria-label="Toggle dark mode">
-                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div id="auth-nav" style="display:flex;align-items:center;gap:0.75rem;"></div>
+                    <button class="theme-toggle" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -510,20 +513,9 @@
             </div>
         </div>
 
-        <!-- Step 1: API Key -->
-        <div id="step-auth" class="form-section">
-            <h2><span class="step-badge">1</span> Authentication</h2>
-            <div class="form-group">
-                <label for="api-key">API Key</label>
-                <input type="password" id="api-key" placeholder="Enter your API key">
-                <p class="help-text">Your API key is stored locally and never sent to third parties.</p>
-            </div>
-            <div id="auth-status" style="font-size: 0.8125rem;"></div>
-        </div>
-
-        <!-- Step 2: Metadata -->
+        <!-- Step 1: Metadata -->
         <div id="step-meta" class="form-section">
-            <h2><span class="step-badge">2</span> Manuscript Details</h2>
+            <h2><span class="step-badge">1</span> Manuscript Details</h2>
             <div class="form-group">
                 <label for="ms-title">Title</label>
                 <input type="text" id="ms-title" placeholder="Full title of your manuscript">
@@ -545,9 +537,9 @@
             </div>
         </div>
 
-        <!-- Step 3: Manuscript Content -->
+        <!-- Step 2: Manuscript Content -->
         <div id="step-content" class="form-section">
-            <h2><span class="step-badge">3</span> Manuscript Content</h2>
+            <h2><span class="step-badge">2</span> Manuscript Content</h2>
 
             <!-- File upload -->
             <div class="file-upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
@@ -573,9 +565,9 @@
             <div id="word-count-warning" class="word-count-warning">Manuscript exceeds 50,000 word limit. Please shorten your manuscript before submitting.</div>
         </div>
 
-        <!-- Step 4: Revision Info -->
+        <!-- Step 3: Revision Info -->
         <div id="step-deadline" class="form-section">
-            <h2><span class="step-badge">4</span> Revision Policy</h2>
+            <h2><span class="step-badge">3</span> Revision Policy</h2>
             <div class="info-box">
                 If revisions are requested, you must resubmit within <strong>24 hours</strong>.
                 Failure to resubmit in time will result in automatic expiration.
@@ -644,6 +636,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
     <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         // --- Categories (same as ask-topic.html) ---
         const ACADEMIC_CATEGORIES = {
@@ -662,10 +655,6 @@
 
         // --- Init ---
         function init() {
-            // Load saved API key
-            const savedKey = localStorage.getItem('research_api_key') || '';
-            if (savedKey) document.getElementById('api-key').value = savedKey;
-
             // Populate category dropdowns
             const majorSelect = document.getElementById('major-field');
             for (const [key, data] of Object.entries(ACADEMIC_CATEGORIES)) {
@@ -693,12 +682,9 @@
             setupDragDrop();
         }
 
-        function getApiKey() { return document.getElementById('api-key').value.trim(); }
+        // Uses auth.js: getApiKey(), getAuthHeaders()
         function apiHeaders() {
-            const h = { 'Content-Type': 'application/json' };
-            const k = getApiKey();
-            if (k) h['X-API-Key'] = k;
-            return h;
+            return getAuthHeaders();
         }
 
         // --- Category dropdowns ---
@@ -827,7 +813,6 @@
 
         // --- Submit ---
         async function submitManuscript() {
-            const apiKey = getApiKey();
             const title = document.getElementById('ms-title').value.trim();
             const content = document.getElementById('ms-content').value;
             const major = document.getElementById('major-field').value;
@@ -837,16 +822,13 @@
 
             errorDiv.style.display = 'none';
 
-            if (!apiKey) { showError(errorDiv, 'Please enter your API key.'); return; }
+            if (!getApiKey()) { showError(errorDiv, 'Not authenticated. Please <a href="login.html" style="color:inherit;text-decoration:underline;">log in</a> first.'); return; }
             if (!title) { showError(errorDiv, 'Please enter a title.'); return; }
             if (!major || !subfield) { showError(errorDiv, 'Please select both major field and subfield.'); return; }
 
             const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
             if (wordCount < 500) { showError(errorDiv, `Manuscript too short (${wordCount} words). Minimum 500 words.`); return; }
             if (wordCount > MAX_WORDS) { showError(errorDiv, `Manuscript too long (${wordCount} words). Maximum ${MAX_WORDS.toLocaleString()} words.`); return; }
-
-            // Save API key
-            localStorage.setItem('research_api_key', apiKey);
 
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
@@ -935,7 +917,7 @@
 
         // --- Status display ---
         function hideWizardSteps() {
-            ['step-guidelines', 'step-auth', 'step-meta', 'step-content', 'step-deadline', 'step-submit'].forEach(id => {
+            ['step-guidelines', 'step-meta', 'step-content', 'step-deadline', 'step-submit'].forEach(id => {
                 document.getElementById(id).classList.add('step-hidden');
             });
         }

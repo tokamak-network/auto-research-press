@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apply for API Key | Autonomous Research Press</title>
-    <meta name="description" content="Apply for an API key to submit research to Autonomous Research Press">
+    <title>Sign Up | Autonomous Research Press</title>
+    <meta name="description" content="Create a researcher account on Autonomous Research Press">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Apply for API Key — Autonomous Research Press">
-    <meta property="og:description" content="Apply for researcher access to Autonomous Research Press">
+    <meta property="og:title" content="Sign Up — Autonomous Research Press">
+    <meta property="og:description" content="Create your researcher account on Autonomous Research Press">
     <meta property="og:image" content="https://ar-press.com/images/og-cover.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://ar-press.com/images/og-cover.png">
@@ -414,25 +414,28 @@
                     <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Researcher Application</p>
                 </div>
-                <button class="theme-toggle" aria-label="Toggle dark mode">
-                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div id="auth-nav" style="display:flex;align-items:center;gap:0.75rem;"></div>
+                    <button class="theme-toggle" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="apply-container">
-        <h1 class="page-title">Apply for API Access</h1>
-        <p class="page-subtitle">Submit your researcher profile and sample works to request an API key for publishing research.</p>
+        <h1 class="page-title">Sign Up</h1>
+        <p class="page-subtitle">Create your researcher account to start publishing research.</p>
 
         <!-- Result banners -->
         <div id="success-banner" class="result-banner success">
@@ -454,8 +457,14 @@
 
                 <div class="form-group">
                     <label class="required">Email</label>
-                    <div class="hint">Used for application status updates and key delivery</div>
+                    <div class="hint">Used for login and application status updates</div>
                     <input type="email" id="email" required placeholder="jane.smith@university.edu">
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Password</label>
+                    <div class="hint">At least 6 characters. Used to log in to your account.</div>
+                    <input type="password" id="password" required minlength="6" placeholder="Choose a password">
                 </div>
 
                 <div class="form-group">
@@ -490,6 +499,10 @@
             <button type="submit" class="btn btn-primary" id="submit-btn">Submit Application</button>
         </form>
 
+        <p style="text-align: center; font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Already have an account? <a href="login.html" style="color: var(--link-primary); text-decoration: none;">Log in</a>
+        </p>
+
         <!-- Status Check -->
         <div class="status-section" style="margin-top: 2rem;">
             <h2>Check Application Status</h2>
@@ -509,6 +522,7 @@
     </footer>
 
     <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         // Tags input
         const interestsContainer = document.getElementById('interests-container');
@@ -597,6 +611,7 @@
             const payload = {
                 name: document.getElementById('name').value.trim(),
                 email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value,
                 affiliation: document.getElementById('affiliation').value.trim(),
                 research_interests: interests,
                 sample_works: sampleWorks.map(w => ({ type: w.type, url: w.url, description: w.description })).filter(w => w.url),
@@ -612,7 +627,17 @@
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.detail || 'Submission failed');
 
-                showSuccess('Application submitted successfully! Check your status below using your email address.');
+                if (data.api_key) {
+                    // Auto-approved: save auth and show welcome
+                    setAuth({ api_key: data.api_key, name: data.name || payload.name, email: data.email || payload.email });
+                    const banner = document.getElementById('success-banner');
+                    document.getElementById('success-message').innerHTML =
+                        '<strong>Welcome!</strong> Your account has been created and you are now logged in.<br>' +
+                        '<a href="ask-topic.html" style="display:inline-block;margin-top:0.75rem;padding:0.5rem 1rem;background:var(--primary-600);color:white;text-decoration:none;font-weight:600;font-size:0.875rem;">Go to Research Dashboard</a>';
+                    banner.style.display = 'block';
+                } else {
+                    showSuccess('Application submitted successfully! Check your status below using your email address.');
+                }
                 document.getElementById('apply-form').reset();
                 interests = [];
                 sampleWorks = [];

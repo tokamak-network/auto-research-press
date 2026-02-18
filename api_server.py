@@ -742,7 +742,7 @@ async def start_workflow(request: StartWorkflowRequest, api_key: str = Depends(v
             if not quota["allowed"]:
                 raise HTTPException(
                     status_code=429,
-                    detail=f"Daily quota exceeded ({quota['used']}/{quota['limit']}). Try again tomorrow."
+                    detail=f"Quota exceeded ({quota['used']}/{quota['limit']} papers used). Contact admin for more."
                 )
 
     try:
@@ -1947,10 +1947,13 @@ async def delete_workflow(project_id: str, api_key: str = Depends(verify_admin_k
     if results_path.exists():
         shutil.rmtree(results_path)
 
-    # Remove article HTML
+    # Remove article HTML and markdown source
     article_path = Path(f"web/articles/{project_id}.html")
     if article_path.exists():
         article_path.unlink()
+    md_path = Path(f"web/articles/{project_id}.md")
+    if md_path.exists():
+        md_path.unlink()
 
     # Remove from index.json
     index_path = Path("web/data/index.json")
@@ -1977,18 +1980,20 @@ async def delete_workflow(project_id: str, api_key: str = Depends(verify_admin_k
 async def list_keys(api_key: str = Depends(verify_admin_key)):
     """List all API keys (admin only)."""
     keys = appdb.list_api_keys()
-    return {"keys": [
-        {
+    result = []
+    for entry in keys:
+        total_used = appdb.get_total_usage(entry["key"]) if not entry.get("revoked_at") else 0
+        result.append({
             "key_prefix": entry["key"][:8] + "...",
             "label": entry.get("label", ""),
             "created": entry.get("created_at", ""),
             "revoked": entry.get("revoked_at"),
-            "daily_quota": entry.get("daily_quota", 10),
+            "total_quota": entry.get("total_quota") or 3,
+            "total_used": total_used,
             "researcher_name": entry.get("name"),
             "researcher_email": entry.get("email"),
-        }
-        for entry in keys
-    ]}
+        })
+    return {"keys": result}
 
 
 class CreateKeyRequest(BaseModel):
@@ -2164,11 +2169,13 @@ async def submit_article(request: SubmitArticleRequest, api_key: str = Depends(v
 </body>
 </html>'''
 
-        # Save article HTML
+        # Save article HTML + markdown source
         articles_dir = Path("web/articles")
         articles_dir.mkdir(parents=True, exist_ok=True)
         article_path = articles_dir / f"{project_id}.html"
         article_path.write_text(html, encoding="utf-8")
+        md_path = articles_dir / f"{project_id}.md"
+        md_path.write_text(request.content, encoding="utf-8")
 
         # Update index.json
         index_path = Path("web/data/index.json")
@@ -2704,10 +2711,16 @@ APPLY_RATE_LIMIT_PER_HOUR = 3
 class ApplyRequest(BaseModel):
     name: str
     email: str
+    password: str = ""
     affiliation: str = ""
     research_interests: List[str] = []
     sample_works: List[dict] = []  # [{type, url, description}]
     bio: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class ApplicationStatusRequest(BaseModel):
@@ -2744,6 +2757,10 @@ async def apply_for_key(request: Request, body: ApplyRequest):
     if "@" not in body.email or "." not in body.email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Invalid email format")
 
+    # Validate password if provided
+    if body.password and len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
     # Validate sample work URLs
     for work in body.sample_works:
         url = work.get("url", "")
@@ -2758,14 +2775,41 @@ async def apply_for_key(request: Request, body: ApplyRequest):
             research_interests=body.research_interests,
             sample_works=body.sample_works,
             bio=body.bio,
+            password=body.password,
         )
+
+        # Auto-approve: immediately generate API key
+        approval = appdb.approve_application(
+            result["application_id"],
+            reviewed_by="auto",
+            admin_notes="Auto-approved on signup",
+        )
+
         return {
-            "status": "submitted",
-            "message": "Application submitted successfully. You will be notified once reviewed.",
+            "status": "approved",
+            "message": "Welcome! Your API key has been generated.",
+            "name": body.name.strip(),
             "email": result["email"],
+            "api_key": approval["api_key"],
+            "total_quota": 3,
         }
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.post("/api/login")
+async def login(body: LoginRequest):
+    """Authenticate with email + password, return API key + profile info."""
+    if not body.email or not body.password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    result = appdb.authenticate_researcher(body.email, body.password)
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {
+        "api_key": result["api_key"],
+        "name": result["name"],
+        "email": result["email"],
+    }
 
 
 @app.get("/api/application-status/{email}")
@@ -2815,7 +2859,7 @@ async def get_my_workflows(api_key: str = Depends(verify_api_key)):
 
 @app.get("/api/my-quota")
 async def get_my_quota(api_key: str = Depends(verify_api_key)):
-    """Get remaining daily quota for the authenticated key."""
+    """Get remaining total quota for the authenticated key."""
     quota = appdb.check_quota(api_key)
     return quota
 
@@ -2865,15 +2909,19 @@ async def reject_application(application_id: str, body: RejectRequest, api_key: 
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class UpdateQuotaRequest(BaseModel):
+    total_quota: int
+
+
 @app.put("/api/admin/keys/{key_prefix}/quota")
-async def update_key_quota(key_prefix: str, daily_quota: int, api_key: str = Depends(verify_admin_key)):
-    """Update daily quota for a key (admin only)."""
-    if daily_quota < 0 or daily_quota > 1000:
+async def update_key_quota(key_prefix: str, body: UpdateQuotaRequest, api_key: str = Depends(verify_admin_key)):
+    """Update total quota for a key (admin only)."""
+    if body.total_quota < 0 or body.total_quota > 1000:
         raise HTTPException(status_code=400, detail="Quota must be between 0 and 1000")
-    updated = appdb.update_key_quota(key_prefix, daily_quota)
+    updated = appdb.update_key_quota(key_prefix, body.total_quota)
     if not updated:
         raise HTTPException(status_code=404, detail="No active key found with this prefix")
-    return {"message": f"Quota updated to {daily_quota}", "updated": updated}
+    return {"message": f"Quota updated to {body.total_quota}", "updated": updated}
 
 
 @app.post("/api/admin/keys/{key_prefix}/revoke")
@@ -2883,6 +2931,226 @@ async def revoke_key(key_prefix: str, api_key: str = Depends(verify_admin_key)):
     if not revoked:
         raise HTTPException(status_code=404, detail="No active key found with this prefix")
     return {"message": "Key revoked", "revoked": revoked}
+
+
+# --- Admin: Article Management ---
+
+@app.get("/api/admin/articles")
+async def list_articles(api_key: str = Depends(verify_admin_key)):
+    """List all published articles (admin only)."""
+    index_path = Path("web/data/index.json")
+    if not index_path.exists():
+        return {"articles": []}
+    with open(index_path) as f:
+        data = json.load(f)
+    return {"articles": data.get("projects", [])}
+
+
+@app.get("/api/admin/articles/{project_id}")
+async def get_article_source(project_id: str, api_key: str = Depends(verify_admin_key)):
+    """Get article markdown source (admin only)."""
+    # 1. Check for .md file first
+    md_path = Path(f"web/articles/{project_id}.md")
+    if md_path.exists():
+        return {"project_id": project_id, "content": md_path.read_text(encoding="utf-8"), "format": "markdown"}
+
+    # 2. Extract from HTML
+    html_path = Path(f"web/articles/{project_id}.html")
+    if not html_path.exists():
+        raise HTTPException(404, "Article not found")
+
+    html = html_path.read_text(encoding="utf-8")
+    match = re.search(r'const (?:rawM|m)arkdown = `(.*?)`;', html, re.DOTALL)
+    if match:
+        content = match.group(1).replace('\\\\', '\\').replace('\\`', '`').replace('\\${', '${')
+        return {"project_id": project_id, "content": content, "format": "extracted"}
+
+    return {"project_id": project_id, "content": "", "format": "unavailable"}
+
+
+class UpdateArticleRequest(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None  # Markdown
+    author: Optional[str] = None
+
+
+@app.put("/api/admin/articles/{project_id}")
+async def update_article(project_id: str, body: UpdateArticleRequest, api_key: str = Depends(verify_admin_key)):
+    """Update article content and/or metadata (admin only)."""
+    index_path = Path("web/data/index.json")
+    if not index_path.exists():
+        raise HTTPException(404, "No articles index found")
+
+    with open(index_path) as f:
+        index_data = json.load(f)
+
+    # Find existing entry
+    entry = next((p for p in index_data.get("projects", []) if p.get("id") == project_id), None)
+    if not entry:
+        raise HTTPException(404, "Article not found in index")
+
+    # Update content if provided
+    if body.content is not None:
+        md_path = Path(f"web/articles/{project_id}.md")
+        md_path.write_text(body.content, encoding="utf-8")
+        _regenerate_article_html(
+            project_id,
+            title=body.title or entry.get("topic", project_id),
+            content=body.content,
+            author=body.author or entry.get("author", "Anonymous"),
+        )
+
+    # Update index.json metadata
+    if body.title:
+        entry["topic"] = body.title
+    if body.author:
+        entry["author"] = body.author
+    index_data["updated_at"] = datetime.now().isoformat()
+
+    with open(index_path, "w") as f:
+        json.dump(index_data, f, indent=2)
+
+    return {"status": "updated", "project_id": project_id}
+
+
+def _regenerate_article_html(project_id: str, title: str, content: str, author: str = "Anonymous"):
+    """Regenerate article HTML from markdown content."""
+    # Escape markdown for JS embedding
+    escaped_markdown = (
+        content
+        .replace('\\', '\\\\')
+        .replace('`', '\\`')
+        .replace('${', '\\${')
+    )
+
+    # Extract headings for TOC
+    headings = []
+    for line in content.split('\n'):
+        match = re.match(r'^##\s+(.+)', line)
+        if match:
+            heading_title = match.group(1).strip()
+            slug = re.sub(r'[^\w\s-]', '', heading_title.lower()).replace(' ', '-')
+            headings.append({"title": heading_title, "slug": slug})
+
+    toc_items = '\n'.join([
+        f'                        <li><a href="#{h["slug"]}">{h["title"]}</a></li>'
+        for h in headings[:10]
+    ])
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} | Autonomous Research Press</title>
+    <meta name="description" content="{title}">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link rel="stylesheet" href="../styles/article.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="header-nav">
+                <a href="../index.html" class="back-link">
+                    <svg viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    Back to Research
+                </a>
+                <div class="header-content">
+                    <h1 class="site-title">Autonomous Research Press</h1>
+                    <p class="site-subtitle">Autonomous Research Platform</p>
+                </div>
+                <button class="theme-toggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+    <main class="article-layout">
+        <aside class="toc-sidebar">
+            <div class="toc-sticky">
+                <h3 class="toc-title">On This Page</h3>
+                <nav class="toc-nav">
+                    <ul>
+{toc_items}
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        <article class="research-report">
+            <header class="article-header">
+                <h1 class="article-title">{title}</h1>
+                <div class="article-meta">
+                    <span class="meta-item"><strong>Author:</strong> {author}</span>
+                    <span class="meta-item"><strong>Date:</strong> {datetime.now().strftime("%Y-%m-%d")}</span>
+                </div>
+            </header>
+            <div id="article-content"></div>
+        </article>
+    </main>
+    <footer class="site-footer">
+        <div class="container">
+            <p><strong>Platform:</strong> Autonomous Research Press</p>
+            <p class="copyright">2026 Autonomous Research Press. All rights reserved.</p>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
+    <script src="../js/main.js"></script>
+    <script>
+        const rawMarkdown = `{escaped_markdown}`;
+        const mathBlocks = [];
+        let protectedContent = rawMarkdown
+            .replace(/\\$\\$[\\s\\S]+?\\$\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }})
+            .replace(/\\$(?!\\$)([^\\$\\n]+?)\\$/g, match => {{
+                mathBlocks.push(match);
+                return `%%MATH_BLOCK_${{mathBlocks.length - 1}}%%`;
+            }});
+        let htmlContent = marked.parse(protectedContent);
+        mathBlocks.forEach((block, i) => {{
+            htmlContent = htmlContent.replace(`%%MATH_BLOCK_${{i}}%%`, block);
+        }});
+        document.getElementById('article-content').innerHTML = htmlContent;
+        function renderMath() {{
+            if (window.renderMathInElement) {{
+                renderMathInElement(document.getElementById('article-content'), {{
+                    delimiters: [
+                        {{left: '$$', right: '$$', display: true}},
+                        {{left: '$', right: '$', display: false}},
+                        {{left: '\\\\(', right: '\\\\)', display: false}},
+                        {{left: '\\\\[', right: '\\\\]', display: true}}
+                    ],
+                    throwOnError: false
+                }});
+            }} else {{
+                setTimeout(renderMath, 100);
+            }}
+        }}
+        renderMath();
+    </script>
+</body>
+</html>'''
+
+    articles_dir = Path("web/articles")
+    articles_dir.mkdir(parents=True, exist_ok=True)
+    article_path = articles_dir / f"{project_id}.html"
+    article_path.write_text(html, encoding="utf-8")
 
 
 # --- Report Download & Upload ---

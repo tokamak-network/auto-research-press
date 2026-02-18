@@ -667,35 +667,30 @@
                     <h1 class="site-title">Autonomous Research Press</h1>
                     <p class="site-subtitle">Ask a New Research</p>
                 </div>
-                <button class="theme-toggle" aria-label="Toggle dark mode">
-                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div id="auth-nav" style="display:flex;align-items:center;gap:0.75rem;"></div>
+                    <button class="theme-toggle" aria-label="Toggle dark mode">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="ask-topic-container">
-        <!-- API Key -->
-        <div class="form-section" style="margin-bottom: 1rem; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem;">
-            <label for="api-key" style="font-weight: 600; white-space: nowrap;">API Key</label>
-            <input type="password" id="api-key" placeholder="Enter your API key"
-                   style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 2px; background: var(--background); color: var(--text); font-size: 0.875rem;">
-            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.5rem 0.75rem;" onclick="saveApiKey()">Save</button>
-            <span id="api-key-status" style="font-size: 0.75rem; color: var(--text-secondary);"></span>
-        </div>
         <div id="rate-limit-warning" class="error-box" style="margin-bottom: 1rem;"></div>
 
         <!-- Step 1: Topic & Category -->
@@ -977,6 +972,7 @@
     </footer>
 
     <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
     <script>
         const API_BASE = '';
 
@@ -997,25 +993,13 @@
         }
         loadSystemVersion();
 
-        // --- API Key helpers ---
-        function getApiKey() {
-            return localStorage.getItem('research_api_key') || '';
-        }
-        function saveApiKey() {
-            const key = document.getElementById('api-key').value.trim();
-            localStorage.setItem('research_api_key', key);
-            document.getElementById('api-key-status').textContent = key ? 'Saved' : 'Cleared';
-            setTimeout(() => document.getElementById('api-key-status').textContent = '', 2000);
-        }
+        // --- API Key helpers (uses auth.js) ---
         function apiHeaders() {
-            const headers = { 'Content-Type': 'application/json' };
-            const key = getApiKey();
-            if (key) headers['X-API-Key'] = key;
-            return headers;
+            return getAuthHeaders();
         }
         function handleApiError(response, errorDiv) {
             if (response.status === 403) {
-                errorDiv.textContent = 'Invalid or missing API key. Please enter a valid key above.';
+                errorDiv.innerHTML = 'Not authenticated. Please <a href="login.html" style="color:inherit;text-decoration:underline;">log in</a> first.';
                 errorDiv.style.display = 'block';
                 return true;
             }
@@ -1029,14 +1013,6 @@
             }
             return false;
         }
-        // Load saved key on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const saved = getApiKey();
-            if (saved) {
-                document.getElementById('api-key').value = saved;
-                document.getElementById('api-key-status').textContent = 'Loaded from saved';
-            }
-        });
 
         // Academic categories (loaded from backend or defined here)
         const ACADEMIC_CATEGORIES = {
