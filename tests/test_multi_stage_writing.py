@@ -2,7 +2,16 @@
 """Test multi-stage writing process."""
 
 import asyncio
+import os
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("GOOGLE_API_KEY"),
+    reason="API keys not set",
+)
+
 from rich.console import Console
 from rich.table import Table
 
@@ -14,7 +23,11 @@ from research_cli.models.section import WritingContext
 console = Console()
 
 
-async def test_multi_stage_writing():
+def test_multi_stage_writing():
+    asyncio.get_event_loop().run_until_complete(_test_multi_stage_writing())
+
+
+async def _test_multi_stage_writing():
     """Test complete multi-stage writing workflow."""
 
     topic = "Ethereum EIP-4844 Proto-Danksharding"

@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""Quick test script to verify basic setup."""
+"""Quick test script to verify basic setup.
+
+Run directly: python tests/test_setup.py
+"""
 
 import asyncio
+import os
 import sys
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="ANTHROPIC_API_KEY not set",
+)
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -12,7 +23,11 @@ from research_cli.config import Config
 from research_cli.llm import ClaudeLLM
 
 
-async def test_basic_setup():
+def test_basic_setup():
+    asyncio.get_event_loop().run_until_complete(_test_basic_setup())
+
+
+async def _test_basic_setup():
     """Test that basic infrastructure works."""
     print("Testing AI Research Setup...")
     print("-" * 50)

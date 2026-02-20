@@ -2,10 +2,24 @@
 """Test script to resume workflow from checkpoint."""
 
 import asyncio
+import os
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("GOOGLE_API_KEY"),
+    reason="API keys not set",
+)
+
 from research_cli.workflow.orchestrator import WorkflowOrchestrator
 
-async def test_resume():
+
+def test_resume():
+    asyncio.get_event_loop().run_until_complete(_test_resume())
+
+
+async def _test_resume():
     """Resume workflow from checkpoint."""
     output_dir = Path("results/quantum-computing-in-drug-discovery")
 

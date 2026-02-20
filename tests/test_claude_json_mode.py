@@ -21,16 +21,15 @@ def claude_llm():
     return ClaudeLLM(api_key=api_key, model="claude-haiku-4-5")
 
 
-@pytest.mark.asyncio
-async def test_claude_json_mode_no_crash(claude_llm):
+def test_claude_json_mode_no_crash(claude_llm):
     """json_mode=True must not raise — Claude silently ignores it."""
-    response = await claude_llm.generate(
+    response = asyncio.get_event_loop().run_until_complete(claude_llm.generate(
         prompt='Return JSON: {"status": "ok"}',
         system="Respond with only valid JSON, no markdown.",
         temperature=0.0,
         max_tokens=32,
         json_mode=True,
-    )
+    ))
     assert response.content.strip()
     # Claude doesn't have native json_mode, so it may wrap in ```json.
     # In production repair_json handles this. Here just verify no crash

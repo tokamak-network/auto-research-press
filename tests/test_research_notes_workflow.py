@@ -2,7 +2,16 @@
 """Test research notes → paper writing workflow."""
 
 import asyncio
+import os
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("GOOGLE_API_KEY"),
+    reason="API keys not set",
+)
+
 from rich.console import Console
 from rich.panel import Panel
 
@@ -14,7 +23,11 @@ from research_cli.agents.integration_editor import IntegrationEditorAgent
 console = Console()
 
 
-async def test_research_notes_workflow():
+def test_research_notes_workflow():
+    asyncio.get_event_loop().run_until_complete(_test_research_notes_workflow())
+
+
+async def _test_research_notes_workflow():
     """Test complete research notes to paper workflow."""
 
     topic = "Ethereum EIP-4844 Blob Transaction Economics"

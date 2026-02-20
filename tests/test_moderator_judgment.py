@@ -3,11 +3,24 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("GOOGLE_API_KEY"),
+    reason="API keys not set",
+)
+
 from research_cli.agents.moderator import ModeratorAgent
 
 
-async def test_moderator_on_existing_data():
+def test_moderator_on_existing_data():
+    asyncio.get_event_loop().run_until_complete(_test_moderator_on_existing_data())
+
+
+async def _test_moderator_on_existing_data():
     """Test moderator on best performing historical project."""
 
     # Load best project data (Research Report - 7.9 score)

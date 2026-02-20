@@ -3,12 +3,22 @@
 
 Verifies that streaming generation returns a valid LLMResponse
 with content, token counts, and stop_reason — matching generate().
+
+Run directly: python tests/test_gemini_streaming.py
 """
 
 import asyncio
+import os
 import sys
 import warnings
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("GOOGLE_API_KEY"),
+    reason="GOOGLE_API_KEY not set",
+)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -21,15 +31,15 @@ from research_cli.llm.base import LLMResponse
 
 
 MODELS_TO_TEST = [
-    ("google", "gemini-3-flash-preview"),
-    ("google", "gemini-3-pro-preview"),
+    ("google", "gemini-2.5-pro"),
+    ("google", "gemini-2.5-flash"),
 ]
 
 PROMPT = "Explain what a blockchain is in exactly 3 sentences."
 SYSTEM = "You are a concise technical writer."
 
 
-async def test_generate_streaming(provider: str, model: str) -> dict:
+async def _test_generate_streaming(provider: str, model: str) -> dict:
     """Test generate_streaming for one model."""
     llm = _create_llm(provider, model)
     result = {"model": model, "provider": provider}
@@ -98,7 +108,7 @@ async def main():
 
     for provider, model in MODELS_TO_TEST:
         print(f"\n--- Testing {model} ---")
-        result = await test_generate_streaming(provider, model)
+        result = await _test_generate_streaming(provider, model)
 
         # Print results
         if result.get("streaming_ok"):
@@ -152,6 +162,15 @@ async def main():
     print("=" * 70)
 
     return 0 if all_passed else 1
+
+
+@pytest.mark.parametrize("provider,model", MODELS_TO_TEST)
+def test_generate_streaming(provider, model):
+    """Pytest-compatible wrapper for streaming test."""
+    result = asyncio.get_event_loop().run_until_complete(
+        _test_generate_streaming(provider, model)
+    )
+    assert result.get("streaming_ok"), result.get("streaming_error", "streaming failed")
 
 
 if __name__ == "__main__":

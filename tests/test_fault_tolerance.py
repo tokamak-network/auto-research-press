@@ -27,8 +27,10 @@ import pytest
 class TestReviewerPartialFailure:
     """Test that run_review_round handles individual reviewer failures."""
 
-    @pytest.mark.asyncio
-    async def test_one_reviewer_fails_others_continue(self):
+    def test_one_reviewer_fails_others_continue(self):
+        asyncio.get_event_loop().run_until_complete(self._test_one_reviewer_fails_others_continue())
+
+    async def _test_one_reviewer_fails_others_continue(self):
         """When 1 of 3 reviewers fails, the other 2 results are kept."""
         from research_cli.workflow.orchestrator import (
             _build_on_leave_review,
@@ -78,8 +80,10 @@ class TestReviewerPartialFailure:
         avg = sum(r["average"] for r in active) / len(active)
         assert abs(avg - 7.0) < 0.01  # (7.2 + 6.8) / 2
 
-    @pytest.mark.asyncio
-    async def test_all_reviewers_fail_raises(self):
+    def test_all_reviewers_fail_raises(self):
+        asyncio.get_event_loop().run_until_complete(self._test_all_reviewers_fail_raises())
+
+    async def _test_all_reviewers_fail_raises(self):
         """When all reviewers fail, RuntimeError is raised."""
         from research_cli.workflow.orchestrator import _build_on_leave_review
 
@@ -104,8 +108,10 @@ class TestReviewerPartialFailure:
 class TestCoauthorPartialFailure:
     """Test _conduct_parallel_research with partial failures."""
 
-    @pytest.mark.asyncio
-    async def test_one_coauthor_fails(self):
+    def test_one_coauthor_fails(self):
+        asyncio.get_event_loop().run_until_complete(self._test_one_coauthor_fails())
+
+    async def _test_one_coauthor_fails(self):
         from research_cli.workflow.collaborative_research import CollaborativeResearchPhase
 
         phase = object.__new__(CollaborativeResearchPhase)
@@ -137,8 +143,10 @@ class TestCoauthorPartialFailure:
         assert len(contribs) == 1
         assert contribs[0].author == "ca1"
 
-    @pytest.mark.asyncio
-    async def test_all_coauthors_fail_raises(self):
+    def test_all_coauthors_fail_raises(self):
+        asyncio.get_event_loop().run_until_complete(self._test_all_coauthors_fail_raises())
+
+    async def _test_all_coauthors_fail_raises(self):
         from research_cli.workflow.collaborative_research import CollaborativeResearchPhase
 
         phase = object.__new__(CollaborativeResearchPhase)

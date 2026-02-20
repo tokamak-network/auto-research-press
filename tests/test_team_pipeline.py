@@ -52,7 +52,6 @@ def _valid_major_subfield(major: str, subfield: str) -> bool:
 class TestCategoryDetection:
     """LLM-based category detection for diverse topics."""
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("topic", TOPICS, ids=[
         "transformer_attention",
         "climate_ocean",
@@ -60,8 +59,9 @@ class TestCategoryDetection:
         "defi_risk",
         "quantum_crypto",
     ])
-    async def test_category_returns_valid_major_subfield(self, topic: str):
-        result = await suggest_category_llm(topic)
+    def test_category_returns_valid_major_subfield(self, topic: str):
+        import asyncio
+        result = asyncio.get_event_loop().run_until_complete(suggest_category_llm(topic))
         assert "major" in result, f"Missing 'major' key for topic: {topic}"
         assert "subfield" in result, f"Missing 'subfield' key for topic: {topic}"
         assert _valid_major_subfield(result["major"], result["subfield"]), (
@@ -72,7 +72,6 @@ class TestCategoryDetection:
 class TestReviewerGeneration:
     """LLM-based reviewer generation for diverse topics."""
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("topic", TOPICS, ids=[
         "transformer_attention",
         "climate_ocean",
@@ -80,9 +79,12 @@ class TestReviewerGeneration:
         "defi_risk",
         "quantum_crypto",
     ])
-    async def test_generates_3_unique_reviewers(self, topic: str):
-        category = await suggest_category_llm(topic)
-        reviewers = await _generate_reviewers_from_category(category, topic)
+    def test_generates_3_unique_reviewers(self, topic: str):
+        import asyncio
+        async def _run():
+            category = await suggest_category_llm(topic)
+            return await _generate_reviewers_from_category(category, topic)
+        reviewers = asyncio.get_event_loop().run_until_complete(_run())
 
         assert len(reviewers) == 3, f"Expected 3 reviewers, got {len(reviewers)}"
 
@@ -100,7 +102,6 @@ class TestReviewerGeneration:
 class TestTeamComposition:
     """LLM-based co-author team proposal for diverse topics."""
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("topic", TOPICS, ids=[
         "transformer_attention",
         "climate_ocean",
@@ -108,9 +109,10 @@ class TestTeamComposition:
         "defi_risk",
         "quantum_crypto",
     ])
-    async def test_proposes_3_coauthors(self, topic: str):
+    def test_proposes_3_coauthors(self, topic: str):
+        import asyncio
         composer = TeamComposerAgent()
-        proposals = await composer.propose_team(topic, num_experts=3)
+        proposals = asyncio.get_event_loop().run_until_complete(composer.propose_team(topic, num_experts=3))
 
         assert len(proposals) >= 3, f"Expected >=3 proposals, got {len(proposals)}"
 

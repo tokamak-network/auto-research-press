@@ -21,8 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 # ── Gemini thinking-token multiplier ─────────────────────────────────────────
 
 class TestGeminiThinkingTokenMultiplier:
-    """All Gemini methods that set effective_max_tokens must use the same
-    model-check condition as generate() — i.e. ("2.5", "3-pro", "3-flash").
+    """The centralized _build_config() method must apply the thinking-token
+    multiplier for all thinking models (2.5, 3-pro, 3-flash) via the
+    _is_thinking_model property.
     """
 
     @pytest.fixture(scope="class")
@@ -30,47 +31,51 @@ class TestGeminiThinkingTokenMultiplier:
         path = ROOT / "research_cli" / "llm" / "gemini.py"
         return path.read_text(encoding="utf-8")
 
-    def _extract_thinking_conditions(self, source: str) -> list[dict]:
-        """Find all `if ...self.model...` guards before effective_max_tokens assignment."""
-        pattern = re.compile(
-            r'effective_max_tokens\s*=\s*max_tokens\s*\n'
-            r'\s+if (.+?):\s*\n'
-            r'\s+effective_max_tokens\s*=',
-            re.MULTILINE,
+    def test_build_config_has_thinking_guard(self, gemini_source):
+        """_build_config() must have effective_max_tokens guard using _is_thinking_model."""
+        assert "_is_thinking_model" in gemini_source, (
+            "_is_thinking_model property not found in gemini.py"
         )
-        results = []
-        for m in pattern.finditer(source):
-            line_num = source[:m.start()].count("\n") + 1
-            results.append({"line": line_num, "condition": m.group(1).strip()})
-        return results
-
-    def test_all_methods_have_thinking_guard(self, gemini_source):
-        """generate(), generate_streaming(), and stream() must all have the guard."""
-        conditions = self._extract_thinking_conditions(gemini_source)
-        assert len(conditions) >= 3, (
-            f"Expected at least 3 thinking-token guards (generate, generate_streaming, stream), "
-            f"found {len(conditions)}: {conditions}"
+        assert "effective_max_tokens" in gemini_source, (
+            "effective_max_tokens not found in gemini.py"
+        )
+        # The guard should be in _build_config, used by all generate methods
+        assert "_build_config" in gemini_source, (
+            "_build_config method not found — thinking guard should be centralized"
         )
 
-    def test_all_conditions_are_identical(self, gemini_source):
-        """Every thinking-token guard must use the same model-check condition."""
-        conditions = self._extract_thinking_conditions(gemini_source)
-        unique = set(c["condition"] for c in conditions)
-        assert len(unique) == 1, (
-            f"Thinking-token conditions are inconsistent across methods:\n"
-            + "\n".join(f"  line {c['line']}: {c['condition']}" for c in conditions)
+    def test_is_thinking_model_checks_all_variants(self, gemini_source):
+        """_is_thinking_model property must check for 2.5, 3-pro, 3-flash."""
+        # Extract the _is_thinking_model property body
+        import re
+        match = re.search(
+            r'def _is_thinking_model\(self\).*?return (.+)',
+            gemini_source, re.DOTALL
         )
+        assert match, "_is_thinking_model property not found"
+        body = match.group(1)
+        for variant in ("2.5", "3-pro", "3-flash"):
+            assert variant in body, (
+                f'_is_thinking_model missing check for "{variant}": {body}'
+            )
 
-    @pytest.mark.parametrize("model_substring", ["2.5", "3-pro", "3-flash"])
-    def test_condition_includes_model(self, gemini_source, model_substring):
-        """The condition must check for each thinking model family."""
-        conditions = self._extract_thinking_conditions(gemini_source)
-        assert conditions, "No thinking-token conditions found"
-        condition_text = conditions[0]["condition"]
-        assert f'"{model_substring}"' in condition_text, (
-            f'Thinking-token condition missing check for "{model_substring}":\n'
-            f"  {condition_text}"
+    def test_all_generate_methods_use_build_config(self, gemini_source):
+        """generate(), generate_streaming(), and stream() must call _build_config."""
+        import re
+        methods = re.findall(r'async def (generate|generate_streaming|stream)\(', gemini_source)
+        assert len(methods) >= 3, (
+            f"Expected at least 3 generate methods, found: {methods}"
         )
+        # Each should call _build_config
+        for method_name in ("generate", "generate_streaming", "stream"):
+            # Find the method body and check it calls _build_config
+            pattern = rf'async def {method_name}\(.*?\n(.*?)(?=\n    async def |\nclass |\Z)'
+            match = re.search(pattern, gemini_source, re.DOTALL)
+            assert match, f"Method {method_name} not found"
+            assert "_build_config" in match.group(1), (
+                f"Method {method_name}() does not call _build_config — "
+                "thinking guard bypass risk"
+            )
 
     @pytest.mark.parametrize("model_name,should_multiply", [
         ("gemini-2.5-flash", True),
@@ -81,9 +86,7 @@ class TestGeminiThinkingTokenMultiplier:
         ("gemini-1.5-pro", False),
     ])
     def test_multiplier_applied_correctly(self, model_name, should_multiply):
-        """Instantiate GeminiLLM (without API key) and verify multiplier logic."""
-        # We can't instantiate GeminiLLM without a valid key (it calls genai.configure),
-        # so we test the condition logic directly.
+        """Verify thinking model detection logic matches expected models."""
         condition_variants = ("2.5", "3-pro", "3-flash")
         matches = any(v in model_name for v in condition_variants)
         assert matches == should_multiply, (

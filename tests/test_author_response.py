@@ -3,11 +3,24 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("GOOGLE_API_KEY"),
+    reason="API keys not set",
+)
+
 from research_cli.agents.writer import WriterAgent
 
 
-async def test_author_response_generation():
+def test_author_response_generation():
+    asyncio.get_event_loop().run_until_complete(_test_author_response_generation())
+
+
+async def _test_author_response_generation():
     """Test author response generation on historical review data."""
 
     # Load historical review data
