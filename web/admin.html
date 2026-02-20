@@ -921,8 +921,8 @@
                                     <td><span class="app-status ${a.passed ? 'approved' : 'rejected'}">${escapeHtml(a.final_decision || a.status || '-')}</span></td>
                                     <td>${a.timestamp ? new Date(a.timestamp).toLocaleDateString() : '-'}</td>
                                     <td style="white-space: nowrap;">
-                                        <button class="btn btn-secondary btn-sm" onclick="editArticle('${escapeHtml(a.id).replace(/'/g, "\\'")}', '${escapeHtml((a.topic || '').replace(/'/g, "\\'"))}')">Edit</button>
-                                        <button class="btn btn-danger btn-sm" onclick="deleteArticle('${escapeHtml(a.id).replace(/'/g, "\\'")}')">Delete</button>
+                                        <button class="btn btn-secondary btn-sm" data-id="${escapeHtml(a.id)}" data-topic="${escapeHtml(a.topic || '')}" onclick="editArticle(this.dataset.id, this.dataset.topic)">Edit</button>
+                                        <button class="btn btn-danger btn-sm" data-id="${escapeHtml(a.id)}" onclick="deleteArticle(this.dataset.id)">Delete</button>
                                     </td>
                                 </tr>
                             `).join('')}
