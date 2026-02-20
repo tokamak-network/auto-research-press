@@ -2975,13 +2975,22 @@ async def update_site_settings(body: SiteSettingsRequest, api_key: str = Depends
 
 @app.get("/api/admin/articles")
 async def list_articles(api_key: str = Depends(verify_admin_key)):
-    """List all published articles (admin only)."""
-    index_path = Path("web/data/index.json")
-    if not index_path.exists():
+    """List all articles (admin only). Reads from results/ directory (same
+    source as /api/projects) so newly completed workflows appear immediately."""
+    results_dir = Path("results")
+    if not results_dir.exists():
         return {"articles": []}
-    with open(index_path) as f:
-        data = json.load(f)
-    return {"articles": data.get("projects", [])}
+
+    articles = []
+    for project_dir in results_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+        summary = _build_project_summary(project_dir)
+        if summary:
+            articles.append(summary)
+
+    articles.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return {"articles": articles}
 
 
 @app.get("/api/admin/articles/{project_id}")
