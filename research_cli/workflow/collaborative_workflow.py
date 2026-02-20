@@ -106,13 +106,20 @@ class CollaborativeWorkflowOrchestrator:
         if self.status_callback:
             self.status_callback("research", 0, "Phase 1: Collaborative research in progress...")
 
+        category_dict = {"major": self.major_field, "subfield": self.subfield}
+        if self.secondary_major:
+            category_dict["secondary_major"] = self.secondary_major
+        if self.secondary_subfield:
+            category_dict["secondary_subfield"] = self.secondary_subfield
+
         research_phase = CollaborativeResearchPhase(
             topic=self.topic,
             category=self.category,
             writer_team=self.writer_team,
             output_dir=self.output_dir,
             research_cycles=self.research_cycles,
-            status_callback=self.status_callback
+            status_callback=self.status_callback,
+            category_dict=category_dict,
         )
 
         research_notes = await research_phase.run()
@@ -145,8 +152,10 @@ class CollaborativeWorkflowOrchestrator:
         manuscript_text = manuscript.content
         if manuscript.abstract:
             # Determine summary heading based on audience level
-            if self.audience_level in ("beginner", "intermediate"):
+            if self.audience_level == "beginner":
                 summary_heading = "## TL;DR"
+            elif self.audience_level == "intermediate":
+                summary_heading = "## Executive Summary"
             else:
                 summary_heading = "## Abstract"
             manuscript_text = f"{summary_heading}\n\n{manuscript.abstract}\n\n---\n\n{manuscript.content}"
@@ -183,6 +192,9 @@ class CollaborativeWorkflowOrchestrator:
 
         # Pass co-author agents so they can provide revision notes during peer review
         review_workflow.coauthor_agents = writing_phase.coauthor_agents
+
+        # Connect verified sources so citation verification + revision can use them
+        review_workflow.sources = research_notes.references
 
         # Run review workflow with pre-written manuscript
         review_result = await review_workflow.run(

@@ -589,6 +589,133 @@ def _build_auto_accept_decision(
     }
 
 
+def _strip_ghost_citations(manuscript: str, verified_refs: List[Reference]) -> str:
+    """Remove fabricated citations from a revised manuscript.
+
+    Compares each entry in the ## References section against the verified
+    source list.  Entries that cannot be matched (by normalized title) are
+    removed, and inline ``[N]`` markers are cleaned up and renumbered so
+    there are no gaps.
+
+    Args:
+        manuscript: Full manuscript text (may contain ``## References`` section)
+        verified_refs: The known-good references from the research phase
+
+    Returns:
+        Manuscript with ghost citations stripped and remaining citations renumbered
+    """
+    if not verified_refs:
+        return manuscript
+
+    # Build set of normalised verified titles for fast lookup
+    from ..utils.normalize_ref import normalize_title
+
+    verified_titles = {normalize_title(r.title) for r in verified_refs}
+    # Also include DOI-based lookup
+    verified_dois = set()
+    for r in verified_refs:
+        if r.doi:
+            verified_dois.add(r.doi.lower().strip())
+
+    # Split manuscript at references heading
+    ref_pattern = re.compile(r'^(#{1,3}\s*References)\s*$', re.MULTILINE)
+    match = ref_pattern.search(manuscript)
+    if not match:
+        return manuscript
+
+    body = manuscript[:match.start()]
+    ref_heading = match.group(1)
+    ref_block = manuscript[match.end():]
+
+    # Parse individual reference entries (lines starting with [N])
+    ref_line_re = re.compile(r'^\s*\[(\d+)\]\s*(.+)', re.MULTILINE)
+    entries = list(ref_line_re.finditer(ref_block))
+    if not entries:
+        return manuscript
+
+    # Determine which entries are verified
+    kept_old_ids: list[int] = []     # old IDs that survive
+    removed_old_ids: set[int] = set()
+
+    for entry_match in entries:
+        old_id = int(entry_match.group(1))
+        entry_text = entry_match.group(2).strip()
+
+        # Try to match against verified refs
+        is_verified = False
+
+        # Check DOI presence in entry text
+        doi_match = re.search(r'10\.\d{4,9}/[^\s\]]+', entry_text)
+        if doi_match:
+            doi_candidate = doi_match.group(0).lower().rstrip('.')
+            if doi_candidate in verified_dois:
+                is_verified = True
+
+        # Check title match — extract quoted title if present
+        if not is_verified:
+            title_match = re.search(r'"([^"]+)"', entry_text)
+            if title_match:
+                norm = normalize_title(title_match.group(1))
+                if norm and norm in verified_titles:
+                    is_verified = True
+
+        # Fallback: try normalising the whole entry text as a title
+        if not is_verified:
+            # Take text before first URL or DOI as title candidate
+            text_before_url = re.split(r'https?://|doi\.org', entry_text)[0]
+            # Remove author prefix (everything before the first period after a year or a quote)
+            for candidate in re.split(r'[.]\s+', text_before_url):
+                norm = normalize_title(candidate)
+                if norm and len(norm) > 10 and norm in verified_titles:
+                    is_verified = True
+                    break
+
+        if is_verified:
+            kept_old_ids.append(old_id)
+        else:
+            removed_old_ids.add(old_id)
+
+    if not removed_old_ids:
+        return manuscript
+
+    # Build old→new ID mapping (sequential, no gaps)
+    old_to_new: dict[int, int] = {}
+    for new_id, old_id in enumerate(kept_old_ids, start=1):
+        old_to_new[old_id] = new_id
+
+    # Rebuild references block — keep only verified entries with new IDs
+    new_ref_lines: list[str] = []
+    for entry_match in entries:
+        old_id = int(entry_match.group(1))
+        if old_id in removed_old_ids:
+            continue
+        new_id = old_to_new[old_id]
+        entry_text = entry_match.group(2).strip()
+        new_ref_lines.append(f"[{new_id}] {entry_text}")
+
+    # Rewrite inline citations in body
+    def _replace_inline(m: re.Match) -> str:
+        old_id = int(m.group(1))
+        if old_id in removed_old_ids:
+            return ""  # remove ghost inline citation
+        new_id = old_to_new.get(old_id)
+        if new_id is None:
+            return ""
+        return f"[{new_id}]"
+
+    new_body = re.sub(r'\[(\d+)\]', _replace_inline, body)
+    # Clean up double-spaces or trailing spaces from removed inline citations
+    new_body = re.sub(r'  +', ' ', new_body)
+    # Clean up empty parenthetical citation groups like "( )" or "(, )"
+    new_body = re.sub(r'\(\s*[,\s]*\)', '', new_body)
+
+    # Reassemble
+    new_refs = "\n".join(new_ref_lines)
+    result = f"{new_body.rstrip()}\n\n{ref_heading}\n\n{new_refs}\n"
+
+    return result
+
+
 class WorkflowOrchestrator:
     """Orchestrates the full research peer review workflow."""
 
@@ -1076,6 +1203,10 @@ class WorkflowOrchestrator:
                 self.tracker.record_revision(**self.writer.get_last_token_usage())
                 progress.update(task, completed=True)
 
+            # Strip ghost citations introduced during revision
+            if self.sources:
+                revised_manuscript = _strip_ghost_citations(revised_manuscript, self.sources)
+
             new_word_count = len(revised_manuscript.split())
             word_change = new_word_count - len(current_manuscript.split())
             console.print(f"[green]✓ Revision complete[/green]")
@@ -1143,7 +1274,7 @@ class WorkflowOrchestrator:
         with self._spinner("[cyan]Retrieving sources...") as progress:
             task = progress.add_task("[cyan]Retrieving sources (OpenAlex, arXiv, ...)...", total=None)
             retriever = SourceRetriever()
-            self.sources = await retriever.search_all(self.topic)
+            self.sources = await retriever.search_all(self.topic, category=self.category)
             progress.update(task, completed=True)
 
         if self.sources:
@@ -1476,6 +1607,10 @@ Research Type: {self.research_type}
                     self.tracker.record_revision(**self.writer.get_last_token_usage())
                     progress.update(task, completed=True)
 
+                # Strip ghost citations introduced during revision
+                if self.sources:
+                    revised_manuscript = _strip_ghost_citations(revised_manuscript, self.sources)
+
                 new_word_count = len(revised_manuscript.split())
                 console.print(f"[green]✓ Revision complete[/green] — {new_word_count:,} words")
 
@@ -1746,6 +1881,10 @@ Research Type: {self.research_type}
                 self.tracker.record_revision_time(revision_time)
                 self.tracker.record_revision(**self.writer.get_last_token_usage())
                 progress.update(task, completed=True)
+
+            # Strip ghost citations introduced during revision
+            if self.sources:
+                revised_manuscript = _strip_ghost_citations(revised_manuscript, self.sources)
 
             new_word_count = len(revised_manuscript.split())
             word_change = new_word_count - len(current_manuscript.split())

@@ -36,7 +36,8 @@ class CollaborativeResearchPhase:
         writer_team: WriterTeam,
         output_dir: Path,
         research_cycles: int = 1,
-        status_callback: Optional[Callable] = None
+        status_callback: Optional[Callable] = None,
+        category_dict: Optional[dict] = None,
     ):
         """Initialize research phase.
 
@@ -47,6 +48,7 @@ class CollaborativeResearchPhase:
             output_dir: Output directory
             research_cycles: Number of research note iterations (default 1)
             status_callback: Optional callback for status updates
+            category_dict: Optional dict with 'major' and 'subfield' for domain-aware source search
         """
         self.topic = topic
         self.category = category
@@ -54,6 +56,7 @@ class CollaborativeResearchPhase:
         self.output_dir = output_dir
         self.research_cycles = research_cycles
         self.status_callback = status_callback
+        self.category_dict = category_dict
 
         # Initialize agents
         lead = writer_team.lead_author
@@ -94,7 +97,9 @@ class CollaborativeResearchPhase:
         self.timer.step("source_retrieval")
         retriever = SourceRetriever()
         try:
-            self.real_references = await retriever.search_all(self.topic)
+            self.real_references = await retriever.search_all(
+                self.topic, category=self.category_dict
+            )
             console.print(f"  ✓ {len(self.real_references)} real references retrieved\n")
         except Exception as e:
             console.print(f"  [yellow]⚠ Source retrieval failed: {e}[/yellow]")
@@ -267,16 +272,19 @@ class CollaborativeResearchPhase:
         """Integrate co-author contributions into research notes."""
 
         for contrib in contributions:
-            # Assign reference IDs and add to notes
+            # Build old_id → actual_id map (dedup via add_reference)
+            id_map: Dict[int, int] = {}
             for ref in contrib.references:
+                old_id = ref.id
                 ref.id = notes.get_next_reference_id()
-                notes.add_reference(ref)
+                actual = notes.add_reference(ref)
+                id_map[old_id] = actual.id
 
-            # Update finding citations with assigned reference IDs
-            # (Simplified - in real version, would match findings to refs)
+            # Remap finding citations through the id_map
             for finding in contrib.findings:
-                # Use all refs from this contribution
-                finding.citations = [r.id for r in contrib.references]
+                finding.citations = [
+                    id_map.get(cid, cid) for cid in finding.citations
+                ]
                 notes.add_finding(finding)
 
             # Store contribution
