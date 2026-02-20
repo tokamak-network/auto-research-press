@@ -661,12 +661,31 @@ class SourceRetriever:
                 page_url = result.get("url", "")
                 description = result.get("description", "")
 
+                # Extract author from meta_url if available
+                author = "Web Source"
+                meta_url = result.get("meta_url", {})
+                if isinstance(meta_url, dict):
+                    author = meta_url.get("author", "") or author
+
+                # Extract year from page_age (publication/update date)
+                year = 0
+                page_age = result.get("page_age", "")
+                if page_age:
+                    year_match = re.search(r'(\d{4})', page_age)
+                    if year_match:
+                        parsed_year = int(year_match.group(1))
+                        # Only use if it's a plausible past publication year
+                        # (not current year — that's just access date for web pages)
+                        from datetime import datetime as _dt
+                        if 1990 <= parsed_year < _dt.now().year:
+                            year = parsed_year
+
                 refs.append(Reference(
                     id=0,
-                    authors=["Web Source"],
+                    authors=[author],
                     title=title,
                     venue=page_url.split("/")[2] if "/" in page_url else "Web",
-                    year=0,
+                    year=year,
                     url=page_url,
                     doi=None,
                     summary=description[:200],
@@ -792,6 +811,41 @@ class SourceRetriever:
             seen_titles.add(norm)
             unique_refs.append(ref)
 
+        # ----------------------------------------------------------
+        # Quality filters: remove refs with unverifiable metadata
+        # ----------------------------------------------------------
+        from datetime import datetime
+        current_year = datetime.now().year
+
+        cleaned: List[Reference] = []
+        for ref in unique_refs:
+            # Drop refs with no year (year=0) — reviewers flag as fabricated
+            if ref.year == 0:
+                logger.debug("Dropping ref with year=0: %s", ref.title)
+                continue
+            # Drop future-dated refs (year > current year)
+            if ref.year > current_year:
+                logger.debug("Dropping future-dated ref (%d): %s", ref.year, ref.title)
+                continue
+            # Drop refs with author "Unknown" — looks fabricated
+            if ref.authors == ["Unknown"]:
+                logger.debug("Dropping ref with Unknown author: %s", ref.title)
+                continue
+            cleaned.append(ref)
+        unique_refs = cleaned
+
+        # Deprioritize web sources: put academic refs first, cap web sources
+        academic_refs = [r for r in unique_refs if r.doi or r.authors != ["Web Source"]]
+        web_refs = [r for r in unique_refs if not r.doi and r.authors == ["Web Source"]]
+        # Keep at most 1 web source when academic sources are sufficient (≥5)
+        if len(academic_refs) >= 8:
+            max_web_kept = 0
+        elif len(academic_refs) >= 5:
+            max_web_kept = 1
+        else:
+            max_web_kept = min(2, max_web)
+        unique_refs = academic_refs + web_refs[:max_web_kept]
+
         # Assign sequential IDs
         for i, ref in enumerate(unique_refs, start=1):
             ref.id = i
@@ -803,11 +857,21 @@ class SourceRetriever:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def format_for_prompt(references: List[Reference]) -> str:
+    def format_for_prompt(references: List[Reference], include_summaries: bool = False) -> str:
         """Format references into a text block suitable for LLM prompts.
 
-        Example output:
+        Args:
+            references: List of Reference objects
+            include_summaries: If True, append summary on next line for
+                context-aware citation placement during revision.
+
+        Example output (include_summaries=False):
           [1] Smith, Lee (2023). "Title". Venue. https://doi.org/10.xxx
+          [2] ...
+
+        Example output (include_summaries=True):
+          [1] Smith, Lee (2023). "Title". Venue. https://doi.org/10.xxx
+              → About: Machine learning for protein folding prediction
           [2] ...
         """
         if not references:
@@ -825,5 +889,8 @@ class SourceRetriever:
             elif ref.url:
                 line += f" {ref.url}"
             lines.append(line)
+
+            if include_summaries and ref.summary:
+                lines.append(f"    → About: {ref.summary[:150]}")
 
         return "\n".join(lines)

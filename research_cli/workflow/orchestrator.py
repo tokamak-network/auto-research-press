@@ -244,17 +244,21 @@ SCORING ADJUSTMENTS (intermediate audience — APPLY THESE):
             "A manuscript that improved from 3/10 to adequate does NOT deserve 8/10 — "
             "score its current absolute quality on the 1-10 scale.\n\n"
             "Citations scoring (same criteria as Round 1):\n"
-            "- 9-10: All claims properly cited with verifiable, real references\n"
-            "- 5-6: Some citations but gaps or dubious references\n"
-            "- 1-2: No bibliography or fabricated references\n"
+            "- 9-10: All claims properly cited with real references, good citation-context match\n"
+            "- 7-8: Most claims cited, minor gaps, references are internally consistent\n"
+            "- 5-6: Some citations but gaps, or some citation-context mismatches\n"
+            "- 3-4: Significant citation gaps or clear misattributions\n"
+            "- 1-2: No bibliography or demonstrably fabricated references (internally contradictory metadata)\n"
             "- A bibliography existing does NOT automatically earn 9-10. Verify reference quality."
         )
     else:
         citations_guidance = (
             "Citations scoring:\n"
-            "- 9-10: All claims properly cited with verifiable, real references\n"
-            "- 5-6: Some citations but gaps or dubious references\n"
-            "- 1-2: No bibliography or fabricated references"
+            "- 9-10: All claims properly cited with real references, good citation-context match\n"
+            "- 7-8: Most claims cited, minor gaps, references are internally consistent\n"
+            "- 5-6: Some citations but gaps, or some citation-context mismatches\n"
+            "- 3-4: Significant citation gaps or clear misattributions\n"
+            "- 1-2: No bibliography or demonstrably fabricated references (internally contradictory metadata)"
         )
 
     review_prompt = f"""Review this research manuscript (Round {round_number}) from your expert perspective.
@@ -281,6 +285,13 @@ CITATION VERIFICATION (check all four levels):
    Flag clear mismatches, but do not flag references simply because you are unfamiliar with them.
 - Fabricated or misattributed references are serious flaws regardless of audience level.
 - Only flag a reference as fabricated if you are confident it is wrong.
+
+IMPORTANT — RECENT REFERENCES ARE EXPECTED:
+Today's date is {datetime.now().strftime('%B %Y')}. References from 2024-2025 are recent but VALID publications.
+arXiv preprints from 2024-2025 (IDs like 2401.xxxxx through 2512.xxxxx) are legitimate and expected.
+DO NOT flag a reference as "fabricated" or "future-dated" merely because you have not seen it.
+A reference is fabricated ONLY if its metadata is internally contradictory (e.g., wrong venue for a known paper,
+author names that don't match the known paper). Being unfamiliar with a paper is NOT evidence of fabrication.
 
 AUTHORING CONSTRAINTS (apply to ALL paper types):
 - Authors cannot conduct new experiments, collect primary data, or run simulations.
@@ -332,7 +343,8 @@ Provide your review in the following JSON format:
 
 {citations_guidance}
 
-Penalize: unsupported claims, fabricated citations. Reward: inline [1], [2] citations, real DOIs/URLs."""
+Penalize: unsupported claims, citation-context mismatches. Reward: inline [1], [2] citations, real DOIs/URLs.
+Remember: a reference you haven't seen is NOT fabricated. Only flag fabrication if metadata is internally contradictory."""
 
     tracker.start_operation(f"review_{specialist_id}")
 

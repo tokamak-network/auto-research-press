@@ -271,11 +271,12 @@ TARGET AUDIENCE: Beginners / Non-specialists
 - Assume no prior domain knowledge"""
         elif audience_level == "intermediate":
             audience_guidance = """
-TARGET AUDIENCE: Intermediate readers (basic domain knowledge assumed)
-- Assume familiarity with fundamental concepts in the field
-- Explain only advanced or specialized terminology
-- Balance theoretical depth with practical applicability
-- Include both conceptual explanations and technical details"""
+TARGET AUDIENCE: Educated readers with basic domain knowledge (think The Economist's science/technology coverage)
+- Assume familiarity with common terms — do NOT define basics
+- Unpack specialist jargon naturally within the prose where it first appears
+- Write in analytical prose — no bullet-point lists for analysis or discussion
+- Ground claims in concrete examples: name specific studies, tools, institutions
+- Balance depth with clarity — precise language without unnecessary complexity"""
 
         # Research type guidance
         research_type_guidance = ""
@@ -316,12 +317,13 @@ Writing rules:
 - Never use "..." or truncate content
 - {"Accessible to non-specialists while maintaining accuracy" if audience_level == "beginner" else "Accessible with basic domain knowledge" if audience_level == "intermediate" else "Written for domain experts"}"""
 
-        # Build references block for injection
+        # Build references block for injection — include summaries for
+        # context-aware citation placement
         refs_block = ""
         if references:
-            refs_text = SourceRetriever.format_for_prompt(references)
+            refs_text = SourceRetriever.format_for_prompt(references, include_summaries=True)
             refs_block = f"""
-VERIFIED SOURCES (use these as primary citations):
+VERIFIED SOURCES (use these as primary citations — read the "About" line):
 {refs_text}
 
 CITATION RULES:
@@ -365,25 +367,16 @@ Common patterns (but feel free to adapt):
 End with ## Conclusion followed by ## References."""
 
         elif audience_level == "intermediate":
-            summary_section = """START WITH: ## TL;DR
-Write EXACTLY 3-5 bullet points (MUST use bullet format, NOT sentences):
-- [First key finding/point in one line]
-- [Second key finding/point in one line]
-- [Third key finding/point in one line]
-- [Fourth key finding/point - optional]
-- [Fifth key finding/point - optional]
-
-Each bullet should be concise (one line) and hit a major point.
-
-THEN: ## Key Takeaways
-List 3-5 main points as bullet points:
-- Each takeaway should be a complete, actionable insight
-- Focus on practical implications and what readers should remember"""
+            summary_section = """START WITH: ## Executive Summary
+Write a single concise paragraph (4-6 sentences) that states the core argument, key findings, and why they matter.
+Do NOT use bullet points. Write in flowing prose.
+This should read like the opening paragraph of an Economist article — authoritative and information-dense."""
 
             structure_guidance = f"""
 Design your own section structure appropriate for this {research_type} content.
 Use clear, descriptive section headings that guide readers.
-Focus on practical value and actionable insights.
+Write in analytical prose throughout — do NOT use bullet-point lists for analysis or discussion.
+Ground abstract claims in concrete examples (name studies, tools, institutions).
 Organize content logically for readers with basic domain knowledge.
 End with ## Conclusion followed by ## References."""
 
@@ -542,10 +535,11 @@ AUDIENCE: Beginner / Non-specialist
 """
         elif audience_level == "intermediate":
             audience_revision_note = """
-AUDIENCE: Intermediate (basic domain knowledge assumed)
-- Fundamental concepts can be assumed
-- Explain only advanced/specialized terminology
-- Balance theoretical depth with practical applicability
+AUDIENCE: Educated readers with basic domain knowledge (Economist-style analytical prose)
+- Fundamental concepts can be assumed — do NOT add basic definitions
+- Unpack specialist terms naturally within the prose, not as separate definitions
+- Write in flowing analytical prose — convert any bullet-point analysis into paragraphs
+- Ground claims in concrete examples (name specific studies, tools, institutions)
 """
 
         # Research type revision guidance
@@ -587,18 +581,23 @@ Revision rules:
 - Flowing academic prose only (no bullet-point lists for analysis, no "..." truncation)
 - Do not add fluff, change scope, or lose valuable existing content"""
 
-        # Build references block for revision
+        # Build references block for revision — include summaries so the LLM
+        # can match each citation to the correct context
         refs_block = ""
         if references:
-            refs_text = SourceRetriever.format_for_prompt(references)
+            refs_text = SourceRetriever.format_for_prompt(references, include_summaries=True)
             refs_block = f"""
-VERIFIED SOURCES (available for citation):
+VERIFIED SOURCES (available for citation — read the "About" line for each source):
 {refs_text}
 
 CITATION RULES FOR REVISION:
+- ONLY cite from the VERIFIED SOURCES list above. Do NOT invent new references or add sources not in this list.
 - Use sequential [1], [2], [3]... numbered by order of first appearance
 - If reviewers noted weak/missing citations, add more from this list
 - Ensure ## References section is complete, with one blank line between entries
+- Every entry in ## References MUST correspond to a source from the VERIFIED SOURCES list above
+- CITATION-CONTEXT MATCH: Read each source's "About" description. Each inline [N] MUST only be placed where the source's actual topic supports the claim. Never cite a source about topic X to support a claim about topic Y.
+- Do NOT cite web news articles or Wikipedia as primary evidence for scientific claims. Use peer-reviewed sources for factual assertions; web sources may only support general context or further reading.
 """
 
         # Build co-author revision notes block
@@ -648,7 +647,7 @@ Reviewers will verify each promise. Any unimplemented commitment will be flagged
                 "   - If you add content in one area, trim elsewhere to stay within limits\n"
             )
 
-        summary_heading = "## Abstract" if audience_level == "professional" else "## TL;DR"
+        summary_heading = "## Abstract" if audience_level == "professional" else "## Executive Summary" if audience_level == "intermediate" else "## TL;DR"
         structure_requirements = (
             "6. Structural requirements (MANDATORY — never remove these sections):\n"
             f"   - The manuscript MUST start with {summary_heading}\n"
@@ -1005,7 +1004,7 @@ Focus on substantive improvements that address reviewer concerns."""
         Returns:
             Manuscript with verified and strengthened citations
         """
-        refs_text = SourceRetriever.format_for_prompt(references)
+        refs_text = SourceRetriever.format_for_prompt(references, include_summaries=True)
 
         system_prompt = """You are a citation verification specialist. Your ONLY job is to strengthen the citation apparatus of a research manuscript.
 
@@ -1016,6 +1015,7 @@ Rules:
 - Ensure the References section at the end lists all cited sources with full details
 - Do not change the manuscript's arguments, structure, or prose — ONLY add/fix citations
 - If a claim cannot be supported by any available reference, flag it with [citation needed]
+- Match each citation to the correct source by reading its "About" description
 - Output the complete manuscript with citations fixed"""
 
         prompt = f"""CITATION VERIFICATION PASS
@@ -1027,7 +1027,7 @@ MANUSCRIPT:
 
 ---
 
-VERIFIED REFERENCES (use these for citations):
+VERIFIED REFERENCES (use these for citations — read the "About" line for each):
 {refs_text}
 
 ---
@@ -1036,7 +1036,7 @@ INSTRUCTIONS:
 1. Read through the manuscript paragraph by paragraph
 2. For each substantive claim, check if it has an inline citation [N]
 3. If a claim lacks citation but a matching reference exists, add the citation
-4. If multiple references support a claim, cite the most relevant one
+4. Read each source's "About" description to match the RIGHT source to each claim
 5. Ensure the References section at the end is complete and matches inline citations
 6. Do NOT change the manuscript content, structure, or arguments — only fix citations
 
