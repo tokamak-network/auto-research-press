@@ -53,14 +53,17 @@ class ClaudeLLM(BaseLLM):
         kwargs.pop("json_mode", None)
 
         async def _call():
-            response = await self.client.messages.create(
+            api_kwargs = dict(
                 model=self.model,
                 messages=messages,
-                system=[{"type": "text", "text": system}] if system else None,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
+            if system:
+                api_kwargs["system"] = [{"type": "text", "text": system}]
+
+            response = await self.client.messages.create(**api_kwargs)
             return LLMResponse(
                 content=response.content[0].text,
                 model=response.model,
@@ -89,14 +92,17 @@ class ClaudeLLM(BaseLLM):
         messages = [{"role": "user", "content": prompt}]
 
         async def _call():
-            async with self.client.messages.stream(
+            stream_kwargs = dict(
                 model=self.model,
                 messages=messages,
-                system=[{"type": "text", "text": system}] if system else None,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
-            ) as stream:
+                **kwargs,
+            )
+            if system:
+                stream_kwargs["system"] = [{"type": "text", "text": system}]
+
+            async with self.client.messages.stream(**stream_kwargs) as stream:
                 async for _chunk in stream.text_stream:
                     pass  # drain the stream to keep connection alive
                 message = await stream.get_final_message()
@@ -134,14 +140,17 @@ class ClaudeLLM(BaseLLM):
         """
         messages = [{"role": "user", "content": prompt}]
 
-        async with self.client.messages.stream(
+        stream_kwargs = dict(
             model=self.model,
             messages=messages,
-            system=[{"type": "text", "text": system}] if system else None,
             temperature=temperature,
             max_tokens=max_tokens,
-            **kwargs
-        ) as stream:
+            **kwargs,
+        )
+        if system:
+            stream_kwargs["system"] = [{"type": "text", "text": system}]
+
+        async with self.client.messages.stream(**stream_kwargs) as stream:
             async for text in stream.text_stream:
                 yield text
 

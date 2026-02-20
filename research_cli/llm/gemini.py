@@ -1,12 +1,9 @@
-"""Google Gemini LLM provider implementation."""
+"""Google Gemini LLM provider implementation using the google-genai SDK."""
 
-import warnings
 from typing import AsyncIterator, Optional
 
-# Suppress FutureWarning from deprecated google.generativeai package on import
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", FutureWarning)
-    import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from .base import BaseLLM, LLMResponse, retry_llm_call
 
@@ -15,19 +12,52 @@ class GeminiLLM(BaseLLM):
     """Google Gemini provider.
 
     Supports Gemini 3.x and 2.x models.
-    Uses the official Google Generative AI Python SDK.
+    Uses the official google-genai SDK with native system_instruction,
+    thinking_config, and request-level timeout support.
     """
 
     def __init__(self, api_key: str, model: str = "gemini-3-flash-preview"):
-        """Initialize Gemini client.
-
-        Args:
-            api_key: Google API key
-            model: Gemini model ID (default: Gemini 3 Flash)
-        """
         super().__init__(api_key, model)
-        genai.configure(api_key=api_key)
-        self.client = genai.GenerativeModel(model)
+        self.client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=300_000),  # 5 min
+        )
+
+    @property
+    def _is_thinking_model(self) -> bool:
+        """Whether this model uses internal thinking tokens."""
+        return any(v in self.model for v in ("2.5", "3-pro", "3-flash"))
+
+    @property
+    def _is_gemini3(self) -> bool:
+        """Whether this model is a Gemini 3.x variant."""
+        return any(v in self.model for v in ("3-pro", "3-flash"))
+
+    def _build_config(
+        self,
+        temperature: float,
+        max_tokens: int,
+        system: Optional[str],
+        **kwargs,
+    ) -> types.GenerateContentConfig:
+        """Build GenerateContentConfig with thinking and json_mode support."""
+        effective_max_tokens = max_tokens
+        if self._is_thinking_model:
+            effective_max_tokens = max(max_tokens * 8, 8192)
+
+        json_mode = kwargs.pop("json_mode", False)
+
+        thinking_config = None
+        if self._is_gemini3:
+            thinking_config = types.ThinkingConfig(thinking_level="LOW")
+
+        return types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=effective_max_tokens,
+            system_instruction=system,
+            thinking_config=thinking_config,
+            response_mime_type="application/json" if json_mode else None,
+        )
 
     async def generate(
         self,
@@ -35,71 +65,15 @@ class GeminiLLM(BaseLLM):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
-        """Generate text using Gemini.
-
-        Args:
-            prompt: User message
-            system: System prompt (prepended to prompt for Gemini)
-            temperature: Sampling temperature
-            max_tokens: Max output tokens
-            **kwargs: Additional Gemini-specific parameters
-
-        Returns:
-            LLMResponse with generated content
-        """
-        # Gemini doesn't have native system prompts, so prepend to user message
-        full_prompt = prompt
-        if system:
-            full_prompt = f"{system}\n\n{prompt}"
-
-        # Gemini thinking models consume thinking tokens from max_output_tokens
-        # Use higher limit to avoid truncation (thinking tokens typically 8x output)
-        effective_max_tokens = max_tokens
-        if any(v in self.model for v in ("2.5", "3-pro", "3-flash")):
-            effective_max_tokens = max(max_tokens * 8, 8192)
-
-        # Support json_mode parameter: force valid JSON output
-        json_mode = kwargs.pop("json_mode", False)
-        if json_mode:
-            kwargs.setdefault("response_mime_type", "application/json")
-
-        generation_config = genai.GenerationConfig(
-            temperature=temperature,
-            max_output_tokens=effective_max_tokens,
-            **kwargs
-        )
+        config = self._build_config(temperature, max_tokens, system, **kwargs)
 
         async def _call():
-            response = await self.client.generate_content_async(
-                full_prompt,
-                generation_config=generation_config,
+            response = await self.client.aio.models.generate_content(
+                model=self.model, contents=prompt, config=config,
             )
-
-            # Extract token counts if available
-            input_tokens = None
-            output_tokens = None
-            if hasattr(response, 'usage_metadata'):
-                input_tokens = response.usage_metadata.prompt_token_count
-                output_tokens = response.usage_metadata.candidates_token_count
-
-            # Extract stop reason if available
-            stop_reason = None
-            if hasattr(response, 'candidates') and response.candidates:
-                finish_reason = response.candidates[0].finish_reason
-                # Gemini uses enum: 1=STOP (normal), 2=MAX_TOKENS, 3=SAFETY, etc.
-                if finish_reason is not None:
-                    stop_reason = finish_reason.name if hasattr(finish_reason, 'name') else str(finish_reason)
-
-            return LLMResponse(
-                content=response.text,
-                model=self.model,
-                provider="google",
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                stop_reason=stop_reason,
-            )
+            return self._parse_response(response)
 
         return await retry_llm_call(_call)
 
@@ -109,7 +83,7 @@ class GeminiLLM(BaseLLM):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate text using streaming to prevent proxy idle-connection timeouts.
 
@@ -117,60 +91,21 @@ class GeminiLLM(BaseLLM):
         keeping the HTTP connection alive with incremental chunks. Returns the
         same LLMResponse once the full message has been received.
         """
-        full_prompt = prompt
-        if system:
-            full_prompt = f"{system}\n\n{prompt}"
-
-        effective_max_tokens = max_tokens
-        if any(v in self.model for v in ("2.5", "3-pro", "3-flash")):
-            effective_max_tokens = max(max_tokens * 8, 8192)
-
-        generation_config = genai.GenerationConfig(
-            temperature=temperature,
-            max_output_tokens=effective_max_tokens,
-            **kwargs
-        )
+        config = self._build_config(temperature, max_tokens, system, **kwargs)
 
         async def _call():
-            response = await self.client.generate_content_async(
-                full_prompt,
-                generation_config=generation_config,
-                stream=True,
-            )
-
-            # Drain the stream to keep connection alive; collect text chunks
             chunks_text = []
             last_chunk = None
-            async for chunk in response:
+            stream = await self.client.aio.models.generate_content_stream(
+                model=self.model, contents=prompt, config=config,
+            )
+            async for chunk in stream:
                 last_chunk = chunk
                 if chunk.text:
                     chunks_text.append(chunk.text)
 
             content = "".join(chunks_text)
-
-            # Extract token counts and stop reason from the last chunk
-            input_tokens = None
-            output_tokens = None
-            stop_reason = None
-
-            if last_chunk:
-                if hasattr(last_chunk, 'usage_metadata') and last_chunk.usage_metadata:
-                    input_tokens = last_chunk.usage_metadata.prompt_token_count
-                    output_tokens = last_chunk.usage_metadata.candidates_token_count
-
-                if hasattr(last_chunk, 'candidates') and last_chunk.candidates:
-                    finish_reason = last_chunk.candidates[0].finish_reason
-                    if finish_reason is not None:
-                        stop_reason = finish_reason.name if hasattr(finish_reason, 'name') else str(finish_reason)
-
-            return LLMResponse(
-                content=content,
-                model=self.model,
-                provider="google",
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                stop_reason=stop_reason,
-            )
+            return self._parse_response(last_chunk, content_override=content)
 
         return await retry_llm_call(_call)
 
@@ -180,46 +115,46 @@ class GeminiLLM(BaseLLM):
         system: Optional[str] = None,
         temperature: float = 1.0,
         max_tokens: int = 4096,
-        **kwargs
+        **kwargs,
     ) -> AsyncIterator[str]:
-        """Stream text generation from Gemini.
+        config = self._build_config(temperature, max_tokens, system, **kwargs)
 
-        Args:
-            prompt: User message
-            system: System prompt
-            temperature: Sampling temperature
-            max_tokens: Max output tokens
-            **kwargs: Additional parameters
-
-        Yields:
-            Text chunks as they arrive
-        """
-        full_prompt = prompt
-        if system:
-            full_prompt = f"{system}\n\n{prompt}"
-
-        # Gemini 2.5 thinking models consume thinking tokens from max_output_tokens
-        effective_max_tokens = max_tokens
-        if any(v in self.model for v in ("2.5", "3-pro", "3-flash")):
-            effective_max_tokens = max(max_tokens * 8, 8192)
-
-        generation_config = genai.GenerationConfig(
-            temperature=temperature,
-            max_output_tokens=effective_max_tokens,
-            **kwargs
+        stream = await self.client.aio.models.generate_content_stream(
+            model=self.model, contents=prompt, config=config,
         )
-
-        response = await self.client.generate_content_async(
-            full_prompt,
-            generation_config=generation_config,
-            stream=True,
-        )
-
-        async for chunk in response:
+        async for chunk in stream:
             if chunk.text:
                 yield chunk.text
 
+    async def close(self):
+        """No-op for compatibility — writer.py calls self.llm.client.close()."""
+        pass
+
+    def _parse_response(self, response, *, content_override: Optional[str] = None) -> LLMResponse:
+        """Extract content, token counts, and stop reason from a response object."""
+        content = content_override if content_override is not None else (response.text if response else "")
+
+        input_tokens = None
+        output_tokens = None
+        if response and hasattr(response, "usage_metadata") and response.usage_metadata:
+            input_tokens = getattr(response.usage_metadata, "prompt_token_count", None)
+            output_tokens = getattr(response.usage_metadata, "candidates_token_count", None)
+
+        stop_reason = None
+        if response and hasattr(response, "candidates") and response.candidates:
+            finish_reason = response.candidates[0].finish_reason
+            if finish_reason is not None:
+                stop_reason = finish_reason.name if hasattr(finish_reason, "name") else str(finish_reason)
+
+        return LLMResponse(
+            content=content,
+            model=self.model,
+            provider="google",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            stop_reason=stop_reason,
+        )
+
     @property
     def provider_name(self) -> str:
-        """Provider identifier."""
         return "google"

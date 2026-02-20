@@ -1,11 +1,11 @@
 {
-  "_comment": "Model configuration using 3-tier structure: Reasoning (Opus) > Support (Sonnet) > Light (Flash). Gemini models use higher max_tokens due to thinking token overhead.",
+  "_comment": "Model configuration using 3-tier structure: Reasoning (Gemini 2.5 Pro) > Support (Sonnet) > Light (Flash). Gemini models use higher max_tokens due to thinking token overhead.",
   "tiers": {
     "reasoning": {
-      "primary": {"model": "gemini-3-pro-preview", "provider": "google"},
+      "primary": {"model": "gemini-2.5-pro", "provider": "google"},
       "fallback": [
-        {"model": "claude-opus-4-6", "provider": "anthropic"},
-        {"model": "claude-sonnet-4-5", "provider": "anthropic"}
+        {"model": "claude-sonnet-4-5", "provider": "anthropic"},
+        {"model": "claude-opus-4-6", "provider": "anthropic"}
       ]
     },
     "support": {
@@ -32,16 +32,13 @@
     "moderator": { "tier": "light", "temperature": 0.3, "max_tokens": 8192 },
     "reviewer": { "tier": "reasoning", "temperature": 0.3, "max_tokens": 8192 },
     "reviewer_rotation": [
-      {"provider": "google", "model": "gemini-3-pro-preview", "fallback": [
-        {"provider": "google", "model": "gemini-2.5-flash"},
+      {"provider": "google", "model": "gemini-2.5-pro", "fallback": [
         {"provider": "anthropic", "model": "claude-sonnet-4-5"}
       ]},
-      {"provider": "google", "model": "gemini-3-pro-preview", "fallback": [
-        {"provider": "google", "model": "gemini-2.5-flash"},
+      {"provider": "google", "model": "gemini-2.5-pro", "fallback": [
         {"provider": "anthropic", "model": "claude-sonnet-4-5"}
       ]},
-      {"provider": "google", "model": "gemini-3-pro-preview", "fallback": [
-        {"provider": "google", "model": "gemini-2.5-flash"},
+      {"provider": "google", "model": "gemini-2.5-pro", "fallback": [
         {"provider": "anthropic", "model": "claude-sonnet-4-5"}
       ]}
     ],

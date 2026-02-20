@@ -10,7 +10,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research_cli.model_config import _load_config, _create_llm
+from dotenv import load_dotenv
+load_dotenv()
+
+from research_cli.model_config import (
+    _load_config, _create_llm, get_role_config, get_reviewer_models,
+)
 
 
 async def test_model(provider: str, model: str) -> dict:
@@ -27,7 +32,7 @@ async def test_model(provider: str, model: str) -> dict:
             "provider": provider,
             "status": "OK",
             "response": response.content[:80],
-            "tokens": response.total_tokens,
+            "tokens": f"in={response.input_tokens} out={response.output_tokens}",
         }
     except Exception as e:
         return {
@@ -40,18 +45,31 @@ async def test_model(provider: str, model: str) -> dict:
 
 async def main():
     config = _load_config()
-    pricing = config.get("pricing", {})
 
-    # Collect unique model+provider pairs from all roles
+    # Collect unique model+provider pairs from tiers + reviewer_rotation
     seen = set()
     tests = []
-    for role_name, role_data in config["roles"].items():
-        primary = role_data["primary"]
+
+    # From tiers
+    for tier_name, tier_data in config.get("tiers", {}).items():
+        primary = tier_data["primary"]
         key = (primary["provider"], primary["model"])
         if key not in seen:
             seen.add(key)
             tests.append(key)
-        for fb in role_data.get("fallback", []):
+        for fb in tier_data.get("fallback", []):
+            key = (fb["provider"], fb["model"])
+            if key not in seen:
+                seen.add(key)
+                tests.append(key)
+
+    # From reviewer_rotation
+    for r in config.get("roles", {}).get("reviewer_rotation", []):
+        key = (r["provider"], r["model"])
+        if key not in seen:
+            seen.add(key)
+            tests.append(key)
+        for fb in r.get("fallback", []):
             key = (fb["provider"], fb["model"])
             if key not in seen:
                 seen.add(key)
@@ -59,7 +77,7 @@ async def main():
 
     print(f"Testing {len(tests)} unique model+provider combinations...\n")
     print(f"{'Provider':12s} {'Model':30s} {'Status':8s} {'Details'}")
-    print("-" * 90)
+    print("-" * 100)
 
     results = await asyncio.gather(*[test_model(p, m) for p, m in tests])
 
@@ -67,14 +85,15 @@ async def main():
     fail = 0
     for r in results:
         if r["status"] == "OK":
-            detail = f"{r['response'][:50]}... ({r['tokens']} tokens)"
+            detail = f"{r['response'][:50]}  ({r['tokens']})"
             ok += 1
         else:
             detail = r["error"]
             fail += 1
         print(f"{r['provider']:12s} {r['model']:30s} {r['status']:8s} {detail}")
 
-    print(f"\n{ok} OK, {fail} FAIL out of {len(tests)} models")
+    print(f"\n{'='*100}")
+    print(f"Result: {ok} OK, {fail} FAIL out of {len(tests)} models")
     return fail == 0
 
 
