@@ -1,5 +1,7 @@
 """Desk editor agent for initial manuscript screening (desk reject)."""
 
+from typing import Optional
+
 from ..model_config import create_llm_for_role
 
 
@@ -20,12 +22,13 @@ class DeskEditorAgent:
         self.llm = create_llm_for_role(role)
         self.model = self.llm.model
 
-    async def screen(self, manuscript: str, topic: str) -> dict:
+    async def screen(self, manuscript: str, topic: str, category: Optional[str] = None) -> dict:
         """Screen a manuscript for obvious fatal flaws.
 
         Args:
             manuscript: The manuscript text to screen
             topic: The intended research topic
+            category: Human-readable academic category (e.g. "Computer Science (Theory & Algorithms)")
 
         Returns:
             Dictionary with decision, reason, and token count:
@@ -39,8 +42,18 @@ class DeskEditorAgent:
             "When in doubt, PASS."
         )
 
-        prompt = f"""Screen this manuscript submitted for the topic: "{topic}"
+        category_line = ""
+        category_check = ""
+        if category:
+            category_line = f'\nAssigned academic field: "{category}"\n'
+            category_check = (
+                "5. The manuscript's actual subject matter clearly belongs to a "
+                "completely different academic field than the assigned field "
+                "(e.g. a biology paper assigned to Computer Science)\n"
+            )
 
+        prompt = f"""Screen this manuscript submitted for the topic: "{topic}"
+{category_line}
 MANUSCRIPT (first 3000 chars):
 {manuscript[:3000]}
 
@@ -51,7 +64,7 @@ Desk-reject ONLY if ANY of these apply:
 2. Manuscript is extremely short or lacks any structure (no sections/headings)
 3. Text is meaningless, garbled, or clearly non-academic (e.g. lorem ipsum)
 4. Critical sections are entirely missing (no introduction AND no analysis AND no conclusion)
-
+{category_check}
 If the manuscript has reasonable content related to the topic, PASS it.
 
 Respond in JSON:

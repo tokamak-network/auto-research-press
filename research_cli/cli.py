@@ -356,7 +356,7 @@ async def _run_workflow(
 ):
     """Run the complete workflow asynchronously."""
     from .agents import TeamComposerAgent
-    from .categories import suggest_category_from_topic
+    from .categories import suggest_category_llm
     from .interactive import TeamEditor
     from .workflow import WorkflowOrchestrator
     from .models.expert import ExpertConfig
@@ -450,7 +450,7 @@ async def _run_workflow(
     if category_major:
         category = {"major": category_major, "subfield": category_subfield or ""}
     else:
-        category = suggest_category_from_topic(topic)
+        category = await suggest_category_llm(topic)
 
     # Create and run orchestrator
     orchestrator = WorkflowOrchestrator(
@@ -510,7 +510,7 @@ async def _run_collaborative_from_run(
     from datetime import datetime
     from .agents import TeamComposerAgent
     from .agents.writer_team_composer import WriterTeamComposerAgent
-    from .categories import suggest_category_from_topic, get_category_name
+    from .categories import suggest_category_llm, get_category_name
     from .interactive import TeamEditor
     from .models.author import AuthorRole, WriterTeam
     from .models.expert import ExpertConfig
@@ -527,7 +527,7 @@ async def _run_collaborative_from_run(
     if category_major:
         category = {"major": category_major, "subfield": category_subfield or ""}
     else:
-        category = suggest_category_from_topic(topic)
+        category = await suggest_category_llm(topic)
 
     major_field = category.get("major", "computer_science")
     subfield = category.get("subfield", "")

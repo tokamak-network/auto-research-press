@@ -904,7 +904,9 @@ class WorkflowOrchestrator:
         console.print("\n[cyan]Desk editor screening manuscript...[/cyan]")
         with self._spinner("[cyan]Desk editor screening...") as progress:
             task = progress.add_task("[cyan]Desk editor screening...", total=None)
-            desk_result = await self.desk_editor.screen(current_manuscript, self.topic)
+            desk_result = await self.desk_editor.screen(
+                current_manuscript, self.topic, category=self.domain_desc
+            )
             self._desk_result = desk_result
             self.tracker.record_desk_editor(
                 tokens=desk_result.get("tokens", 0),

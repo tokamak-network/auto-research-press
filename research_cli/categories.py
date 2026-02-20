@@ -455,7 +455,12 @@ Example: social_sciences/anthropology"""
         import logging
         logging.getLogger(__name__).warning(f"LLM category classification failed: {e}, falling back to keywords")
 
-    return suggest_category_from_topic(topic)
+    result = suggest_category_from_topic(topic)
+    # If keyword matching also failed, default to natural_sciences/biology
+    # (safer than computer_science/theory for unknown topics)
+    if result.get("major") is None:
+        return {"major": "natural_sciences", "subfield": "biology"}
+    return result
 
 
 def suggest_category_from_topic(topic: str) -> dict:
@@ -547,5 +552,12 @@ def suggest_category_from_topic(topic: str) -> dict:
         return {"major": "engineering", "subfield": "civil"}
     if any(kw in topic_lower for kw in ['materials science', 'nanomaterial', 'metallurgy', 'composite', 'ceramic']):
         return {"major": "engineering", "subfield": "materials"}
+    # Biology / biotech keywords (broad net for keyword fallback)
+    if any(kw in topic_lower for kw in ['gene', 'genome', 'crispr', 'biotech', 'stem cell', 'cell', 'enzyme', 'amino acid', 'peptide', 'microbiome', 'pathogen', 'virus', 'bacteria']):
+        return {"major": "natural_sciences", "subfield": "biology"}
+    # Medicine / clinical (broad net)
+    if any(kw in topic_lower for kw in ['therapy', 'treatment', 'cancer', 'tumor', 'immune', 'disease', 'disorder', 'symptom', 'diagnosis', 'clinical']):
+        return {"major": "medicine_health", "subfield": "clinical"}
 
-    return {"major": "computer_science", "subfield": "theory"}
+    # No keyword matched — return None to signal caller should use LLM
+    return {"major": None, "subfield": None}
